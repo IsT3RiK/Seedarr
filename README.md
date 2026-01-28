@@ -27,15 +27,26 @@ Accessible sur http://localhost:8000
 
 ## Configuration
 
-1. **Settings** (`/settings`) - TMDB API key, qBittorrent, FlareSolverr, chemins
-2. **Trackers** (`/trackers`) - Ajouter vos trackers (URL, passkey, adapter)
-3. **Templates** (`/bbcode-templates`) - Personnaliser les presentations
+Apres le premier lancement, configurez l'application via l'interface web:
+
+1. **Settings** (`/settings`)
+   - TMDB API Key (obligatoire) - https://www.themoviedb.org/settings/api
+   - qBittorrent (host, username, password)
+   - FlareSolverr URL (si tracker avec Cloudflare)
+
+2. **Trackers** (`/trackers`)
+   - Ajouter vos trackers (URL, passkey, adapter type)
+   - Tester la connexion
+   - Activer le tracker
+
+3. **Templates** (`/bbcode-templates`) - Optionnel
+   - Personnaliser les presentations BBCode
 
 ## Utilisation
 
 1. **File Manager** - Selectionner un fichier media
 2. **Add to Queue** - Ajouter a la file d'attente
-3. **Process** - Le pipeline s'execute automatiquement (scan -> analyze -> rename -> metadata -> upload)
+3. **Process** - Le pipeline s'execute automatiquement
 4. **Dashboard** - Suivre la progression en temps reel
 
 ## Pages
@@ -59,11 +70,13 @@ Accessible sur http://localhost:8000
 | C411 | c411 | API Key | Non |
 | Generic | generic | Passkey | Non |
 
-## Services requis
+## Variables d'environnement (.env)
 
-- **TMDB API Key** - https://www.themoviedb.org/settings/api
-- **qBittorrent** - Pour le seeding
-- **FlareSolverr** - Si tracker avec Cloudflare
+| Variable | Description | Defaut |
+|----------|-------------|--------|
+| `APP_PORT` | Port de l'application | 8000 |
+| `MEDIA_PATH` | Chemin vers vos fichiers media | ./media |
+| `TZ` | Timezone | Europe/Paris |
 
 ## API
 
@@ -84,12 +97,6 @@ source venv/bin/activate  # Linux/Mac
 pip install -r backend/requirements.txt
 cd backend && alembic upgrade head
 python dev.py
-```
-
-### Tests
-
-```bash
-pytest backend/tests -v
 ```
 
 ## License
