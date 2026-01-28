@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Seedarr v2.0{% endblock %}</title>
+
+    <!-- Theme Initialization (must be before CSS to prevent flash) -->
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+
+    <!-- TailwindCSS + DaisyUI -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@3.9.4/dist/full.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+    <!-- Custom Dashboard CSS -->
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+
+    <!-- Hot Reload (Development Only) -->
+    <script>
+        (function() {
+            // Only run in development mode when WebSocket is available
+            if (typeof WebSocket === 'undefined') return;
+
+            let reconnectDelay = 1000; // Start with 1 second
+            const maxReconnectDelay = 8000; // Max 8 seconds
+            let ws = null;
+            let reconnectTimeout = null;
+
+            function connect() {
+                try {
+                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    const wsUrl = `${protocol}//${window.location.host}/__hot_reload__`;
+
+                    ws = new WebSocket(wsUrl);
+
+                    ws.onopen = function() {
+                        console.log('Hot reload: Connected');
+                        reconnectDelay = 1000; // Reset delay on successful connection
+                    };
+
+                    ws.onmessage = function(event) {
+                        console.log('Hot reload: Reloading page...');
+                        window.location.reload();
+                    };
+
+                    ws.onerror = function(error) {
+                        console.log('Hot reload: Connection error');
+                    };
+
+                    ws.onclose = function() {
+                        console.log(`Hot reload: Disconnected, reconnecting in ${reconnectDelay}ms...`);
+
+                        // Clear any existing timeout
+                        if (reconnectTimeout) {
+                            clearTimeout(reconnectTimeout);
+                        }
+
+                        // Attempt to reconnect with exponential backoff
+                        reconnectTimeout = setTimeout(function() {
+                            reconnectDelay = Math.min(reconnectDelay * 2, maxReconnectDelay);
+                            connect();
+                        }, reconnectDelay);
+                    };
+                } catch (error) {
+                    console.log('Hot reload: Failed to connect', error);
+                }
+            }
+
+            // Initial connection attempt
+            connect();
+        })();
+    </script>
+
+    <style>
+        /* WireGuard-Inspired Layout Styles */
+        .dashboard-layout {
+            display: flex;
+            min-height: 100vh;
+            background: var(--bg-base, #0f172a);
+        }
+
+        /* Theme variables for dark mode */
+        [data-theme="dark"] {
+            --bg-base: #0f172a;
+            --bg-sidebar: #1e293b;
+            --border-color: #334155;
+            --text-primary: #fff;
+            --text-secondary: #94a3b8;
+            --nav-hover: #334155;
+            --nav-active-bg: #1e40af;
+            --nav-active-border: #3b82f6;
+        }
+
+        /* Theme variables for light mode */
+        [data-theme="light"] {
+            --bg-base: #f1f5f9;
+            --bg-sidebar: #ffffff;
+            --border-color: #e2e8f0;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --nav-hover: #f1f5f9;
+            --nav-active-bg: #dbeafe;
+            --nav-active-border: #3b82f6;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 1rem 0;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1.5rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover {
+            background: var(--nav-hover);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: var(--nav-active-bg);
+            color: var(--text-primary);
+            border-left-color: var(--nav-active-border);
+        }
+
+        [data-theme="light"] .nav-item.active {
+            color: #1e40af;
+        }
+
+        .nav-item svg {
+            width: 20px;
+            height: 20px;
+            margin-right: 0.75rem;
+        }
+
+        .main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            margin-left: 280px;
+        }
+
+        .top-bar {
+            background: var(--bg-sidebar);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Theme Toggle Button */
+        .theme-toggle {
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .theme-toggle:hover {
+            background: var(--nav-hover);
+            color: var(--text-primary);
+        }
+
+        .theme-toggle svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Show/hide icons based on theme */
+        [data-theme="dark"] .theme-toggle .sun-icon { display: none; }
+        [data-theme="dark"] .theme-toggle .moon-icon { display: block; }
+        [data-theme="light"] .theme-toggle .sun-icon { display: block; }
+        [data-theme="light"] .theme-toggle .moon-icon { display: none; }
+
+        .service-health {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .health-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: #94a3b8;
+        }
+
+        .health-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .health-dot.warning {
+            background: #f59e0b;
+        }
+
+        .health-dot.error {
+            background: #ef4444;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .sidebar {
+                left: -280px;
+                z-index: 1000;
+                transition: left 0.3s ease;
+            }
+
+            .sidebar.open {
+                left: 0;
+            }
+
+            .main-container {
+                margin-left: 0;
+                width: 100%;
+            }
+        }
+    </style>
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-base-100">
+    <div class="dashboard-layout">
+        <!-- Left Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="text-xl font-bold text-white flex items-center">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    Seedarr
+                </h1>
+                <p class="text-sm text-gray-400 mt-1">v2.0</p>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item {% if request.url.path == '/dashboard' %}active{% endif %}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                    </svg>
+                    Dashboard
+                </a>
+
+                <a href="/queue" class="nav-item {% if request.url.path == '/queue' %}active{% endif %}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                    </svg>
+                    Queue
+                </a>
+
+                <a href="/filemanager" class="nav-item {% if request.url.path == '/filemanager' or request.url.path.startswith('/filemanager') %}active{% endif %}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                    </svg>
+                    File Manager
+                </a>
+
+                <a href="/history" class="nav-item {% if request.url.path == '/history' %}active{% endif %}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    History
+                </a>
+
+                <a href="/settings" class="nav-item {% if request.url.path == '/settings' %}active{% endif %}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    Settings
+                </a>
+
+                <a href="/trackers" class="nav-item {% if request.url.path == '/trackers' %}active{% endif %}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
+                    </svg>
+                    Trackers
+                </a>
+
+                <a href="/statistics" class="nav-item {% if request.url.path == '/statistics' %}active{% endif %}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    Statistics
+                </a>
+
+                <a href="/templates" class="nav-item {% if request.url.path == '/templates' %}active{% endif %}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                    </svg>
+                    Templates
+                </a>
+
+                <a href="/presentations" class="nav-item {% if request.url.path == '/presentations' %}active{% endif %}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
+                    </svg>
+                    Presentations
+                </a>
+
+                <a href="/logs" class="nav-item {% if request.url.path == '/logs' %}active{% endif %}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Logs
+                </a>
+            </nav>
+
+            <div class="p-4 border-t border-gray-700">
+                <!-- Service Health Monitors - Loaded via HTMX -->
+                <div class="text-xs text-gray-500 mb-2">Services Status</div>
+                <div class="service-health"
+                     hx-get="/api/system/health"
+                     hx-trigger="load, every 30s"
+                     hx-swap="innerHTML">
+                    <!-- Loading placeholder -->
+                    <div class="health-indicator">
+                        <span class="health-dot warning"></span>
+                        <span>Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Container -->
+        <div class="main-container">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <div class="flex items-center">
+                    <button class="md:hidden mr-4 text-gray-400 hover:text-white" onclick="toggleSidebar()">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                    </button>
+                    <h2 class="text-lg font-semibold" style="color: var(--text-primary)">{% block page_title %}Dashboard{% endblock %}</h2>
+                </div>
+                <div class="flex items-center gap-2">
+                    <!-- Theme Toggle -->
+                    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+                        <!-- Sun icon (shown in light mode) -->
+                        <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                        </svg>
+                        <!-- Moon icon (shown in dark mode) -->
+                        <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Main Content Area -->
+            <main class="main-content">
+                {% block content %}
+                <!-- Page content goes here -->
+                {% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Mobile Sidebar Toggle Script -->
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            sidebar.classList.toggle('open');
+        }
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', function(event) {
+            const sidebar = document.querySelector('.sidebar');
+            const toggleBtn = event.target.closest('button');
+
+            if (window.innerWidth <= 768 &&
+                sidebar.classList.contains('open') &&
+                !sidebar.contains(event.target) &&
+                !toggleBtn) {
+                sidebar.classList.remove('open');
+            }
+        });
+
+        // Theme Toggle Function
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+
+            // Dispatch event for components that need to know about theme changes
+            window.dispatchEvent(new CustomEvent('themechange', { detail: { theme: newTheme } }));
+        }
+
+        // Listen for system theme preference changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+            // Only auto-switch if user hasn't manually set a preference
+            if (!localStorage.getItem('theme')) {
+                const newTheme = e.matches ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', newTheme);
+            }
+        });
+    </script>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

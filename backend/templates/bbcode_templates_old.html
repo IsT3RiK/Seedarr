@@ -1,0 +1,1101 @@
+{% extends "base.html" %}
+
+{% block title %}BBCode Templates - Seedarr{% endblock %}
+
+{% block page_title %}BBCode Templates{% endblock %}
+
+{% block content %}
+<div class="templates-container">
+    <!-- Left Panel: Templates List -->
+    <div class="templates-sidebar">
+        <div class="sidebar-header">
+            <h2>Mes Templates</h2>
+            <button class="btn btn-primary btn-sm" onclick="createNewTemplate()">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Nouveau
+            </button>
+        </div>
+        <div class="templates-list" id="templates-list">
+            {% for template in templates %}
+            <div class="template-item {% if loop.first %}active{% endif %}"
+                 data-id="{{ template.id }}"
+                 onclick="loadTemplate({{ template.id }})">
+                <div class="template-item-header">
+                    <span class="template-name">{{ template.name }}</span>
+                    {% if template.is_default %}
+                    <span class="badge-default">Defaut</span>
+                    {% endif %}
+                </div>
+                <div class="template-item-meta">
+                    {{ template.updated_at.strftime('%d/%m/%Y %H:%M') if template.updated_at else '' }}
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-list">
+                <p>Aucun template</p>
+                <button class="btn btn-primary btn-sm" onclick="createNewTemplate()">Creer un template</button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Main Content: Editor + Preview -->
+    <div class="editor-main">
+        <!-- Editor Header -->
+        <div class="editor-header">
+            <div class="editor-title-row">
+                <input type="text" id="template-name" class="input-title" placeholder="Nom du template" value="">
+                <input type="hidden" id="template-id" value="">
+            </div>
+            <div class="editor-actions">
+                <button class="btn btn-secondary" onclick="setAsDefault()" id="btn-set-default" title="Definir par defaut">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
+                    </svg>
+                </button>
+                <button class="btn btn-danger" onclick="deleteCurrentTemplate()" id="btn-delete" title="Supprimer">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                </button>
+                <button class="btn btn-primary" onclick="saveTemplate()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Sauvegarder
+                </button>
+            </div>
+        </div>
+
+        <!-- Description -->
+        <div class="editor-description">
+            <input type="text" id="template-description" class="input-description" placeholder="Description du template (optionnel)">
+        </div>
+
+        <!-- Variables Panel -->
+        <div class="variables-panel">
+            <div class="variables-section">
+                <span class="variables-label">TMDB:</span>
+                <div class="variables-chips">
+                    {% for key, desc in variables.tmdb.items() %}
+                    <button class="var-chip" onclick="insertVariable('{{ key }}')" title="{{ desc }}">{{ key }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="variables-section">
+                <span class="variables-label">Casting:</span>
+                <div class="variables-chips">
+                    {% for key, desc in variables.cast.items() %}
+                    <button class="var-chip var-chip-cast" onclick="insertVariable('{{ key }}')" title="{{ desc }}">{{ key }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="variables-section">
+                <span class="variables-label">MediaInfo:</span>
+                <div class="variables-chips">
+                    {% for key, desc in variables.mediainfo.items() %}
+                    <button class="var-chip" onclick="insertVariable('{{ key }}')" title="{{ desc }}">{{ key }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- BBCode Toolbar -->
+        <div class="bbcode-toolbar">
+            <button type="button" class="toolbar-btn" onclick="insertBBCode('b')" title="Gras"><b>B</b></button>
+            <button type="button" class="toolbar-btn" onclick="insertBBCode('i')" title="Italique"><i>I</i></button>
+            <button type="button" class="toolbar-btn" onclick="insertBBCode('u')" title="Souligne"><u>U</u></button>
+            <button type="button" class="toolbar-btn" onclick="insertBBCode('center')" title="Centrer">Center</button>
+            <button type="button" class="toolbar-btn" onclick="insertBBCode('quote')" title="Citation">Quote</button>
+            <button type="button" class="toolbar-btn" onclick="insertBBCode('img')" title="Image">Img</button>
+            <button type="button" class="toolbar-btn" onclick="insertBBCodeWithAttr('color', '#eab308')" title="Couleur">Color</button>
+            <button type="button" class="toolbar-btn" onclick="insertBBCodeWithAttr('size', '6')" title="Taille">Size</button>
+            <button type="button" class="toolbar-btn" onclick="insertBBCode('url')" title="Lien">URL</button>
+        </div>
+
+        <!-- Split View: Editor + Preview -->
+        <div class="split-view">
+            <!-- Code Editor -->
+            <div class="editor-pane">
+                <div class="pane-header">
+                    <span>Code BBCode</span>
+                </div>
+                <textarea id="template-content" class="code-editor" placeholder="Entrez votre template BBCode ici...
+Utilisez les variables comme {{title}}, {{year}}, {{poster_url}}, etc."></textarea>
+            </div>
+
+            <!-- Live Preview -->
+            <div class="preview-pane">
+                <div class="pane-header">
+                    <span>Apercu en direct</span>
+                    <div class="preview-toggle">
+                        <button class="toggle-btn active" id="btn-preview-html" onclick="setPreviewMode('html')">Rendu</button>
+                        <button class="toggle-btn" id="btn-preview-bbcode" onclick="setPreviewMode('bbcode')">BBCode</button>
+                    </div>
+                </div>
+                <div id="preview-content" class="preview-area">
+                    <div class="preview-placeholder">
+                        Commencez a editer pour voir l'apercu...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Main Container */
+.templates-container {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+    max-width: 100%;
+    min-height: calc(100vh - 120px);
+}
+
+/* Sidebar */
+.templates-sidebar {
+    width: 240px;
+    min-width: 240px;
+    max-width: 240px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    align-self: flex-start;
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 140px);
+    overflow: hidden;
+}
+
+.sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-header h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.templates-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+.template-item {
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 0.25rem;
+    border: 1px solid transparent;
+}
+
+.template-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.template-item.active {
+    background: rgba(234, 179, 8, 0.1);
+    border-color: var(--accent-color);
+}
+
+.template-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.template-name {
+    font-weight: 500;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.badge-default {
+    background: var(--accent-color);
+    color: #000;
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.template-item-meta {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.empty-list {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--text-muted);
+}
+
+/* Editor Main */
+.editor-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    min-width: 0;
+}
+
+.editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    gap: 1rem;
+}
+
+.editor-title-row {
+    flex: 1;
+}
+
+.input-title {
+    width: 100%;
+    background: transparent;
+    border: none;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    padding: 0.25rem 0;
+}
+
+.input-title:focus {
+    outline: none;
+}
+
+.input-title::placeholder {
+    color: var(--text-muted);
+}
+
+.editor-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.editor-description {
+    padding: 0 1rem 0.5rem 1rem;
+}
+
+.input-description {
+    width: 100%;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+}
+
+.input-description::placeholder {
+    color: #6b7280;
+    opacity: 1;
+}
+
+.input-description:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+/* Variables Panel */
+.variables-panel {
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.variables-section {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.variables-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fbbf24;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    min-width: 80px;
+}
+
+.variables-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.var-chip {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 0.375rem;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.7rem;
+    font-family: 'Consolas', monospace;
+    color: #93c5fd;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-weight: 500;
+}
+
+.var-chip:hover {
+    border-color: #3b82f6;
+    color: #60a5fa;
+    background: rgba(59, 130, 246, 0.2);
+    transform: translateY(-1px);
+}
+
+.var-chip-cast {
+    background: rgba(147, 51, 234, 0.1);
+    border-color: rgba(147, 51, 234, 0.3);
+    color: #c4b5fd;
+}
+
+.var-chip-cast:hover {
+    border-color: #9333ea;
+    color: #a78bfa;
+    background: rgba(147, 51, 234, 0.2);
+    transform: translateY(-1px);
+}
+
+/* BBCode Toolbar */
+.bbcode-toolbar {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
+}
+
+.toolbar-btn {
+    background: rgba(51, 65, 85, 0.5);
+    border: 1px solid rgba(100, 116, 139, 0.3);
+    border-radius: 0.375rem;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.15s;
+    min-width: 42px;
+}
+
+.toolbar-btn:hover {
+    border-color: var(--accent-color);
+    color: #fbbf24;
+    background: rgba(251, 191, 36, 0.1);
+    transform: translateY(-1px);
+}
+
+/* Split View */
+.split-view {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.editor-pane {
+    width: 50%;
+    min-width: 350px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border-color);
+    min-height: 0;
+}
+
+.preview-pane {
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+.pane-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: rgba(30, 41, 59, 0.6);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #94a3b8;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.code-editor {
+    flex: 1;
+    width: 100%;
+    background: #0f172a;
+    border: none;
+    padding: 1rem;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: #e2e8f0;
+    resize: none;
+    min-height: 400px;
+}
+
+.code-editor::placeholder {
+    color: #64748b;
+    opacity: 1;
+}
+
+.code-editor:focus {
+    outline: none;
+}
+
+.preview-area {
+    flex: 1;
+    padding: 1.5rem;
+    background: #0f172a;
+    overflow-y: auto;
+}
+
+.preview-placeholder {
+    color: #64748b;
+    text-align: center;
+    padding: 2rem;
+    font-style: italic;
+    font-size: 0.9rem;
+}
+
+/* Preview Toggle */
+.preview-toggle {
+    display: flex;
+    background: rgba(15, 23, 42, 0.8);
+    border-radius: 0.375rem;
+    padding: 0.2rem;
+    gap: 0.2rem;
+}
+
+.toggle-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    border-radius: 0.25rem;
+    transition: all 0.15s;
+}
+
+.toggle-btn:hover {
+    color: #94a3b8;
+}
+
+.toggle-btn.active {
+    background: var(--accent-color);
+    color: #000;
+    border-color: var(--accent-color);
+}
+
+/* Preview Styles */
+.preview-area.bbcode-mode {
+    font-family: 'Consolas', monospace;
+    font-size: 0.75rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.preview-area.html-mode {
+    line-height: 1.6;
+}
+
+.preview-area img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5rem;
+    margin: 0.5rem auto;
+    display: block;
+}
+
+.preview-area img[src*="w185"] {
+    max-width: 120px;
+    display: inline-block;
+    margin: 0.25rem;
+}
+
+.preview-area blockquote {
+    max-width: 600px;
+    margin: 1rem auto;
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.btn:hover {
+    border-color: var(--accent-color);
+}
+
+.btn-sm {
+    padding: 0.375rem 0.625rem;
+    font-size: 0.75rem;
+}
+
+.btn-primary {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: #000;
+}
+
+.btn-primary:hover {
+    background: #d4a107;
+}
+
+.btn-secondary {
+    background: var(--bg-tertiary);
+}
+
+.btn-danger {
+    background: var(--bg-tertiary);
+}
+
+.btn-danger:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+/* Toast Notification */
+.toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1rem 1.5rem;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    z-index: 1000;
+    animation: slideIn 0.3s ease;
+}
+
+.toast.success {
+    border-color: #22c55e;
+}
+
+.toast.error {
+    border-color: #ef4444;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Responsive */
+@media (max-width: 1400px) {
+    .editor-pane {
+        width: 35%;
+        min-width: 300px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .templates-sidebar {
+        width: 220px;
+        min-width: 220px;
+    }
+    .editor-pane {
+        width: 40%;
+        min-width: 280px;
+    }
+}
+
+@media (max-width: 900px) {
+    .templates-container {
+        flex-direction: column;
+    }
+
+    .templates-sidebar {
+        width: 100%;
+        min-width: 100%;
+        max-height: 200px;
+    }
+
+    .split-view {
+        flex-direction: column;
+    }
+
+    .editor-pane {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .preview-pane {
+        width: 100%;
+    }
+}
+</style>
+
+<script>
+// State
+let currentTemplateId = null;
+let previewMode = 'html';
+let debounceTimer = null;
+
+// Sample data for live preview
+const sampleData = {
+    // TMDB data
+    title: "The Rip",
+    original_title: "The Rip",
+    year: "2026",
+    release_date: "mardi 13 janvier 2026",
+    poster_url: "https://image.tmdb.org/t/p/w500/hMoQlTlUlesatqxOtzVLZjkU9Wm.jpg",
+    backdrop_url: "https://image.tmdb.org/t/p/w1280/jOuQR3k4TqoMSWyGzWqGmfH7B0V.jpg",
+    rating: "3.53",
+    rating_10: "3.53/10",
+    genres: "Action, Thriller, Crime",
+    overview: "La mefiance s'installe quand une equipe de flics de Miami decouvre des millions en cash dans une planque delabree. Plus personne ne sait quoi penser... ni a qui se fier.",
+    tagline: "La confiance se paie cher.",
+    runtime: "1h et 53min",
+    country: "Etats-Unis",
+    director: "Joe Carnahan",
+    tmdb_id: "1306368",
+    imdb_id: "tt21059952",
+    tmdb_url: "https://www.themoviedb.org/movie/1306368",
+    trailer_url: "https://www.youtube.com/watch?v=R4hA7hyQSUg",
+    // Cast data (6 actors)
+    cast_names: "Matt Damon, Ben Affleck, Steven Yeun, Teyana Taylor, Catalina Sandino Moreno, Sasha Calle",
+    cast_1_card: "[cast-card][img]https://image.tmdb.org/t/p/w138_and_h175_face/elSlNgV8xVifsbHpFsqrPGxJToZ.jpg[/img]Matt Damon[/cast-card]",
+    cast_1_name: "Matt Damon",
+    cast_1_character: "Tom",
+    cast_2_card: "[cast-card][img]https://image.tmdb.org/t/p/w138_and_h175_face/8guQqUQ9qsGooDbv7JwOOZX2UUJ.jpg[/img]Ben Affleck[/cast-card]",
+    cast_2_name: "Ben Affleck",
+    cast_2_character: "Big John",
+    cast_3_card: "[cast-card][img]https://image.tmdb.org/t/p/w138_and_h175_face/fOMFO2Xx4duzpNgS9Q5ytO44yGb.jpg[/img]Steven Yeun[/cast-card]",
+    cast_3_name: "Steven Yeun",
+    cast_3_character: "Danny",
+    cast_4_card: "[cast-card][img]https://image.tmdb.org/t/p/w138_and_h175_face/foj8l6GGlZxZXcW6pU5wnNxDjSx.jpg[/img]Teyana Taylor[/cast-card]",
+    cast_4_name: "Teyana Taylor",
+    cast_4_character: "Jackie",
+    cast_5_card: "[cast-card][img]https://image.tmdb.org/t/p/w138_and_h175_face/9Q2y6WdqQkV6GmxKBaoCDJl74ZF.jpg[/img]Catalina Sandino Moreno[/cast-card]",
+    cast_5_name: "Catalina Sandino Moreno",
+    cast_5_character: "Carmen",
+    cast_6_card: "[cast-card][img]https://image.tmdb.org/t/p/w138_and_h175_face/lGE2pNaEKfQPDJKlZyxCHZ9R9i9.jpg[/img]Sasha Calle[/cast-card]",
+    cast_6_name: "Sasha Calle",
+    cast_6_character: "Rosa",
+    // MediaInfo data
+    quality: "2160p BluRay",
+    format: "MKV",
+    video_codec: "HEVC / H.265",
+    video_bitrate: "45.0 Mb/s",
+    resolution: "3840x2160",
+    hdr: "Dolby Vision / HDR10",
+    duration: "1h 53min",
+    audio_list: "- Francais (VFF) : TrueHD Atmos 7.1 @ 4 500 kb/s\n- Anglais (VO) : TrueHD Atmos 7.1 @ 4 500 kb/s",
+    languages: "Francais (VFF), Anglais (VO)",
+    subtitles: "Francais, Anglais",
+    file_size: "65.4 GiB",
+    file_count: "1",
+    source: "BluRay REMUX"
+};
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    // Load first template if exists
+    const firstItem = document.querySelector('.template-item');
+    if (firstItem) {
+        loadTemplate(parseInt(firstItem.dataset.id));
+    } else {
+        createNewTemplate();
+    }
+
+    // Setup live preview
+    const editor = document.getElementById('template-content');
+    editor.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(updatePreview, 150);
+    });
+});
+
+// Load template
+async function loadTemplate(id) {
+    try {
+        const response = await fetch(`/api/templates/${id}`);
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            const t = result.template;
+            currentTemplateId = t.id;
+            document.getElementById('template-id').value = t.id;
+            document.getElementById('template-name').value = t.name;
+            document.getElementById('template-description').value = t.description || '';
+            document.getElementById('template-content').value = t.content || '';
+
+            // Update active state in list
+            document.querySelectorAll('.template-item').forEach(el => {
+                el.classList.toggle('active', parseInt(el.dataset.id) === id);
+            });
+
+            // Update buttons visibility
+            document.getElementById('btn-delete').style.display = t.is_default ? 'none' : 'flex';
+            document.getElementById('btn-set-default').style.display = t.is_default ? 'none' : 'flex';
+
+            updatePreview();
+        } else {
+            showToast(result.detail || 'Erreur de chargement', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+// Create new template
+function createNewTemplate() {
+    currentTemplateId = null;
+    document.getElementById('template-id').value = '';
+    document.getElementById('template-name').value = '';
+    document.getElementById('template-description').value = '';
+    document.getElementById('template-content').value = getDefaultTemplateContent();
+
+    // Deselect all items
+    document.querySelectorAll('.template-item').forEach(el => el.classList.remove('active'));
+
+    // Show all buttons
+    document.getElementById('btn-delete').style.display = 'none';
+    document.getElementById('btn-set-default').style.display = 'none';
+
+    updatePreview();
+    document.getElementById('template-name').focus();
+}
+
+// Get default template content
+function getDefaultTemplateContent() {
+    return `[center]
+[img]{{poster_url}}[/img]
+
+[size=6][color=#eab308][b]{{title}} ({{year}})[/b][/color][/size]
+
+[b]Note :[/b] {{rating}}
+[b]Genre :[/b] {{genres}}
+
+[quote]{{overview}}[/quote]
+
+[color=#eab308][b]--- DETAILS TECHNIQUES ---[/b][/color]
+
+[b]Qualite :[/b] {{quality}}
+[b]Format :[/b] {{format}}
+[b]Rendu :[/b] {{hdr}}
+[b]Duree :[/b] {{duration}}
+[b]Codec Video :[/b] {{video_codec}}
+
+[b]Codec Audio :[/b]
+{{audio_list}}
+
+[b]Langues :[/b] {{languages}}
+[b]Sous-titres :[/b] {{subtitles}}
+[b]Taille :[/b] {{file_size}}
+[/center]`;
+}
+
+// Save template
+async function saveTemplate() {
+    const name = document.getElementById('template-name').value.trim();
+    const description = document.getElementById('template-description').value.trim();
+    const content = document.getElementById('template-content').value;
+
+    if (!name) {
+        showToast('Le nom du template est requis', 'error');
+        document.getElementById('template-name').focus();
+        return;
+    }
+
+    if (!content) {
+        showToast('Le contenu du template est requis', 'error');
+        return;
+    }
+
+    const id = document.getElementById('template-id').value;
+    const url = id ? `/api/templates/${id}` : '/api/templates';
+    const method = id ? 'PUT' : 'POST';
+
+    try {
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, description: description || null, content })
+        });
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            showToast(id ? 'Template mis a jour' : 'Template cree', 'success');
+            // Reload page to refresh list
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            showToast(result.detail || result.message || 'Erreur', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+// Delete template
+async function deleteCurrentTemplate() {
+    const id = document.getElementById('template-id').value;
+    if (!id) return;
+
+    const name = document.getElementById('template-name').value;
+    if (!confirm(`Supprimer le template "${name}" ?`)) return;
+
+    try {
+        const response = await fetch(`/api/templates/${id}`, { method: 'DELETE' });
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            showToast('Template supprime', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            showToast(result.detail || result.message || 'Erreur', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+// Set as default
+async function setAsDefault() {
+    const id = document.getElementById('template-id').value;
+    if (!id) return;
+
+    try {
+        const response = await fetch(`/api/templates/${id}/set-default`, { method: 'POST' });
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            showToast('Template defini par defaut', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            showToast(result.detail || result.message || 'Erreur', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+// Variables that should be wrapped with [img] tags
+const imageVariables = ['poster_url', 'backdrop_url'];
+
+// Variables that should be wrapped with [url] tags
+const urlVariables = ['tmdb_url', 'trailer_url'];
+
+// Insert variable at cursor with automatic tag wrapping
+function insertVariable(varName) {
+    const editor = document.getElementById('template-content');
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const text = editor.value;
+
+    let varText;
+    if (imageVariables.includes(varName)) {
+        // Wrap with [img] tags
+        varText = '[img]{' + '{' + varName + '}' + '}[/img]';
+    } else if (urlVariables.includes(varName)) {
+        // Wrap with [url] tags - user can add link text after
+        varText = '[url={' + '{' + varName + '}' + '}]Lien[/url]';
+    } else {
+        varText = '{' + '{' + varName + '}' + '}';
+    }
+
+    editor.value = text.substring(0, start) + varText + text.substring(end);
+    editor.focus();
+    editor.setSelectionRange(start + varText.length, start + varText.length);
+    updatePreview();
+}
+
+// Insert BBCode tag
+function insertBBCode(tag) {
+    const editor = document.getElementById('template-content');
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const text = editor.value;
+    const selected = text.substring(start, end);
+    const openTag = `[${tag}]`;
+    const closeTag = `[/${tag}]`;
+
+    editor.value = text.substring(0, start) + openTag + selected + closeTag + text.substring(end);
+    editor.focus();
+    editor.setSelectionRange(start + openTag.length, start + openTag.length + selected.length);
+    updatePreview();
+}
+
+// Insert BBCode with attribute
+function insertBBCodeWithAttr(tag, attr) {
+    const editor = document.getElementById('template-content');
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const text = editor.value;
+    const selected = text.substring(start, end);
+    const openTag = `[${tag}=${attr}]`;
+    const closeTag = `[/${tag}]`;
+
+    editor.value = text.substring(0, start) + openTag + selected + closeTag + text.substring(end);
+    editor.focus();
+    editor.setSelectionRange(start + openTag.length, start + openTag.length + selected.length);
+    updatePreview();
+}
+
+// Update live preview
+function updatePreview() {
+    const content = document.getElementById('template-content').value;
+    const previewEl = document.getElementById('preview-content');
+
+    if (!content.trim()) {
+        previewEl.innerHTML = '<div class="preview-placeholder">Commencez a editer pour voir l\'apercu...</div>';
+        previewEl.className = 'preview-area';
+        return;
+    }
+
+    // Replace variables with sample data
+    let rendered = content;
+    for (const [key, value] of Object.entries(sampleData)) {
+        const regex = new RegExp('\\{\\{' + key + '\\}\\}', 'g');
+        rendered = rendered.replace(regex, value);
+    }
+
+    if (previewMode === 'html') {
+        previewEl.innerHTML = bbcodeToHtml(rendered);
+        previewEl.className = 'preview-area html-mode';
+    } else {
+        previewEl.textContent = rendered;
+        previewEl.className = 'preview-area bbcode-mode';
+    }
+}
+
+// Set preview mode
+function setPreviewMode(mode) {
+    previewMode = mode;
+    document.getElementById('btn-preview-html').classList.toggle('active', mode === 'html');
+    document.getElementById('btn-preview-bbcode').classList.toggle('active', mode === 'bbcode');
+    updatePreview();
+}
+
+// BBCode to HTML converter
+function bbcodeToHtml(bbcode) {
+    let html = bbcode;
+
+    // Store complex elements temporarily to protect them from HTML escaping
+    const placeholders = [];
+
+    // Extract [cast-card] tags first (inline-block cards with photo + name)
+    html = html.replace(/\[cast-card\]([\s\S]*?)\[\/cast-card\]/gi, (match, content) => {
+        const idx = placeholders.length;
+        // Extract image URL and name from content
+        const imgMatch = content.match(/\[img\](.*?)\[\/img\]/i);
+        const imgUrl = imgMatch ? imgMatch[1] : '';
+        const name = content.replace(/\[img\].*?\[\/img\]/i, '').trim();
+        placeholders.push(`<div style="display:inline-block;text-align:center;margin:10px;vertical-align:top;"><img src="${imgUrl}" style="max-width:120px;height:auto;border-radius:8px;display:block;margin:0 auto 5px auto;" onerror="this.style.display='none'" /><span style="font-size:12px;color:#ccc;">${name}</span></div>`);
+        return `__CARD_PLACEHOLDER_${idx}__`;
+    });
+
+    // Extract [img] tags and replace with placeholders
+    html = html.replace(/\[img\](.*?)\[\/img\]/gi, (match, url) => {
+        const idx = placeholders.length;
+        placeholders.push(`<img src="${url}" style="display:inline-block;max-width:300px;height:auto;border-radius:8px;margin:5px;vertical-align:middle;" onerror="this.style.display='none'" />`);
+        return `__IMG_PLACEHOLDER_${idx}__`;
+    });
+
+    // Extract [url] tags
+    html = html.replace(/\[url=(.*?)\]([\s\S]*?)\[\/url\]/gi, (match, url, text) => {
+        const idx = placeholders.length;
+        placeholders.push(`<a href="${url}" style="color:#60a5fa;">${text}</a>`);
+        return `__URL_PLACEHOLDER_${idx}__`;
+    });
+    html = html.replace(/\[url\](.*?)\[\/url\]/gi, (match, url) => {
+        const idx = placeholders.length;
+        placeholders.push(`<a href="${url}" style="color:#60a5fa;">${url}</a>`);
+        return `__URL_PLACEHOLDER_${idx}__`;
+    });
+
+    // Now escape HTML for the rest of the content
+    html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // Convert BBCode to HTML
+    html = html.replace(/\[center\]([\s\S]*?)\[\/center\]/gi, '<div style="text-align:center;">$1</div>');
+    html = html.replace(/\[size=(\d+)\]([\s\S]*?)\[\/size\]/gi, (m, size, text) => {
+        const px = parseInt(size) * 4 + 8;
+        return `<span style="font-size:${px}px;">${text}</span>`;
+    });
+    html = html.replace(/\[color=(#?[\w]+)\]([\s\S]*?)\[\/color\]/gi, '<span style="color:$1;">$2</span>');
+    html = html.replace(/\[b\]([\s\S]*?)\[\/b\]/gi, '<strong>$1</strong>');
+    html = html.replace(/\[i\]([\s\S]*?)\[\/i\]/gi, '<em>$1</em>');
+    html = html.replace(/\[u\]([\s\S]*?)\[\/u\]/gi, '<u>$1</u>');
+    html = html.replace(/\[quote\]([\s\S]*?)\[\/quote\]/gi, '<blockquote style="border-left:3px solid #4a5568;padding-left:1rem;margin:1rem 0;color:#a0aec0;font-style:italic;">$1</blockquote>');
+    html = html.replace(/\n/g, '<br>');
+
+    // Restore all placeholders
+    placeholders.forEach((content, idx) => {
+        html = html.replace(`__CARD_PLACEHOLDER_${idx}__`, content);
+        html = html.replace(`__IMG_PLACEHOLDER_${idx}__`, content);
+        html = html.replace(`__URL_PLACEHOLDER_${idx}__`, content);
+    });
+
+    return html;
+}
+
+// Show toast notification
+function showToast(message, type = 'info') {
+    // Remove existing toast
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => toast.remove(), 3000);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,1344 @@
+{% extends "base.html" %}
+
+{% block title %}Templates - Seedarr{% endblock %}
+
+{% block page_title %}Templates{% endblock %}
+
+{% block content %}
+<div class="templates-page">
+    <!-- Tab Navigation -->
+    <div class="tabs-container">
+        <div class="tabs">
+            <button class="tab active" data-tab="presentation" onclick="switchTab('presentation')">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"></path>
+                </svg>
+                Presentation (BBCode)
+            </button>
+            <button class="tab" data-tab="naming" onclick="switchTab('naming')">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                </svg>
+                Nommage
+            </button>
+            <button class="tab" data-tab="nfo" onclick="switchTab('nfo')">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                NFO
+            </button>
+        </div>
+    </div>
+
+    <!-- Tab Content: Presentation (BBCode) -->
+    <div id="tab-presentation" class="tab-content active">
+        <div class="templates-container">
+            <!-- Left Panel: Templates List -->
+            <div class="templates-sidebar">
+                <div class="sidebar-header">
+                    <h2>Templates BBCode</h2>
+                    <button class="btn btn-primary btn-sm" onclick="createNewBBCodeTemplate()">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Nouveau
+                    </button>
+                </div>
+                <div class="templates-list" id="bbcode-templates-list">
+                    {% for template in bbcode_templates %}
+                    <div class="template-item {% if loop.first %}active{% endif %}"
+                         data-id="{{ template.id }}"
+                         onclick="loadBBCodeTemplate({{ template.id }})">
+                        <div class="template-item-header">
+                            <span class="template-name">{{ template.name }}</span>
+                            {% if template.is_default %}
+                            <span class="badge-default">Defaut</span>
+                            {% endif %}
+                        </div>
+                        <div class="template-item-meta">
+                            {{ template.updated_at.strftime('%d/%m/%Y %H:%M') if template.updated_at else '' }}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="empty-list">
+                        <p>Aucun template</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Main Content: Editor -->
+            <div class="editor-main">
+                <div class="editor-header">
+                    <div class="editor-title-row">
+                        <input type="text" id="bbcode-template-name" class="input-title" placeholder="Nom du template">
+                        <input type="hidden" id="bbcode-template-id">
+                    </div>
+                    <div class="editor-actions">
+                        <button class="btn btn-secondary" onclick="setBBCodeAsDefault()" id="btn-bbcode-default" title="Definir par defaut">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
+                            </svg>
+                        </button>
+                        <button class="btn btn-danger" onclick="deleteBBCodeTemplate()" id="btn-bbcode-delete" title="Supprimer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                        <button class="btn btn-primary" onclick="saveBBCodeTemplate()">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Sauvegarder
+                        </button>
+                    </div>
+                </div>
+
+                <div class="editor-description">
+                    <input type="text" id="bbcode-template-description" class="input-description" placeholder="Description du template (optionnel)">
+                </div>
+
+                <!-- Variables Panel -->
+                <div class="variables-panel">
+                    <details class="variables-accordion" open>
+                        <summary class="accordion-header">
+                            <span class="accordion-title">Variables disponibles</span>
+                        </summary>
+                        <div class="variables-chips">
+                            {% for category, vars in bbcode_variables.items() %}
+                            {% for key, desc in vars.items() %}
+                            <button class="var-chip" onclick="insertBBCodeVariable('{{ key }}')" title="{{ desc }}">{{ key }}</button>
+                            {% endfor %}
+                            {% endfor %}
+                        </div>
+                    </details>
+                </div>
+
+                <!-- BBCode Editor -->
+                <div class="editor-area">
+                    <textarea id="bbcode-template-content" class="code-editor" placeholder="Entrez votre template BBCode ici..."></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Content: Naming -->
+    <div id="tab-naming" class="tab-content">
+        <div class="templates-container">
+            <!-- Left Panel: Templates List -->
+            <div class="templates-sidebar">
+                <div class="sidebar-header">
+                    <h2>Templates Nommage</h2>
+                    <button class="btn btn-primary btn-sm" onclick="createNewNamingTemplate()">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Nouveau
+                    </button>
+                </div>
+                <div class="templates-list" id="naming-templates-list">
+                    {% for template in naming_templates %}
+                    <div class="template-item {% if loop.first %}active{% endif %}"
+                         data-id="{{ template.id }}"
+                         onclick="loadNamingTemplate({{ template.id }})">
+                        <div class="template-item-header">
+                            <span class="template-name">{{ template.name }}</span>
+                            {% if template.is_default %}
+                            <span class="badge-default">Defaut</span>
+                            {% endif %}
+                        </div>
+                        <div class="template-item-meta">
+                            {{ template.updated_at.strftime('%d/%m/%Y %H:%M') if template.updated_at else '' }}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="empty-list">
+                        <p>Aucun template de nommage</p>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Example Templates -->
+                <div class="examples-section">
+                    <h3>Exemples</h3>
+                    {% for example in naming_examples %}
+                    <div class="example-item" onclick="useNamingExample('{{ example.template }}')">
+                        <span class="example-name">{{ example.name }}</span>
+                        <code class="example-template">{{ example.template }}</code>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Main Content: Editor -->
+            <div class="editor-main">
+                <div class="editor-header">
+                    <div class="editor-title-row">
+                        <input type="text" id="naming-template-name" class="input-title" placeholder="Nom du template">
+                        <input type="hidden" id="naming-template-id">
+                    </div>
+                    <div class="editor-actions">
+                        <button class="btn btn-secondary" onclick="setNamingAsDefault()" id="btn-naming-default" title="Definir par defaut">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
+                            </svg>
+                        </button>
+                        <button class="btn btn-danger" onclick="deleteNamingTemplate()" id="btn-naming-delete" title="Supprimer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                        <button class="btn btn-primary" onclick="saveNamingTemplate()">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Sauvegarder
+                        </button>
+                    </div>
+                </div>
+
+                <div class="editor-description">
+                    <input type="text" id="naming-template-description" class="input-description" placeholder="Description du template (optionnel)">
+                </div>
+
+                <!-- Variables Panel -->
+                <div class="variables-panel">
+                    <details class="variables-accordion" open>
+                        <summary class="accordion-header">
+                            <span class="accordion-title">Variables disponibles</span>
+                        </summary>
+                        <div class="variables-chips">
+                            {% for category, vars in naming_variables.items() %}
+                            {% for key, desc in vars.items() %}
+                            <button class="var-chip var-chip-naming" onclick="insertNamingVariable('{{ key }}')" title="{{ desc }}">{{"{"}}{{ key }}{{"}"}}</button>
+                            {% endfor %}
+                            {% endfor %}
+                        </div>
+                    </details>
+                </div>
+
+                <!-- Naming Template Editor -->
+                <div class="naming-editor-area">
+                    <label class="editor-label">Format du nom de release</label>
+                    <input type="text" id="naming-template-content" class="naming-input"
+                           placeholder="{titre}.{annee}.{langue}.{resolution}.{source}.{codec_video}-{group}">
+
+                    <!-- Live Preview -->
+                    <div class="naming-preview">
+                        <label class="preview-label">Apercu</label>
+                        <div id="naming-preview-result" class="preview-result">
+                            Cloud.9.2014.MULTi.1080p.WEB.H264-FW
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Content: NFO -->
+    <div id="tab-nfo" class="tab-content">
+        <div class="templates-container">
+            <!-- Left Panel: Templates List -->
+            <div class="templates-sidebar">
+                <div class="sidebar-header">
+                    <h2>Templates NFO</h2>
+                    <button class="btn btn-primary btn-sm" onclick="createNewNFOTemplate()">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Nouveau
+                    </button>
+                </div>
+                <div class="templates-list" id="nfo-templates-list">
+                    {% for template in nfo_templates %}
+                    <div class="template-item {% if loop.first %}active{% endif %}"
+                         data-id="{{ template.id }}"
+                         onclick="loadNFOTemplate({{ template.id }})">
+                        <div class="template-item-header">
+                            <span class="template-name">{{ template.name }}</span>
+                            {% if template.is_default %}
+                            <span class="badge-default">Defaut</span>
+                            {% endif %}
+                        </div>
+                        <div class="template-item-meta">
+                            {{ template.updated_at.strftime('%d/%m/%Y %H:%M') if template.updated_at else '' }}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="empty-list">
+                        <p>Aucun template NFO</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Main Content: Editor -->
+            <div class="editor-main">
+                <div class="editor-header">
+                    <div class="editor-title-row">
+                        <input type="text" id="nfo-template-name" class="input-title" placeholder="Nom du template">
+                        <input type="hidden" id="nfo-template-id">
+                    </div>
+                    <div class="editor-actions">
+                        <button class="btn btn-secondary" onclick="setNFOAsDefault()" id="btn-nfo-default" title="Definir par defaut">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
+                            </svg>
+                        </button>
+                        <button class="btn btn-danger" onclick="deleteNFOTemplate()" id="btn-nfo-delete" title="Supprimer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                        <button class="btn btn-primary" onclick="saveNFOTemplate()">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Sauvegarder
+                        </button>
+                    </div>
+                </div>
+
+                <div class="editor-description">
+                    <input type="text" id="nfo-template-description" class="input-description" placeholder="Description du template (optionnel)">
+                </div>
+
+                <!-- Variables Panel -->
+                <div class="variables-panel">
+                    <details class="variables-accordion" open>
+                        <summary class="accordion-header">
+                            <span class="accordion-title">Variables disponibles</span>
+                        </summary>
+                        <div class="variables-chips">
+                            {% for category, vars in nfo_variables.items() %}
+                            {% for key, desc in vars.items() %}
+                            <button class="var-chip var-chip-nfo" onclick="insertNFOVariable('{{ key }}')" title="{{ desc }}">{{ "{{" }}{{ key }}{{ "}}" }}</button>
+                            {% endfor %}
+                            {% endfor %}
+                        </div>
+                    </details>
+                </div>
+
+                <!-- NFO Editor -->
+                <div class="editor-area">
+                    <textarea id="nfo-template-content" class="code-editor nfo-editor" placeholder="Entrez votre template NFO ici..."></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Templates Page Styles */
+.templates-page {
+    padding: 1rem;
+    max-width: 100%;
+    min-height: calc(100vh - 120px);
+}
+
+/* Tabs */
+.tabs-container {
+    margin-bottom: 1.5rem;
+}
+
+.tabs {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.75rem 1.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    min-width: 140px;
+}
+
+.tab:hover:not(.active) {
+    color: var(--text-primary);
+    border-color: var(--accent-primary);
+}
+
+.tab.active {
+    color: var(--accent-primary);
+    background: var(--bg-secondary);
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 1px var(--accent-primary);
+}
+
+.tab svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+}
+
+/* Tab Content */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Templates Container */
+.templates-container {
+    display: flex;
+    gap: 1rem;
+    min-height: calc(100vh - 200px);
+}
+
+/* Sidebar */
+.templates-sidebar {
+    width: 280px;
+    min-width: 280px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 200px);
+    overflow: hidden;
+}
+
+.sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-header h2 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.templates-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+.template-item {
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 0.25rem;
+    border: 1px solid transparent;
+}
+
+.template-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.template-item.active {
+    background: rgba(234, 179, 8, 0.1);
+    border-color: var(--accent-color);
+}
+
+.template-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.template-name {
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.badge-default {
+    background: var(--accent-color);
+    color: #0f172a;
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.template-item-meta {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.empty-list {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--text-muted);
+}
+
+/* Examples Section (Naming) */
+.examples-section {
+    border-top: 1px solid var(--border-color);
+    padding: 0.75rem;
+}
+
+.examples-section h3 {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+
+.example-item {
+    padding: 0.5rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    margin-bottom: 0.25rem;
+    transition: all 0.2s;
+}
+
+.example-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.example-name {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.example-template {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--accent-color);
+    background: rgba(234, 179, 8, 0.1);
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    word-break: break-all;
+}
+
+/* Editor Main */
+.editor-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    min-width: 0;
+}
+
+.editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    gap: 1rem;
+}
+
+.editor-title-row {
+    flex: 1;
+}
+
+.input-title {
+    width: 100%;
+    background: transparent;
+    border: none;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    padding: 0.25rem 0;
+}
+
+.input-title:focus {
+    outline: none;
+    color: var(--accent-color);
+}
+
+.editor-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.editor-description {
+    padding: 0 1rem 0.5rem 1rem;
+}
+
+.input-description {
+    width: 100%;
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(100, 116, 139, 0.4);
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.input-description:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+/* Variables Panel */
+.variables-panel {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.variables-accordion {
+    border: 1px solid rgba(100, 116, 139, 0.2);
+    border-radius: 0.5rem;
+    background: rgba(15, 23, 42, 0.3);
+}
+
+.accordion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+.accordion-header::-webkit-details-marker {
+    display: none;
+}
+
+.accordion-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent-color);
+    text-transform: uppercase;
+}
+
+.variables-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0.75rem 1rem 1rem;
+}
+
+button.var-chip {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.08)) !important;
+    border: 1.5px solid rgba(96, 165, 250, 0.4) !important;
+    border-radius: 0.4rem !important;
+    padding: 0.4rem 0.7rem !important;
+    font-size: 0.75rem !important;
+    font-family: 'Consolas', monospace !important;
+    color: #60a5fa !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+button.var-chip:hover {
+    border-color: #3b82f6 !important;
+    color: #93c5fd !important;
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(59, 130, 246, 0.15)) !important;
+}
+
+button.var-chip-naming {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.08)) !important;
+    border: 1.5px solid rgba(74, 222, 128, 0.4) !important;
+    color: #4ade80 !important;
+}
+
+button.var-chip-naming:hover {
+    border-color: #22c55e !important;
+    color: #86efac !important;
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.25), rgba(34, 197, 94, 0.15)) !important;
+}
+
+button.var-chip-nfo {
+    background: linear-gradient(135deg, rgba(147, 51, 234, 0.15), rgba(147, 51, 234, 0.08)) !important;
+    border: 1.5px solid rgba(168, 85, 247, 0.4) !important;
+    color: #a78bfa !important;
+}
+
+button.var-chip-nfo:hover {
+    border-color: #9333ea !important;
+    color: #c4b5fd !important;
+    background: linear-gradient(135deg, rgba(147, 51, 234, 0.25), rgba(147, 51, 234, 0.15)) !important;
+}
+
+/* Editor Area */
+.editor-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 400px;
+}
+
+.code-editor {
+    flex: 1;
+    width: 100%;
+    background: #0f172a;
+    border: none;
+    padding: 1rem;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    resize: none;
+    min-height: 400px;
+}
+
+.code-editor:focus {
+    outline: none;
+}
+
+.nfo-editor {
+    font-size: 0.75rem;
+    line-height: 1.4;
+}
+
+/* Naming Editor */
+.naming-editor-area {
+    padding: 1.5rem;
+    flex: 1;
+}
+
+.editor-label,
+.preview-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+
+.naming-input {
+    width: 100%;
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    font-family: 'Consolas', monospace;
+    font-size: 1rem;
+    color: var(--accent-color);
+}
+
+.naming-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+.naming-preview {
+    margin-top: 1.5rem;
+}
+
+.preview-result {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    font-family: 'Consolas', monospace;
+    font-size: 0.9rem;
+    color: #4ade80;
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+.btn:hover {
+    border-color: var(--accent-color);
+    color: var(--text-primary);
+}
+
+.btn-sm {
+    padding: 0.375rem 0.625rem;
+    font-size: 0.75rem;
+}
+
+.btn-primary {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: #0f172a;
+    font-weight: 600;
+}
+
+.btn-primary:hover {
+    background: #d4a107;
+}
+
+.btn-secondary {
+    background: rgba(51, 65, 85, 0.6);
+    border-color: rgba(100, 116, 139, 0.4);
+}
+
+.btn-secondary:hover {
+    background: rgba(251, 191, 36, 0.15);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+.btn-danger:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: #ef4444;
+    color: #fca5a5;
+}
+
+/* Toast */
+.toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1rem 1.5rem;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    z-index: 1000;
+    animation: slideIn 0.3s ease;
+}
+
+.toast.success {
+    border-color: #22c55e;
+    background: rgba(34, 197, 94, 0.15);
+    color: #86efac;
+}
+
+.toast.error {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
+}
+
+@keyframes slideIn {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .templates-container {
+        flex-direction: column;
+    }
+    .templates-sidebar {
+        width: 100%;
+        min-width: 100%;
+        max-height: 250px;
+    }
+}
+</style>
+
+<script>
+// ============================================================================
+// Tab Management
+// ============================================================================
+
+function switchTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+
+    // Update tab content
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.toggle('active', content.id === `tab-${tabName}`);
+    });
+}
+
+// ============================================================================
+// Sample Data for Previews
+// ============================================================================
+
+const namingSampleData = {
+    titre: "Cloud.9",
+    titre_fr: "Cloud.9.L.Ultime.Figure",
+    titre_en: "Cloud.9",
+    titre_lower: "cloud.9",
+    titre_fr_lower: "cloud.9.l.ultime.figure",
+    titre_en_lower: "cloud.9",
+    annee: "2014",
+    langue: "MULTi",
+    vff: "VFF",
+    resolution: "1080p",
+    source: "WEB",
+    quality: "HDLight",
+    codec_audio: "AAC",
+    codec_audio_full: "AAC.2.0",
+    audio_channels: "2.0",
+    codec_video: "x264",
+    group: "FW",
+    hdr: "",
+    saison: "S01",
+    episode: "E05"
+};
+
+// ============================================================================
+// BBCode Templates Functions
+// ============================================================================
+
+async function loadBBCodeTemplate(id) {
+    try {
+        const response = await fetch(`/api/templates/bbcode/${id}`);
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            const t = result.template;
+            document.getElementById('bbcode-template-id').value = t.id;
+            document.getElementById('bbcode-template-name').value = t.name;
+            document.getElementById('bbcode-template-description').value = t.description || '';
+            document.getElementById('bbcode-template-content').value = t.content || '';
+
+            // Update active state
+            document.querySelectorAll('#bbcode-templates-list .template-item').forEach(el => {
+                el.classList.toggle('active', parseInt(el.dataset.id) === id);
+            });
+
+            // Update buttons
+            document.getElementById('btn-bbcode-default').style.display = t.is_default ? 'none' : 'flex';
+            document.getElementById('btn-bbcode-delete').style.display = t.is_default ? 'none' : 'flex';
+        }
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+function createNewBBCodeTemplate() {
+    document.getElementById('bbcode-template-id').value = '';
+    document.getElementById('bbcode-template-name').value = '';
+    document.getElementById('bbcode-template-description').value = '';
+    document.getElementById('bbcode-template-content').value = '';
+
+    document.querySelectorAll('#bbcode-templates-list .template-item').forEach(el => {
+        el.classList.remove('active');
+    });
+
+    document.getElementById('btn-bbcode-default').style.display = 'none';
+    document.getElementById('btn-bbcode-delete').style.display = 'none';
+    document.getElementById('bbcode-template-name').focus();
+}
+
+async function saveBBCodeTemplate() {
+    const id = document.getElementById('bbcode-template-id').value;
+    const name = document.getElementById('bbcode-template-name').value.trim();
+    const description = document.getElementById('bbcode-template-description').value.trim();
+    const content = document.getElementById('bbcode-template-content').value;
+
+    if (!name) {
+        showToast('Le nom du template est requis', 'error');
+        return;
+    }
+
+    const url = id ? `/api/templates/bbcode/${id}` : '/api/templates/bbcode';
+    const method = id ? 'PUT' : 'POST';
+
+    try {
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, description: description || null, content })
+        });
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            showToast(id ? 'Template mis a jour' : 'Template cree', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            showToast(result.detail || 'Erreur', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+async function deleteBBCodeTemplate() {
+    const id = document.getElementById('bbcode-template-id').value;
+    if (!id) return;
+
+    if (!confirm('Supprimer ce template ?')) return;
+
+    try {
+        const response = await fetch(`/api/templates/bbcode/${id}`, { method: 'DELETE' });
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            showToast('Template supprime', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            showToast(result.detail || 'Erreur', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+async function setBBCodeAsDefault() {
+    const id = document.getElementById('bbcode-template-id').value;
+    if (!id) return;
+
+    try {
+        const response = await fetch(`/api/templates/bbcode/${id}/set-default`, { method: 'POST' });
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            showToast('Template defini par defaut', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        }
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+function insertBBCodeVariable(varName) {
+    const editor = document.getElementById('bbcode-template-content');
+    const start = editor.selectionStart;
+    const text = editor.value;
+    const varText = '{{' + varName + '}}';
+
+    editor.value = text.substring(0, start) + varText + text.substring(start);
+    editor.focus();
+    editor.setSelectionRange(start + varText.length, start + varText.length);
+}
+
+// ============================================================================
+// Naming Templates Functions
+// ============================================================================
+
+async function loadNamingTemplate(id) {
+    try {
+        const response = await fetch(`/api/templates/naming/${id}`);
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            const t = result.template;
+            document.getElementById('naming-template-id').value = t.id;
+            document.getElementById('naming-template-name').value = t.name;
+            document.getElementById('naming-template-description').value = t.description || '';
+            document.getElementById('naming-template-content').value = t.template || '';
+
+            document.querySelectorAll('#naming-templates-list .template-item').forEach(el => {
+                el.classList.toggle('active', parseInt(el.dataset.id) === id);
+            });
+
+            document.getElementById('btn-naming-default').style.display = t.is_default ? 'none' : 'flex';
+            document.getElementById('btn-naming-delete').style.display = t.is_default ? 'none' : 'flex';
+
+            updateNamingPreview();
+        }
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+function createNewNamingTemplate() {
+    document.getElementById('naming-template-id').value = '';
+    document.getElementById('naming-template-name').value = '';
+    document.getElementById('naming-template-description').value = '';
+    document.getElementById('naming-template-content').value = '';
+
+    document.querySelectorAll('#naming-templates-list .template-item').forEach(el => {
+        el.classList.remove('active');
+    });
+
+    document.getElementById('btn-naming-default').style.display = 'none';
+    document.getElementById('btn-naming-delete').style.display = 'none';
+    document.getElementById('naming-template-name').focus();
+
+    updateNamingPreview();
+}
+
+async function saveNamingTemplate() {
+    const id = document.getElementById('naming-template-id').value;
+    const name = document.getElementById('naming-template-name').value.trim();
+    const description = document.getElementById('naming-template-description').value.trim();
+    const template = document.getElementById('naming-template-content').value;
+
+    if (!name) {
+        showToast('Le nom du template est requis', 'error');
+        return;
+    }
+
+    const url = id ? `/api/templates/naming/${id}` : '/api/templates/naming';
+    const method = id ? 'PUT' : 'POST';
+
+    try {
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, description: description || null, template })
+        });
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            showToast(id ? 'Template mis a jour' : 'Template cree', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            showToast(result.detail || 'Erreur', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+async function deleteNamingTemplate() {
+    const id = document.getElementById('naming-template-id').value;
+    if (!id) return;
+
+    if (!confirm('Supprimer ce template ?')) return;
+
+    try {
+        const response = await fetch(`/api/templates/naming/${id}`, { method: 'DELETE' });
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            showToast('Template supprime', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        }
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+async function setNamingAsDefault() {
+    const id = document.getElementById('naming-template-id').value;
+    if (!id) return;
+
+    try {
+        const response = await fetch(`/api/templates/naming/${id}/set-default`, { method: 'POST' });
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            showToast('Template defini par defaut', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        }
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+function insertNamingVariable(varName) {
+    const editor = document.getElementById('naming-template-content');
+    const start = editor.selectionStart;
+    const text = editor.value;
+    const varText = '{' + varName + '}';
+
+    editor.value = text.substring(0, start) + varText + text.substring(start);
+    editor.focus();
+    editor.setSelectionRange(start + varText.length, start + varText.length);
+
+    updateNamingPreview();
+}
+
+function useNamingExample(template) {
+    document.getElementById('naming-template-content').value = template;
+    updateNamingPreview();
+}
+
+function updateNamingPreview() {
+    const template = document.getElementById('naming-template-content').value;
+    let result = template;
+
+    // Replace variables with sample data
+    for (const [key, value] of Object.entries(namingSampleData)) {
+        const regex = new RegExp('\\{' + key + '\\}', 'g');
+        result = result.replace(regex, value);
+    }
+
+    // Clean up (remove empty parts)
+    result = result.replace(/\.{2,}/g, '.');
+    result = result.replace(/\.-/g, '-');
+    result = result.replace(/^\.|\.$/, '');
+
+    document.getElementById('naming-preview-result').textContent = result || 'Apercu...';
+}
+
+// ============================================================================
+// NFO Templates Functions
+// ============================================================================
+
+async function loadNFOTemplate(id) {
+    try {
+        const response = await fetch(`/api/templates/nfo/${id}`);
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            const t = result.template;
+            document.getElementById('nfo-template-id').value = t.id;
+            document.getElementById('nfo-template-name').value = t.name;
+            document.getElementById('nfo-template-description').value = t.description || '';
+            document.getElementById('nfo-template-content').value = t.content || '';
+
+            document.querySelectorAll('#nfo-templates-list .template-item').forEach(el => {
+                el.classList.toggle('active', parseInt(el.dataset.id) === id);
+            });
+
+            document.getElementById('btn-nfo-default').style.display = t.is_default ? 'none' : 'flex';
+            document.getElementById('btn-nfo-delete').style.display = t.is_default ? 'none' : 'flex';
+        }
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+function createNewNFOTemplate() {
+    document.getElementById('nfo-template-id').value = '';
+    document.getElementById('nfo-template-name').value = '';
+    document.getElementById('nfo-template-description').value = '';
+    document.getElementById('nfo-template-content').value = '';
+
+    document.querySelectorAll('#nfo-templates-list .template-item').forEach(el => {
+        el.classList.remove('active');
+    });
+
+    document.getElementById('btn-nfo-default').style.display = 'none';
+    document.getElementById('btn-nfo-delete').style.display = 'none';
+    document.getElementById('nfo-template-name').focus();
+}
+
+async function saveNFOTemplate() {
+    const id = document.getElementById('nfo-template-id').value;
+    const name = document.getElementById('nfo-template-name').value.trim();
+    const description = document.getElementById('nfo-template-description').value.trim();
+    const content = document.getElementById('nfo-template-content').value;
+
+    if (!name) {
+        showToast('Le nom du template est requis', 'error');
+        return;
+    }
+
+    const url = id ? `/api/templates/nfo/${id}` : '/api/templates/nfo';
+    const method = id ? 'PUT' : 'POST';
+
+    try {
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, description: description || null, content })
+        });
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            showToast(id ? 'Template mis a jour' : 'Template cree', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            showToast(result.detail || 'Erreur', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+async function deleteNFOTemplate() {
+    const id = document.getElementById('nfo-template-id').value;
+    if (!id) return;
+
+    if (!confirm('Supprimer ce template ?')) return;
+
+    try {
+        const response = await fetch(`/api/templates/nfo/${id}`, { method: 'DELETE' });
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            showToast('Template supprime', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        }
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+async function setNFOAsDefault() {
+    const id = document.getElementById('nfo-template-id').value;
+    if (!id) return;
+
+    try {
+        const response = await fetch(`/api/templates/nfo/${id}/set-default`, { method: 'POST' });
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            showToast('Template defini par defaut', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        }
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+function insertNFOVariable(varName) {
+    const editor = document.getElementById('nfo-template-content');
+    const start = editor.selectionStart;
+    const text = editor.value;
+    const varText = '{{' + varName + '}}';
+
+    editor.value = text.substring(0, start) + varText + text.substring(start);
+    editor.focus();
+    editor.setSelectionRange(start + varText.length, start + varText.length);
+}
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+function showToast(message, type = 'info') {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => toast.remove(), 3000);
+}
+
+// ============================================================================
+// Initialize
+// ============================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Load first template in each tab
+    const firstBBCode = document.querySelector('#bbcode-templates-list .template-item');
+    if (firstBBCode) loadBBCodeTemplate(parseInt(firstBBCode.dataset.id));
+
+    const firstNaming = document.querySelector('#naming-templates-list .template-item');
+    if (firstNaming) loadNamingTemplate(parseInt(firstNaming.dataset.id));
+
+    const firstNFO = document.querySelector('#nfo-templates-list .template-item');
+    if (firstNFO) loadNFOTemplate(parseInt(firstNFO.dataset.id));
+
+    // Setup naming preview
+    const namingInput = document.getElementById('naming-template-content');
+    if (namingInput) {
+        namingInput.addEventListener('input', updateNamingPreview);
+        updateNamingPreview();
+    }
+});
+</script>
+{% endblock %}

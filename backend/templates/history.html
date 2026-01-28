@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}History - Seedarr v2.0{% endblock %}
+{% block page_title %}History{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- History Header with Controls -->
+    <div class="dashboard-header">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="dashboard-title">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Job History
+                </h1>
+                <p class="dashboard-subtitle">View completed and failed jobs</p>
+            </div>
+            <div class="flex gap-2">
+                <button
+                    class="btn-secondary"
+                    hx-post="/api/history/filter"
+                    hx-target="#history-table"
+                    hx-swap="innerHTML"
+                    hx-include="[name='status']"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                    </svg>
+                    Filter
+                </button>
+                <button
+                    class="btn-primary"
+                    hx-get="/api/history/refresh"
+                    hx-target="#history-table"
+                    hx-swap="innerHTML"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Stats (Dynamic from database) -->
+    {% set successful_count = 0 %}
+    {% set failed_count = 0 %}
+    {% if completed_jobs %}
+        {% for job in completed_jobs %}
+            {% if job.status and job.status.value == 'UPLOADED' %}
+                {% set successful_count = successful_count + 1 %}
+            {% elif job.status and job.status.value == 'FAILED' %}
+                {% set failed_count = failed_count + 1 %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Completed</div>
+            <div class="stat-value">{{ completed_jobs|length if completed_jobs else 0 }}</div>
+            <div class="stat-change positive">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+                Total jobs
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Successful</div>
+            <div class="stat-value">{{ successful_count }}</div>
+            <div class="stat-change positive">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+                Completed successfully
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Failed</div>
+            <div class="stat-value">{{ failed_count }}</div>
+            <div class="stat-change negative">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                </svg>
+                {% if failed_count > 0 %}Requires attention{% else %}None{% endif %}
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Success Rate</div>
+            <div class="stat-value">
+                {% if completed_jobs and completed_jobs|length > 0 %}
+                    {{ "%.0f"|format((successful_count / completed_jobs|length) * 100) }}%
+                {% else %}
+                    0%
+                {% endif %}
+            </div>
+            <div class="stat-change positive">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clip-rule="evenodd"></path>
+                </svg>
+                All time
+            </div>
+        </div>
+    </div>
+
+    <!-- Completed Jobs Table -->
+    <div class="dashboard-card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Completed Jobs
+            </h2>
+            <div class="flex gap-2 items-center">
+                <span class="text-muted text-sm">Filter:</span>
+                <select
+                    class="select-field"
+                    name="status"
+                    hx-post="/api/history/filter"
+                    hx-target="#history-table"
+                    hx-swap="innerHTML"
+                    hx-trigger="change"
+                >
+                    <option value="">All Status</option>
+                    <option value="successful">Successful</option>
+                    <option value="failed">Failed</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+            </div>
+        </div>
+        <div class="card-body">
+            <table class="dashboard-table" id="history-table">
+                {% include "components/history_table.html" %}
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination-container" id="history-pagination">
+        <button
+            class="btn-secondary"
+            disabled
+            hx-get="/api/history/page?page=0"
+            hx-target="#history-table"
+            hx-swap="innerHTML"
+        >
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            Previous
+        </button>
+        <div class="pagination-info">
+            <span class="text-muted" id="pagination-info">Page 1 of 42</span>
+        </div>
+        <button
+            class="btn-secondary"
+            hx-get="/api/history/page?page=2"
+            hx-target="#history-table"
+            hx-swap="innerHTML"
+        >
+            Next
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+            </svg>
+        </button>
+    </div>
+</div>
+
+<style>
+    /* Status Badges - Success and Error */
+    .status-badge.success {
+        background: rgba(16, 185, 129, 0.1);
+        border-color: rgba(16, 185, 129, 0.3);
+        color: #10b981;
+    }
+
+    .status-badge.error {
+        background: rgba(239, 68, 68, 0.1);
+        border-color: rgba(239, 68, 68, 0.3);
+        color: #ef4444;
+    }
+
+    /* Error Row Highlight */
+    .row-error {
+        background: rgba(239, 68, 68, 0.05);
+        border-left: 3px solid rgba(239, 68, 68, 0.5);
+    }
+
+    /* Button Icons */
+    .btn-icon {
+        padding: 0.5rem;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-primary);
+        border-radius: 0.375rem;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-icon:hover {
+        background: var(--bg-secondary);
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+    }
+
+    /* Select Field */
+    .select-field {
+        padding: 0.5rem 0.75rem;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-primary);
+        border-radius: 0.375rem;
+        color: var(--text-primary);
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .select-field:hover {
+        border-color: var(--accent-primary);
+    }
+
+    .select-field:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 0 3px var(--shadow-glow);
+    }
+
+    /* Pagination Container */
+    .pagination-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 2rem;
+        padding: 1rem;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 0.5rem;
+    }
+
+    .pagination-info {
+        font-size: 0.875rem;
+    }
+
+    /* Stat change indicators */
+    .stat-change.negative {
+        color: #ef4444;
+    }
+
+    .stat-change.positive {
+        color: var(--status-success);
+    }
+
+    /* Spacing utilities */
+    .flex {
+        display: flex;
+    }
+
+    .items-center {
+        align-items: center;
+    }
+
+    .justify-between {
+        justify-content: space-between;
+    }
+
+    .gap-2 {
+        gap: 0.5rem;
+    }
+</style>
+{% endblock %}

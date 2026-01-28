@@ -1,0 +1,1669 @@
+{% extends "base.html" %}
+
+{% block title %}Presentations - Seedarr{% endblock %}
+
+{% block page_title %}Presentation Generator{% endblock %}
+
+{% block extra_head %}
+<style>
+    :root {
+        --accent-color: #eab308;
+    }
+
+    /* Bento Grid Layout */
+    .bento-grid {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        grid-template-rows: auto auto auto;
+        gap: 1.5rem;
+    }
+
+    /* Columns */
+    .left-column {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .right-column {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    /* BBCode section spans full width */
+    .bbcode-section {
+        grid-column: 1 / -1;
+    }
+
+    /* Bento Tile Styles */
+    .bento-tile {
+        background: rgba(30, 41, 59, 0.6);
+        border: 2px solid rgba(100, 116, 139, 0.2);
+        border-radius: 1.5rem;
+        padding: 1.5rem;
+        transition: all 0.3s ease;
+    }
+
+    .bento-tile:hover {
+        border-color: rgba(6, 182, 212, 0.4);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .bento-tile.active {
+        border-color: var(--accent-color);
+        box-shadow: 0 4px 16px rgba(234, 179, 8, 0.15);
+    }
+
+    .tile-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .tile-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 0.5rem;
+        background: rgba(100, 116, 139, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .tile-icon svg {
+        width: 18px;
+        height: 18px;
+        stroke: rgba(148, 163, 184, 0.8);
+    }
+
+    .bento-tile.active .tile-icon {
+        background: rgba(234, 179, 8, 0.15);
+    }
+
+    .bento-tile.active .tile-icon svg {
+        stroke: var(--accent-color);
+    }
+
+    .tile-title {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    /* File Tile */
+    .file-select-btn {
+        width: 100%;
+        padding: 1rem;
+        background: rgba(59, 130, 246, 0.1);
+        border: 2px dashed rgba(59, 130, 246, 0.3);
+        border-radius: 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        color: rgba(148, 163, 184, 0.8);
+    }
+
+    .file-select-btn:hover {
+        background: rgba(59, 130, 246, 0.15);
+        border-color: rgba(59, 130, 246, 0.5);
+        color: #60a5fa;
+    }
+
+    .selected-file-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        background: rgba(34, 197, 94, 0.1);
+        border: 1px solid rgba(34, 197, 94, 0.3);
+        border-radius: 0.75rem;
+    }
+
+    .selected-file-info .file-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 0.5rem;
+        background: rgba(34, 197, 94, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .selected-file-info .file-icon svg {
+        stroke: #4ade80;
+    }
+
+    .selected-file-info .file-details {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .selected-file-info .file-name {
+        font-weight: 600;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 0.875rem;
+    }
+
+    .selected-file-info .file-size {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+
+    /* Poster Tile */
+    .poster-container {
+        position: relative;
+        aspect-ratio: 2/3;
+        border-radius: 0.75rem;
+        overflow: hidden;
+        background: rgba(15, 23, 42, 0.5);
+    }
+
+    .poster-container img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .poster-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+        gap: 0.5rem;
+    }
+
+    .poster-placeholder svg {
+        width: 48px;
+        height: 48px;
+        opacity: 0.5;
+    }
+
+    .poster-change-btn {
+        position: absolute;
+        bottom: 0.75rem;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 0.5rem 1rem;
+        background: rgba(0, 0, 0, 0.8);
+        border: 1px solid var(--primary);
+        border-radius: 0.5rem;
+        font-size: 0.75rem;
+        color: white;
+        cursor: pointer;
+        opacity: 1;
+        transition: background 0.2s ease;
+    }
+
+    .poster-change-btn:hover {
+        background: var(--primary);
+    }
+
+    /* Templates List */
+    .templates-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .template-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        background: rgba(30, 41, 59, 0.5);
+        border: 2px solid transparent;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .template-item:hover {
+        background: rgba(168, 85, 247, 0.1);
+        border-color: rgba(168, 85, 247, 0.3);
+    }
+
+    .template-item.selected {
+        background: rgba(168, 85, 247, 0.15);
+        border-color: #a855f7;
+    }
+
+    .template-item .template-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 0.375rem;
+        background: rgba(168, 85, 247, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .template-item .template-icon svg {
+        width: 16px;
+        height: 16px;
+        stroke: #a855f7;
+    }
+
+    .template-item .template-name {
+        flex: 1;
+        font-weight: 500;
+        color: var(--text-primary);
+        font-size: 0.875rem;
+    }
+
+    .template-badge {
+        padding: 0.125rem 0.5rem;
+        background: rgba(234, 179, 8, 0.15);
+        border: 1px solid rgba(234, 179, 8, 0.3);
+        border-radius: 9999px;
+        font-size: 0.625rem;
+        color: var(--accent-color);
+        font-weight: 600;
+    }
+
+    /* Info TMDB Tile */
+    .tmdb-info {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .tmdb-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        line-height: 1.2;
+    }
+
+    .tmdb-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+    }
+
+    .tmdb-year {
+        font-size: 1rem;
+        color: var(--text-secondary);
+    }
+
+    .tmdb-rating {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.25rem 0.5rem;
+        background: rgba(234, 179, 8, 0.15);
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--accent-color);
+    }
+
+    .tmdb-rating svg {
+        width: 14px;
+        height: 14px;
+        fill: var(--accent-color);
+    }
+
+    .tmdb-genres {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .genre-badge {
+        padding: 0.25rem 0.75rem;
+        background: rgba(100, 116, 139, 0.2);
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+
+    .tmdb-overview {
+        font-size: 0.875rem;
+        line-height: 1.6;
+        color: var(--text-secondary);
+        display: -webkit-box;
+        -webkit-line-clamp: 4;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .tmdb-placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        text-align: center;
+        color: var(--text-secondary);
+    }
+
+    .tmdb-placeholder svg {
+        width: 48px;
+        height: 48px;
+        opacity: 0.5;
+        margin-bottom: 0.75rem;
+    }
+
+    /* Audio Tile */
+    .audio-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        max-height: 180px;
+        overflow-y: auto;
+    }
+
+    .audio-track {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        background: rgba(15, 23, 42, 0.5);
+        border-radius: 0.5rem;
+    }
+
+    .audio-track .track-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 0.375rem;
+        background: rgba(59, 130, 246, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .audio-track .track-icon svg {
+        width: 16px;
+        height: 16px;
+        stroke: #60a5fa;
+    }
+
+    .audio-track .track-info {
+        flex: 1;
+    }
+
+    .audio-track .track-format {
+        font-weight: 600;
+        color: var(--text-primary);
+        font-size: 0.875rem;
+    }
+
+    .audio-track .track-meta {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+
+    .audio-track .track-lang {
+        padding: 0.125rem 0.5rem;
+        background: rgba(100, 116, 139, 0.2);
+        border-radius: 0.25rem;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+    }
+
+    /* Details Mini-Tiles */
+    .details-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.75rem;
+    }
+
+    .mini-tile {
+        background: rgba(15, 23, 42, 0.5);
+        border: 1px solid rgba(100, 116, 139, 0.2);
+        border-radius: 1rem;
+        padding: 1rem;
+        text-align: center;
+        transition: all 0.2s ease;
+    }
+
+    .mini-tile:hover {
+        border-color: rgba(6, 182, 212, 0.4);
+    }
+
+    .mini-tile .mini-label {
+        font-size: 0.625rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 0.5rem;
+    }
+
+    .mini-tile .mini-value {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .mini-tile .mini-sub {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        margin-top: 0.25rem;
+    }
+
+    /* BBCode Section */
+    .bbcode-section .bento-tile {
+        padding: 0;
+    }
+
+    .bbcode-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid rgba(100, 116, 139, 0.2);
+    }
+
+    .bbcode-tabs {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .bbcode-tab {
+        padding: 0.5rem 1rem;
+        background: transparent;
+        border: 1px solid rgba(100, 116, 139, 0.3);
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .bbcode-tab:hover {
+        background: rgba(100, 116, 139, 0.1);
+    }
+
+    .bbcode-tab.active {
+        background: var(--accent-color);
+        border-color: var(--accent-color);
+        color: #0f172a;
+        font-weight: 600;
+    }
+
+    .bbcode-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .bbcode-content {
+        padding: 1.5rem;
+        min-height: 300px;
+    }
+
+    .bbcode-output {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(100, 116, 139, 0.2);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        font-family: 'Courier New', monospace;
+        font-size: 0.875rem;
+        color: #94a3b8;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
+
+    .bbcode-preview {
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(100, 116, 139, 0.2);
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+    }
+
+    .bbcode-placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 3rem;
+        text-align: center;
+        color: var(--text-secondary);
+    }
+
+    .bbcode-placeholder svg {
+        width: 64px;
+        height: 64px;
+        opacity: 0.3;
+        margin-bottom: 1rem;
+    }
+
+    .generate-btn {
+        margin-top: 1rem;
+    }
+
+    /* Modal Styles */
+    .modal-box {
+        max-width: 90vw;
+        max-height: 90vh;
+        background: rgba(30, 41, 59, 0.98);
+        border: 1px solid rgba(100, 116, 139, 0.3);
+    }
+
+    /* Scrollbar Styles */
+    .templates-list::-webkit-scrollbar,
+    .audio-list::-webkit-scrollbar,
+    .bbcode-output::-webkit-scrollbar,
+    .movie-list::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .templates-list::-webkit-scrollbar-track,
+    .audio-list::-webkit-scrollbar-track,
+    .bbcode-output::-webkit-scrollbar-track,
+    .movie-list::-webkit-scrollbar-track {
+        background: rgba(30, 41, 59, 0.5);
+        border-radius: 3px;
+    }
+
+    .templates-list::-webkit-scrollbar-thumb,
+    .audio-list::-webkit-scrollbar-thumb,
+    .bbcode-output::-webkit-scrollbar-thumb,
+    .movie-list::-webkit-scrollbar-thumb {
+        background: rgba(100, 116, 139, 0.5);
+        border-radius: 3px;
+    }
+
+    /* Movie Search Results */
+    .movie-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .movie-item {
+        display: flex;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        background: rgba(30, 41, 59, 0.5);
+        border: 2px solid transparent;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .movie-item:hover {
+        background: rgba(59, 130, 246, 0.1);
+        border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .movie-item.selected {
+        background: rgba(234, 179, 8, 0.15);
+        border-color: var(--accent-color);
+    }
+
+    .movie-item img {
+        width: 45px;
+        height: 68px;
+        border-radius: 0.375rem;
+        object-fit: cover;
+        flex-shrink: 0;
+    }
+
+    .movie-item-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .movie-item-info h5 {
+        margin: 0;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .movie-item-info p {
+        margin: 0.25rem 0 0;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+
+    /* Loading spinner for tiles */
+    .tile-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+    }
+
+    /* Cast grid for BBCode preview */
+    .cast-grid {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+
+    .cast-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        width: 100px;
+    }
+
+    .cast-photo {
+        width: 80px;
+        height: 120px;
+        object-fit: cover;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .cast-name {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        max-width: 100px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 1024px) {
+        .bento-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .details-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .left-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .left-column .bento-tile:first-child {
+            grid-column: 1 / -1;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .left-column {
+            grid-template-columns: 1fr;
+        }
+
+        .details-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <div class="bento-grid">
+        <!-- Left Column -->
+        <div class="left-column">
+            <!-- File Selection Tile -->
+            <div class="bento-tile" id="file-tile">
+                <div class="tile-header">
+                    <div class="tile-icon">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
+                        </svg>
+                    </div>
+                    <span class="tile-title">Fichier</span>
+                </div>
+
+                <div id="file-select-area">
+                    <button class="file-select-btn" onclick="openFileBrowser()">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                        </svg>
+                        Parcourir
+                    </button>
+                </div>
+
+                <div id="file-selected-area" style="display: none;">
+                    <div class="selected-file-info">
+                        <div class="file-icon">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
+                            </svg>
+                        </div>
+                        <div class="file-details">
+                            <div class="file-name" id="selected-file-name">-</div>
+                            <div class="file-size" id="selected-file-size">-</div>
+                        </div>
+                        <button class="btn btn-sm btn-ghost btn-circle" onclick="clearFileSelection()">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <input type="hidden" id="selected-file-path">
+                </div>
+            </div>
+
+            <!-- Poster Tile -->
+            <div class="bento-tile" id="poster-tile">
+                <div class="tile-header">
+                    <div class="tile-icon">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <span class="tile-title">Poster TMDB</span>
+                </div>
+
+                <div class="poster-container" id="poster-container">
+                    <div class="poster-placeholder" id="poster-placeholder">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <span class="text-sm">Aucun film</span>
+                    </div>
+                    <img id="poster-image" src="" alt="Movie Poster" style="display: none;">
+                    <button class="poster-change-btn" onclick="showManualSearch()" style="display: none;" id="change-movie-btn">
+                        Changer
+                    </button>
+                </div>
+            </div>
+
+            <!-- Templates Tile -->
+            <div class="bento-tile" id="templates-tile">
+                <div class="tile-header">
+                    <div class="tile-icon">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
+                    <span class="tile-title">Templates</span>
+                </div>
+
+                {% if templates %}
+                <div class="templates-list">
+                    {% for template in templates %}
+                    <div class="template-item" onclick="selectTemplate({{ template.id }}, '{{ template.name }}')" data-template-id="{{ template.id }}">
+                        <div class="template-icon">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                        <span class="template-name">{{ template.name }}</span>
+                        {% if template.is_default %}
+                        <span class="template-badge">Defaut</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="tmdb-placeholder">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    <span class="text-sm">Aucun template</span>
+                </div>
+                {% endif %}
+                <input type="hidden" id="selected-template-id">
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="right-column">
+            <!-- TMDB Info Tile -->
+            <div class="bento-tile" id="tmdb-tile">
+                <div class="tile-header">
+                    <div class="tile-icon">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
+                        </svg>
+                    </div>
+                    <span class="tile-title">Info TMDB</span>
+                </div>
+
+                <div id="tmdb-content">
+                    <div class="tmdb-placeholder">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                        </svg>
+                        <span class="text-sm">Selectionnez un fichier pour detecter le film</span>
+                    </div>
+                </div>
+
+                <div id="tmdb-info" style="display: none;">
+                    <div class="tmdb-info">
+                        <div class="tmdb-title" id="tmdb-title">-</div>
+                        <div class="tmdb-meta">
+                            <span class="tmdb-year" id="tmdb-year">-</span>
+                            <div class="tmdb-rating" id="tmdb-rating-container" style="display: none;">
+                                <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                <span id="tmdb-rating">-</span>
+                            </div>
+                        </div>
+                        <div class="tmdb-genres" id="tmdb-genres"></div>
+                        <p class="tmdb-overview" id="tmdb-overview">-</p>
+                    </div>
+                    <input type="hidden" id="selected-tmdb-id">
+                </div>
+            </div>
+
+            <!-- Audio Tile -->
+            <div class="bento-tile" id="audio-tile">
+                <div class="tile-header">
+                    <div class="tile-icon">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
+                        </svg>
+                    </div>
+                    <span class="tile-title">Audio</span>
+                </div>
+
+                <div id="audio-content">
+                    <div class="tmdb-placeholder">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
+                        </svg>
+                        <span class="text-sm">Aucune piste audio</span>
+                    </div>
+                </div>
+
+                <div id="audio-list-container" style="display: none;">
+                    <div class="audio-list" id="audio-list"></div>
+                </div>
+            </div>
+
+            <!-- Subtitles Tile -->
+            <div class="bento-tile" id="subtitles-tile">
+                <div class="tile-header">
+                    <div class="tile-icon">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+                        </svg>
+                    </div>
+                    <span class="tile-title">Sous-titres</span>
+                </div>
+
+                <div id="subtitles-content">
+                    <div class="tmdb-placeholder">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+                        </svg>
+                        <span class="text-sm">Aucun sous-titre</span>
+                    </div>
+                </div>
+
+                <div id="subtitles-list-container" style="display: none;">
+                    <div class="audio-list" id="subtitles-list"></div>
+                </div>
+            </div>
+
+            <!-- Details Mini-Tiles -->
+            <div class="details-grid" id="details-grid">
+                <div class="mini-tile">
+                    <div class="mini-label">Resolution</div>
+                    <div class="mini-value" id="detail-resolution">-</div>
+                    <div class="mini-sub" id="detail-resolution-full">-</div>
+                </div>
+                <div class="mini-tile">
+                    <div class="mini-label">Codec Video</div>
+                    <div class="mini-value" id="detail-codec">-</div>
+                    <div class="mini-sub" id="detail-codec-profile">-</div>
+                </div>
+                <div class="mini-tile">
+                    <div class="mini-label">Audio Principal</div>
+                    <div class="mini-value" id="detail-audio">-</div>
+                    <div class="mini-sub" id="detail-audio-channels">-</div>
+                </div>
+                <div class="mini-tile">
+                    <div class="mini-label">Taille</div>
+                    <div class="mini-value" id="detail-size">-</div>
+                    <div class="mini-sub" id="detail-duration">-</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BBCode Section (Full Width) -->
+        <div class="bbcode-section">
+            <div class="bento-tile">
+                <div class="bbcode-header">
+                    <div class="bbcode-tabs">
+                        <button class="bbcode-tab active" onclick="switchBBCodeTab('code')" id="tab-code">Code</button>
+                        <button class="bbcode-tab" onclick="switchBBCodeTab('preview')" id="tab-preview">Apercu</button>
+                    </div>
+                    <div class="bbcode-actions">
+                        <button class="btn btn-sm btn-outline gap-2" onclick="copyToClipboard()" id="copy-btn" disabled>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                            </svg>
+                            Copier
+                        </button>
+                        <button class="btn btn-sm btn-outline gap-2" onclick="downloadBBCode()" id="download-btn" disabled>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                            Telecharger
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bbcode-content">
+                    <div id="bbcode-placeholder" class="bbcode-placeholder">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                        </svg>
+                        <span>Selectionnez un fichier, un film TMDB et un template</span>
+                        <span class="text-xs mt-2 opacity-60">Le BBCode sera genere automatiquement</span>
+                        <button class="btn btn-primary gap-2 generate-btn" onclick="generatePresentation()" id="generate-btn" disabled>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            Generer la presentation
+                        </button>
+                    </div>
+
+                    <div id="bbcode-code-view" style="display: none;">
+                        <pre class="bbcode-output" id="bbcode-result"></pre>
+                    </div>
+
+                    <div id="bbcode-preview-view" style="display: none;">
+                        <div class="bbcode-preview" id="bbcode-preview-content">
+                            <!-- BBCode preview will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- File Browser Modal -->
+<dialog id="file-browser-modal" class="modal">
+    <div class="modal-box max-w-3xl">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">X</button>
+        </form>
+        <h3 class="font-bold text-lg mb-4">Selectionner un fichier</h3>
+
+        <!-- Search Bar -->
+        <div class="mb-4">
+            <div class="relative">
+                <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <input type="text"
+                       id="file-search-input"
+                       placeholder="Rechercher un fichier..."
+                       class="input input-bordered w-full pl-10"
+                       oninput="filterFileBrowser(this.value)">
+            </div>
+        </div>
+
+        <div id="file-browser-content" hx-get="/api/presentations/browse" hx-trigger="load" hx-swap="innerHTML">
+            <div class="flex justify-center p-8">
+                <span class="loading loading-spinner loading-lg"></span>
+            </div>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
+
+<!-- Manual TMDB Search Modal -->
+<dialog id="manual-search-modal" class="modal">
+    <div class="modal-box max-w-2xl">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">X</button>
+        </form>
+        <h3 class="font-bold text-lg mb-4">Recherche manuelle TMDB</h3>
+
+        <div class="form-control mb-4">
+            <input type="text" id="manual-search-input" placeholder="Tapez le titre d'un film..." class="input input-bordered w-full" autocomplete="off">
+        </div>
+
+        <div id="manual-search-results" class="movie-list">
+            <div class="tmdb-placeholder py-8">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-12 h-12 opacity-50 mb-2">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <span class="text-sm">Recherchez un film par son titre</span>
+            </div>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
+
+<script>
+// State
+let selectedFile = null;
+let selectedMovie = null;
+let selectedTemplate = null;
+let mediaInfo = null;
+let generatedBBCode = null;
+let currentBBCodeTab = 'code';
+
+// ===== File Selection =====
+function openFileBrowser() {
+    document.getElementById('file-search-input').value = '';
+    document.getElementById('file-browser-modal').showModal();
+}
+
+function filterFileBrowser(query) {
+    const searchTerm = query.toLowerCase().trim();
+    // Target items in the scrollable container (folders and files)
+    const container = document.querySelector('#file-browser-content .space-y-1');
+    if (!container) return;
+
+    const items = container.querySelectorAll(':scope > div');
+
+    items.forEach(item => {
+        const fileName = item.textContent.toLowerCase();
+        if (searchTerm === '' || fileName.includes(searchTerm)) {
+            item.style.display = '';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+// Reset search when navigating folders
+document.addEventListener('htmx:afterSwap', function(event) {
+    if (event.detail.target.id === 'file-browser-content') {
+        document.getElementById('file-search-input').value = '';
+    }
+});
+
+async function selectFile(path, name) {
+    selectedFile = { path, name };
+    document.getElementById('selected-file-name').textContent = name;
+    document.getElementById('selected-file-path').value = path;
+    document.getElementById('file-select-area').style.display = 'none';
+    document.getElementById('file-selected-area').style.display = 'block';
+    document.getElementById('file-tile').classList.add('active');
+    document.getElementById('file-browser-modal').close();
+
+    // Analyze file and search TMDB
+    await analyzeFileAndSearchTMDB(path, name);
+    updateGenerateButton();
+}
+
+function clearFileSelection() {
+    selectedFile = null;
+    mediaInfo = null;
+    document.getElementById('file-select-area').style.display = 'block';
+    document.getElementById('file-selected-area').style.display = 'none';
+    document.getElementById('file-tile').classList.remove('active');
+    document.getElementById('selected-file-size').textContent = '-';
+
+    // Clear details
+    resetMediaInfoDisplay();
+    clearMovieSelection();
+    updateGenerateButton();
+}
+
+// ===== MediaInfo Analysis =====
+async function analyzeFileAndSearchTMDB(path, filename) {
+    // Show loading states
+    document.getElementById('audio-content').innerHTML = '<div class="tile-loading"><span class="loading loading-spinner"></span></div>';
+    document.getElementById('tmdb-content').innerHTML = '<div class="tile-loading"><span class="loading loading-spinner"></span></div>';
+
+    try {
+        // Analyze file
+        const analyzeResponse = await fetch(`/api/presentations/analyze?path=${encodeURIComponent(path)}`);
+        const analyzeData = await analyzeResponse.json();
+
+        if (analyzeData.status === 'success') {
+            mediaInfo = analyzeData;
+            updateMediaInfoDisplay(analyzeData);
+        } else {
+            showToast(analyzeData.message || 'Erreur d\'analyse', 'error');
+            resetMediaInfoDisplay();
+        }
+
+        // Search TMDB
+        await loadTMDBSuggestions(filename);
+
+    } catch (error) {
+        console.error('Error analyzing file:', error);
+        showToast('Erreur lors de l\'analyse du fichier', 'error');
+        resetMediaInfoDisplay();
+    }
+}
+
+function updateMediaInfoDisplay(data) {
+    // Update file size
+    document.getElementById('selected-file-size').textContent = data.file_size || '-';
+
+    // Update details tiles
+    if (data.video) {
+        document.getElementById('detail-resolution').textContent = data.video.resolution_label || '-';
+        document.getElementById('detail-resolution-full').textContent = data.video.resolution || '-';
+        document.getElementById('detail-codec').textContent = data.video.codec || '-';
+        document.getElementById('detail-codec-profile').textContent = data.video.codec_profile || '-';
+    }
+
+    if (data.audio_tracks && data.audio_tracks.length > 0) {
+        const mainAudio = data.audio_tracks[0];
+        document.getElementById('detail-audio').textContent = mainAudio.format || '-';
+        document.getElementById('detail-audio-channels').textContent = mainAudio.channels_label || '-';
+    }
+
+    document.getElementById('detail-size').textContent = data.file_size || '-';
+    document.getElementById('detail-duration').textContent = data.duration || '-';
+
+    // Update audio list
+    if (data.audio_tracks && data.audio_tracks.length > 0) {
+        document.getElementById('audio-content').style.display = 'none';
+        document.getElementById('audio-list-container').style.display = 'block';
+
+        const audioList = document.getElementById('audio-list');
+        audioList.innerHTML = data.audio_tracks.map(track => `
+            <div class="audio-track">
+                <div class="track-icon">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
+                    </svg>
+                </div>
+                <div class="track-info">
+                    <div class="track-format">${track.format} ${track.channels_label}</div>
+                    <div class="track-meta">${track.bitrate || ''}</div>
+                </div>
+                <span class="track-lang">${track.language}</span>
+            </div>
+        `).join('');
+    } else {
+        document.getElementById('audio-content').style.display = 'block';
+        document.getElementById('audio-list-container').style.display = 'none';
+    }
+
+    // Update subtitles list
+    if (data.subtitles && data.subtitles.length > 0) {
+        document.getElementById('subtitles-content').style.display = 'none';
+        document.getElementById('subtitles-list-container').style.display = 'block';
+
+        const subtitlesList = document.getElementById('subtitles-list');
+        subtitlesList.innerHTML = data.subtitles.map(sub => `
+            <div class="audio-track">
+                <div class="track-icon">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+                    </svg>
+                </div>
+                <div class="track-info">
+                    <div class="track-format">${sub.format || 'Subtitle'}</div>
+                    <div class="track-meta">${sub.title || ''}</div>
+                </div>
+                <span class="track-lang">${sub.language}</span>
+            </div>
+        `).join('');
+    } else {
+        document.getElementById('subtitles-content').style.display = 'block';
+        document.getElementById('subtitles-list-container').style.display = 'none';
+    }
+}
+
+function resetMediaInfoDisplay() {
+    document.getElementById('detail-resolution').textContent = '-';
+    document.getElementById('detail-resolution-full').textContent = '-';
+    document.getElementById('detail-codec').textContent = '-';
+    document.getElementById('detail-codec-profile').textContent = '-';
+    document.getElementById('detail-audio').textContent = '-';
+    document.getElementById('detail-audio-channels').textContent = '-';
+    document.getElementById('detail-size').textContent = '-';
+    document.getElementById('detail-duration').textContent = '-';
+
+    document.getElementById('audio-content').innerHTML = `
+        <div class="tmdb-placeholder">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
+            </svg>
+            <span class="text-sm">Aucune piste audio</span>
+        </div>
+    `;
+    document.getElementById('audio-content').style.display = 'block';
+    document.getElementById('audio-list-container').style.display = 'none';
+
+    // Reset subtitles
+    document.getElementById('subtitles-content').innerHTML = `
+        <div class="tmdb-placeholder">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+            </svg>
+            <span class="text-sm">Aucun sous-titre</span>
+        </div>
+    `;
+    document.getElementById('subtitles-content').style.display = 'block';
+    document.getElementById('subtitles-list-container').style.display = 'none';
+}
+
+// ===== TMDB Selection =====
+async function loadTMDBSuggestions(filename) {
+    try {
+        const response = await fetch(`/api/presentations/suggest-movies?filename=${encodeURIComponent(filename)}`);
+        const data = await response.json();
+
+        // Check if response is an error object
+        if (data.error) {
+            console.error('TMDB search error:', data.error);
+            document.getElementById('tmdb-content').innerHTML = `
+                <div class="tmdb-placeholder">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    <span class="text-sm text-error">${data.error}</span>
+                    <button class="btn btn-sm btn-primary mt-2" onclick="showManualSearch()">Recherche manuelle</button>
+                </div>
+            `;
+            return;
+        }
+
+        // data is a list of movies
+        const movies = Array.isArray(data) ? data : (data.movies || []);
+
+        if (movies && movies.length > 0) {
+            // Auto-select first movie
+            await selectMovie(movies[0]);
+
+            document.getElementById('tmdb-content').innerHTML = `
+                <div class="text-sm text-gray-400 mb-2">Film detecte automatiquement</div>
+            `;
+        } else {
+            document.getElementById('tmdb-content').innerHTML = `
+                <div class="tmdb-placeholder">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    <span class="text-sm">Aucun film trouve</span>
+                    <button class="btn btn-sm btn-primary mt-2" onclick="showManualSearch()">Recherche manuelle</button>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading TMDB suggestions:', error);
+        document.getElementById('tmdb-content').innerHTML = `
+            <div class="tmdb-placeholder">
+                <span class="text-sm text-error">Erreur de recherche TMDB</span>
+                <button class="btn btn-sm btn-primary mt-2" onclick="showManualSearch()">Recherche manuelle</button>
+            </div>
+        `;
+    }
+}
+
+async function selectMovie(movie) {
+    selectedMovie = movie;
+
+    // Update poster
+    if (movie.poster) {
+        document.getElementById('poster-placeholder').style.display = 'none';
+        document.getElementById('poster-image').src = movie.poster;
+        document.getElementById('poster-image').style.display = 'block';
+        document.getElementById('change-movie-btn').style.display = 'block';
+    }
+
+    // Fetch full details
+    try {
+        const response = await fetch(`/api/presentations/movie-details/${movie.id}`);
+        const details = await response.json();
+
+        selectedMovie = { ...selectedMovie, ...details };
+
+        // Update TMDB info
+        document.getElementById('tmdb-content').style.display = 'none';
+        document.getElementById('tmdb-info').style.display = 'block';
+        document.getElementById('tmdb-tile').classList.add('active');
+
+        document.getElementById('tmdb-title').textContent = details.title || movie.title;
+        document.getElementById('tmdb-year').textContent = details.year || movie.year || '-';
+        document.getElementById('selected-tmdb-id').value = movie.id;
+
+        if (details.rating) {
+            document.getElementById('tmdb-rating').textContent = details.rating.toFixed(1);
+            document.getElementById('tmdb-rating-container').style.display = 'flex';
+        } else {
+            document.getElementById('tmdb-rating-container').style.display = 'none';
+        }
+
+        // Genres
+        const genresContainer = document.getElementById('tmdb-genres');
+        if (details.genres && details.genres.length > 0) {
+            genresContainer.innerHTML = details.genres.map(g => `<span class="genre-badge">${g}</span>`).join('');
+        } else {
+            genresContainer.innerHTML = '';
+        }
+
+        document.getElementById('tmdb-overview').textContent = details.overview || '-';
+
+    } catch (error) {
+        console.error('Error fetching movie details:', error);
+    }
+
+    updateGenerateButton();
+
+    // Auto-generate if file and template are selected
+    if (selectedFile && selectedTemplate) {
+        resetBBCodeDisplay();
+        generatePresentation();
+    }
+}
+
+function clearMovieSelection() {
+    selectedMovie = null;
+    document.getElementById('poster-placeholder').style.display = 'flex';
+    document.getElementById('poster-image').style.display = 'none';
+    document.getElementById('change-movie-btn').style.display = 'none';
+    document.getElementById('tmdb-content').style.display = 'block';
+    document.getElementById('tmdb-info').style.display = 'none';
+    document.getElementById('tmdb-tile').classList.remove('active');
+
+    document.getElementById('tmdb-content').innerHTML = `
+        <div class="tmdb-placeholder">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+            </svg>
+            <span class="text-sm">Selectionnez un fichier pour detecter le film</span>
+        </div>
+    `;
+
+    updateGenerateButton();
+}
+
+function showManualSearch() {
+    document.getElementById('manual-search-modal').showModal();
+    document.getElementById('manual-search-input').value = '';
+    document.getElementById('manual-search-input').focus();
+}
+
+let searchTimeout;
+document.getElementById('manual-search-input')?.addEventListener('input', (e) => {
+    clearTimeout(searchTimeout);
+    const query = e.target.value.trim();
+
+    if (query.length < 2) {
+        document.getElementById('manual-search-results').innerHTML = `
+            <div class="tmdb-placeholder py-8">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-12 h-12 opacity-50 mb-2">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <span class="text-sm">Recherchez un film par son titre</span>
+            </div>
+        `;
+        return;
+    }
+
+    searchTimeout = setTimeout(async () => {
+        try {
+            const response = await fetch(`/api/presentations/search-movies?query=${encodeURIComponent(query)}`);
+            const movies = await response.json();
+
+            const resultsDiv = document.getElementById('manual-search-results');
+            if (movies.length === 0) {
+                resultsDiv.innerHTML = `
+                    <div class="tmdb-placeholder py-8">
+                        <span class="text-sm">Aucun resultat trouve</span>
+                    </div>
+                `;
+                return;
+            }
+
+            resultsDiv.innerHTML = movies.map(movie => `
+                <div class="movie-item" onclick="selectFromManualSearch(${JSON.stringify(movie).replace(/"/g, '&quot;')})">
+                    <img src="${movie.poster}" alt="${movie.title}" onerror="this.src='https://via.placeholder.com/45x68?text=?'">
+                    <div class="movie-item-info">
+                        <h5>${movie.title}</h5>
+                        <p>${movie.year || 'N/A'}</p>
+                    </div>
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Search error:', error);
+        }
+    }, 300);
+});
+
+function selectFromManualSearch(movie) {
+    document.getElementById('manual-search-modal').close();
+    selectMovie(movie);
+}
+
+// ===== Template Selection =====
+function selectTemplate(id, name) {
+    selectedTemplate = { id, name };
+
+    // Update UI
+    document.querySelectorAll('.template-item').forEach(item => {
+        item.classList.remove('selected');
+        if (item.dataset.templateId == id) {
+            item.classList.add('selected');
+        }
+    });
+
+    document.getElementById('selected-template-id').value = id;
+    document.getElementById('templates-tile').classList.add('active');
+
+    updateGenerateButton();
+
+    // Auto-generate if file and movie are selected
+    if (selectedFile && selectedMovie) {
+        // Reset BBCode display before regenerating
+        resetBBCodeDisplay();
+        generatePresentation();
+    }
+}
+
+function resetBBCodeDisplay() {
+    generatedBBCode = null;
+    document.getElementById('bbcode-placeholder').style.display = 'flex';
+    document.getElementById('bbcode-code-view').style.display = 'none';
+    document.getElementById('bbcode-preview-view').style.display = 'none';
+    document.getElementById('bbcode-result').textContent = '';
+    document.getElementById('bbcode-preview-content').innerHTML = '';
+    document.getElementById('copy-btn').disabled = true;
+    document.getElementById('download-btn').disabled = true;
+}
+
+// ===== Generate Presentation =====
+function updateGenerateButton() {
+    const btn = document.getElementById('generate-btn');
+    const canGenerate = selectedFile && selectedMovie && selectedTemplate;
+    btn.disabled = !canGenerate;
+}
+
+async function generatePresentation() {
+    if (!selectedFile || !selectedMovie || !selectedTemplate) {
+        showToast('Veuillez completer toutes les selections', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('generate-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Generation...';
+
+    try {
+        // Build request data with proper types
+        const requestData = {
+            file_path: selectedFile.path,
+            tmdb_id: String(selectedMovie.id),  // Ensure string
+            template_id: parseInt(selectedTemplate.id, 10)  // Ensure integer
+        };
+        console.log('Generate request:', requestData);
+
+        const response = await fetch('/api/presentations/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestData)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            generatedBBCode = result.bbcode;
+
+            // Show result - keep current tab
+            document.getElementById('bbcode-placeholder').style.display = 'none';
+            document.getElementById('bbcode-result').textContent = result.bbcode;
+
+            // Switch to current tab (preserves user's tab selection)
+            switchBBCodeTab(currentBBCodeTab);
+
+            // Enable buttons
+            document.getElementById('copy-btn').disabled = false;
+            document.getElementById('download-btn').disabled = false;
+
+            showToast('Presentation generee avec succes!', 'success');
+        } else {
+            // Handle validation errors (422) which return an array of errors
+            let errorMsg = 'Erreur de generation';
+            if (result.detail) {
+                if (Array.isArray(result.detail)) {
+                    errorMsg = result.detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+                } else if (typeof result.detail === 'string') {
+                    errorMsg = result.detail;
+                } else {
+                    errorMsg = JSON.stringify(result.detail);
+                }
+            }
+            console.error('API error:', result);
+            throw new Error(errorMsg);
+        }
+    } catch (error) {
+        console.error('Generation error:', error);
+        showToast(error.message || 'Erreur lors de la generation', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+            Generer la presentation
+        `;
+        updateGenerateButton();
+    }
+}
+
+// ===== BBCode Tabs =====
+function switchBBCodeTab(tab) {
+    currentBBCodeTab = tab;  // Save current tab
+
+    document.getElementById('tab-code').classList.remove('active');
+    document.getElementById('tab-preview').classList.remove('active');
+    document.getElementById(`tab-${tab}`).classList.add('active');
+
+    document.getElementById('bbcode-code-view').style.display = 'none';
+    document.getElementById('bbcode-preview-view').style.display = 'none';
+
+    if (generatedBBCode) {
+        if (tab === 'code') {
+            document.getElementById('bbcode-code-view').style.display = 'block';
+        } else {
+            document.getElementById('bbcode-preview-view').style.display = 'block';
+            // Simple BBCode to HTML conversion for preview
+            const preview = bbcodeToHtml(generatedBBCode);
+            document.getElementById('bbcode-preview-content').innerHTML = preview;
+        }
+    }
+}
+
+function bbcodeToHtml(bbcode) {
+    // Basic BBCode to HTML conversion
+    let html = bbcode
+        .replace(/\[b\](.*?)\[\/b\]/gi, '<strong>$1</strong>')
+        .replace(/\[i\](.*?)\[\/i\]/gi, '<em>$1</em>')
+        .replace(/\[u\](.*?)\[\/u\]/gi, '<u>$1</u>')
+        .replace(/\[s\](.*?)\[\/s\]/gi, '<s>$1</s>')
+        .replace(/\[url=(.*?)\](.*?)\[\/url\]/gi, '<a href="$1" target="_blank" class="link link-primary">$2</a>')
+        .replace(/\[url\](.*?)\[\/url\]/gi, '<a href="$1" target="_blank" class="link link-primary">$1</a>')
+        .replace(/\[color=(.*?)\](.*?)\[\/color\]/gi, '<span style="color:$1">$2</span>')
+        .replace(/\[size=(.*?)\](.*?)\[\/size\]/gi, '<span style="font-size:$1">$2</span>')
+        .replace(/\[center\](.*?)\[\/center\]/gis, '<div class="text-center">$1</div>')
+        .replace(/\[quote\](.*?)\[\/quote\]/gis, '<blockquote class="border-l-4 border-gray-500 pl-4 italic my-4">$1</blockquote>')
+        .replace(/\[code\](.*?)\[\/code\]/gis, '<pre class="bg-base-300 p-2 rounded">$1</pre>')
+        .replace(/\[list\](.*?)\[\/list\]/gis, '<ul class="list-disc list-inside my-2">$1</ul>')
+        .replace(/\[\*\]\s*(.*?)(?=\[\*\]|$|\[\/list\])/gi, '<li>$1</li>');
+
+    // Handle cast cards: detect pattern of multiple [img]...[/img] Name on same line
+    // Wrap them in a flex container for inline display
+    html = html.replace(/(\[img\].*?\[\/img\]\s*\w+(?:\s+\w+)*\s*){2,}/gi, (match) => {
+        // Convert each cast card to a flex item
+        const cards = match.replace(/\[img\](.*?)\[\/img\]\s*(\w+(?:\s+\w+)*)/gi,
+            '<div class="cast-card"><img src="$1" class="cast-photo" alt="$2"><span class="cast-name">$2</span></div>');
+        return `<div class="cast-grid">${cards}</div>`;
+    });
+
+    // Handle remaining [img] tags (non-cast images like poster/backdrop)
+    html = html.replace(/\[img\](.*?)\[\/img\]/gi, '<img src="$1" class="max-w-full rounded my-2" alt="Image">');
+
+    // Convert newlines to <br> at the end
+    html = html.replace(/\n/g, '<br>');
+
+    return html;
+}
+
+// ===== Utility Functions =====
+function copyToClipboard() {
+    if (!generatedBBCode) return;
+    navigator.clipboard.writeText(generatedBBCode).then(() => {
+        showToast('BBCode copie!', 'success');
+    });
+}
+
+function downloadBBCode() {
+    if (!generatedBBCode || !selectedMovie) return;
+
+    const blob = new Blob([generatedBBCode], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedMovie.title}_${selectedMovie.year || ''}_presentation.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function showToast(message, type = 'info') {
+    const alertClass = type === 'error' ? 'alert-error' : type === 'success' ? 'alert-success' : 'alert-info';
+    const toast = document.createElement('div');
+    toast.className = `alert ${alertClass} fixed top-4 right-4 w-auto max-w-md shadow-lg z-50`;
+    toast.innerHTML = `<span>${message}</span>`;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    // Auto-select default template if exists
+    const defaultTemplate = document.querySelector('.template-item .template-badge');
+    if (defaultTemplate) {
+        const templateItem = defaultTemplate.closest('.template-item');
+        const templateId = templateItem.dataset.templateId;
+        const templateName = templateItem.querySelector('.template-name').textContent;
+        selectTemplate(templateId, templateName);
+    }
+});
+</script>
+{% endblock %}

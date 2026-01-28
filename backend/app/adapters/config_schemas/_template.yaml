@@ -1,0 +1,191 @@
+# Tracker Configuration Template
+# Copy this file and rename to your_tracker.yaml
+# Fill in your tracker's specific API details
+
+# ============================================================================
+# TRACKER IDENTITY (Required)
+# ============================================================================
+tracker:
+  name: "My Tracker"           # Display name
+  slug: "mytracker"            # URL-safe identifier (lowercase, no spaces)
+  description: "Description of tracker"
+
+# ============================================================================
+# AUTHENTICATION (Required)
+# ============================================================================
+# Choose ONE of these auth types:
+
+# Option 1: Bearer Token (most common for APIs)
+auth:
+  type: "bearer"
+  header: "Authorization"
+  prefix: "Bearer "
+
+# Option 2: API Key in custom header
+# auth:
+#   type: "api_key"
+#   header: "X-API-Key"
+
+# Option 3: Passkey in URL
+# auth:
+#   type: "passkey"
+#   passkey_param: "passkey"
+
+# ============================================================================
+# CLOUDFLARE BYPASS (Optional)
+# ============================================================================
+cloudflare:
+  enabled: false              # Set to true if tracker uses Cloudflare
+  service: "flaresolverr"
+  timeout: 60000
+
+# ============================================================================
+# API ENDPOINTS (Required)
+# ============================================================================
+endpoints:
+  base: "/api"                # Base path for all endpoints
+  upload: "/api/torrents"     # Upload endpoint
+  categories: "/api/categories"
+  tags: "/api/tags"
+  search: "/api/torrents/search"
+  health: "/api/health"
+
+# ============================================================================
+# UPLOAD CONFIGURATION (Required)
+# ============================================================================
+upload:
+  method: "POST"
+  content_type: "multipart/form-data"
+
+  # Map internal field names to API field names
+  # Available types: file, string, json, boolean, repeated, number
+  fields:
+    torrent:
+      name: "torrent"         # API field name
+      type: "file"
+      required: true
+
+    nfo:
+      name: "nfo"
+      type: "file"
+      required: false
+
+    title:
+      name: "title"
+      type: "string"
+      source: "release_name"  # Where to get the value
+      sanitize:
+        replace_spaces: "."   # Optional: replace spaces
+        max_length: 255
+
+    category:
+      name: "categoryId"
+      type: "string"
+      source: "category_id"
+      required: true
+
+    # Add more fields as needed:
+    # subcategory:
+    #   name: "subcategoryId"
+    #   type: "string"
+    #   source: "subcategory_id"
+    #
+    # description:
+    #   name: "description"
+    #   type: "string"
+    #   source: "description"
+    #
+    # tmdb_data:
+    #   name: "tmdbData"
+    #   type: "json"
+    #   source: "tmdb_data"
+    #
+    # options:
+    #   name: "options"
+    #   type: "json"
+    #   source: "options"
+    #
+    # tags:
+    #   name: "tags[]"        # Use [] for repeated fields
+    #   type: "repeated"
+    #   source: "tag_ids"
+
+# ============================================================================
+# OPTIONS MAPPING (Optional - for trackers with options system)
+# ============================================================================
+options:
+  # Language mapping
+  language:
+    type: "1"                 # Option type ID used by tracker API
+    multi_select: true
+    default: [1]              # Default value(s)
+    mappings:
+      english: 1
+      french: 2
+      multi: 4
+      vostfr: 8
+
+  # Quality mapping
+  quality:
+    type: "2"
+    multi_select: false
+    default: 25
+    mappings:
+      2160p_web: 26
+      1080p_web: 25
+      720p_web: 24
+      1080p_bluray: 11
+      remux: 12
+    resolution_fallback:
+      2160p: 26
+      1080p: 25
+      720p: 24
+
+  # Genre mapping (from TMDB genre IDs)
+  # genre:
+  #   type: "5"
+  #   multi_select: true
+  #   tmdb_mappings:
+  #     28: 39    # Action
+  #     35: 49    # Comedy
+  #     18: 57    # Drama
+
+  # Season/Episode for TV shows
+  # season:
+  #   type: "7"
+  #   complete_value: 118
+  #   base_value: 120
+  #   max_value: 150
+  # episode:
+  #   type: "6"
+  #   complete_value: 96
+  #   base_value: 96
+  #   max_value: 116
+
+# ============================================================================
+# CATEGORY MAPPING (Optional)
+# ============================================================================
+categories:
+  movie_4k: "1"
+  movie_1080p: "2"
+  movie_720p: "3"
+  tv_1080p: "4"
+  tv_720p: "5"
+  # movie_category: "1"       # Parent category ID
+  # tv_category: "2"
+
+# ============================================================================
+# TORRENT GENERATION (Optional)
+# ============================================================================
+torrent:
+  piece_size_strategy: "auto"  # auto | c411 | standard
+  source_flag: "MYTRACKER"     # Makes torrent hash unique per tracker
+
+# ============================================================================
+# RESPONSE PARSING (Optional)
+# ============================================================================
+response:
+  success_field: "success"
+  error_field: "error"
+  torrent_id_field: "data.id"
+  torrent_url_template: "{tracker_url}/torrent/{torrent_id}"

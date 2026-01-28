@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block title %}File Manager - Seedarr v2.0{% endblock %}
+
+{% block page_title %}File Manager{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- File Manager Header -->
+    <div class="dashboard-header">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="dashboard-title">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                    </svg>
+                    File Manager
+                </h1>
+                <p class="dashboard-subtitle">Browse and scan media files</p>
+            </div>
+            {% if current_path %}
+            <button
+                onclick="scanCurrentFolder()"
+                class="btn-primary"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                Scan Folder
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Messages Container -->
+    <div id="message-container" class="mb-4"></div>
+
+    {% if error %}
+    <!-- Error State -->
+    <div class="alert alert-error">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+        </svg>
+        <span>{{ error }}</span>
+        <a href="/settings" class="btn-secondary" style="margin-left: auto;">Go to Settings</a>
+    </div>
+    {% else %}
+
+    <!-- File Browser Content -->
+    <div id="filemanager-content">
+        {% include "components/filemanager_content.html" %}
+    </div>
+
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const currentPath = "{{ current_path | replace('\\', '\\\\') }}";
+
+    function navigateTo(path) {
+        // Reset state
+        isSearching = false;
+        isLoadingMore = false;
+        const searchInput = document.getElementById('filemanager-search');
+        if (searchInput) searchInput.value = '';
+
+        // Update URL without reload
+        const url = new URL(window.location);
+        url.searchParams.set('path', path);
+        window.history.pushState({}, '', url);
+
+        // Fetch new content via HTMX
+        htmx.ajax('GET', `/api/filemanager/browse?path=${encodeURIComponent(path)}`, {
+            target: '#filemanager-content',
+            swap: 'innerHTML'
+        });
+    }
+
+    function scanFile(path) {
+        const messageContainer = document.getElementById('message-container');
+        messageContainer.innerHTML = `
+            <div class="alert alert-info">
+                <div class="loading-spinner"></div>
+                <span>Scanning file...</span>
+            </div>
+        `;
+
+        fetch(`/api/filemanager/scan?path=${encodeURIComponent(path)}`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                messageContainer.innerHTML = `
+                    <div class="alert alert-success">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>${data.message}</span>
+                    </div>
+                `;
+            } else {
+                messageContainer.innerHTML = `
+                    <div class="alert alert-error">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>${data.detail || 'Scan failed'}</span>
+                    </div>
+                `;
+            }
+            setTimeout(() => { messageContainer.innerHTML = ''; }, 5000);
+        })
+        .catch(error => {
+            messageContainer.innerHTML = `
+                <div class="alert alert-error">
+                    <span>Error: ${error.message}</span>
+                </div>
+            `;
+        });
+    }
+
+    function scanCurrentFolder() {
+        const path = document.getElementById('current-path-value')?.value || currentPath;
+        const messageContainer = document.getElementById('message-container');
+
+        messageContainer.innerHTML = `
+            <div class="alert alert-info">
+                <div class="loading-spinner"></div>
+                <span>Scanning folder for video files...</span>
+            </div>
+        `;
+
+        fetch(`/api/filemanager/scan?path=${encodeURIComponent(path)}`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                messageContainer.innerHTML = `
+                    <div class="alert alert-success">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div>
+                            <p style="font-weight: 600;">${data.message}</p>
+                            ${data.created.length > 0 ? `<p style="font-size: 0.875rem; margin-top: 0.25rem;">Added: ${data.created.join(', ')}</p>` : ''}
+                        </div>
+                    </div>
+                `;
+            } else {
+                messageContainer.innerHTML = `
+                    <div class="alert alert-error">
+                        <span>${data.detail || 'Scan failed'}</span>
+                    </div>
+                `;
+            }
+            setTimeout(() => { messageContainer.innerHTML = ''; }, 8000);
+        })
+        .catch(error => {
+            messageContainer.innerHTML = `
+                <div class="alert alert-error">
+                    <span>Error: ${error.message}</span>
+                </div>
+            `;
+        });
+    }
+
+    // --- Infinite Scroll ---
+    let scrollObserver = null;
+    let isLoadingMore = false;
+    let isSearching = false;
+
+    function setupInfiniteScroll() {
+        if (scrollObserver) {
+            scrollObserver.disconnect();
+            scrollObserver = null;
+        }
+        if (isSearching) return;
+
+        const sentinel = document.getElementById('scroll-sentinel');
+        if (!sentinel) return;
+
+        scrollObserver = new IntersectionObserver(function(entries) {
+            if (entries[0].isIntersecting && !isLoadingMore && !isSearching) {
+                loadMoreItems();
+            }
+        }, { rootMargin: '300px' });
+
+        scrollObserver.observe(sentinel);
+    }
+
+    function loadMoreItems() {
+        const sentinel = document.getElementById('scroll-sentinel');
+        if (!sentinel || isLoadingMore) return;
+
+        isLoadingMore = true;
+        const offset = parseInt(sentinel.dataset.nextOffset);
+        const path = document.getElementById('current-path-value')?.value || currentPath;
+
+        fetch('/api/filemanager/load-more?path=' + encodeURIComponent(path) + '&offset=' + offset)
+            .then(function(r) { return r.text(); })
+            .then(function(html) {
+                const tbody = document.querySelector('#filemanager-content table tbody');
+                if (!tbody) { isLoadingMore = false; return; }
+                // Remove old sentinel
+                sentinel.remove();
+                // Append new rows (may include a new sentinel)
+                if (html.trim()) {
+                    tbody.insertAdjacentHTML('beforeend', html);
+                }
+                isLoadingMore = false;
+                // Re-setup for the next sentinel
+                setupInfiniteScroll();
+            })
+            .catch(function() { isLoadingMore = false; });
+    }
+
+    // Setup on page load
+    document.addEventListener('DOMContentLoaded', setupInfiniteScroll);
+    // Re-setup after HTMX navigation
+    document.body.addEventListener('htmx:afterSwap', function(e) {
+        if (e.detail.target.id === 'filemanager-content') {
+            isSearching = false;
+            isLoadingMore = false;
+            setupInfiniteScroll();
+        }
+    });
+
+    // --- Search ---
+    let searchDebounce = null;
+    let searchAbort = null;
+
+    function filterFiles(query) {
+        clearTimeout(searchDebounce);
+        if (searchAbort) { searchAbort.abort(); searchAbort = null; }
+
+        var q = query.trim();
+        if (!q) {
+            // Clear search: restore normal paginated view
+            isSearching = false;
+            var table = document.getElementById('filemanager-table-body');
+            if (table) table.style.display = '';
+            var searchResults = document.getElementById('search-results-body');
+            if (searchResults) searchResults.remove();
+            var sentinel = document.getElementById('scroll-sentinel');
+            if (sentinel) sentinel.style.display = '';
+            var counter = document.getElementById('filemanager-count');
+            var totalEl = document.getElementById('filemanager-total');
+            if (counter && totalEl) counter.textContent = totalEl.value;
+            setupInfiniteScroll();
+            return;
+        }
+
+        searchDebounce = setTimeout(function() { doSearch(q); }, 250);
+    }
+
+    function doSearch(query) {
+        isSearching = true;
+        if (scrollObserver) { scrollObserver.disconnect(); scrollObserver = null; }
+
+        var path = document.getElementById('current-path-value')?.value || currentPath;
+        searchAbort = new AbortController();
+
+        fetch('/api/filemanager/search?path=' + encodeURIComponent(path) + '&q=' + encodeURIComponent(query), {
+            signal: searchAbort.signal
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(results) {
+            searchAbort = null;
+            renderSearchResults(results);
+        })
+        .catch(function(e) {
+            if (e.name !== 'AbortError') console.error(e);
+        });
+    }
+
+    function renderSearchResults(results) {
+        // Hide normal paginated rows
+        var table = document.getElementById('filemanager-table-body');
+        if (table) table.style.display = 'none';
+        var sentinel = document.getElementById('scroll-sentinel');
+        if (sentinel) sentinel.style.display = 'none';
+
+        // Remove previous search results
+        var old = document.getElementById('search-results-body');
+        if (old) old.remove();
+
+        // Build result rows
+        var tbody = document.createElement('tbody');
+        tbody.id = 'search-results-body';
+
+        for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var tr = document.createElement('tr');
+            tr.innerHTML = buildRowHTML(item);
+            tbody.appendChild(tr);
+        }
+
+        var tableEl = document.querySelector('#filemanager-content table');
+        if (tableEl) tableEl.appendChild(tbody);
+
+        var counter = document.getElementById('filemanager-count');
+        if (counter) counter.textContent = results.length;
+    }
+
+    function buildRowHTML(item) {
+        var iconSvg = '';
+        if (item.is_dir) {
+            iconSvg = '<svg style="width:1.25rem;height:1.25rem;color:var(--status-warning);display:inline-block" fill="currentColor" viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>';
+        } else if (item.type === 'video') {
+            iconSvg = '<svg style="width:1.25rem;height:1.25rem;color:var(--status-success);display:inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>';
+        } else {
+            iconSvg = '<svg style="width:1.25rem;height:1.25rem;color:var(--text-muted);display:inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>';
+        }
+
+        var escapedPath = item.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        var nameCol = '';
+        if (item.is_dir) {
+            nameCol = '<button onclick="navigateTo(\'' + escapedPath + '\')" style="text-align:left;color:var(--text-primary);background:none;border:none;cursor:pointer;font-weight:500;padding:0" onmouseover="this.style.color=\'var(--accent-primary)\';this.style.textDecoration=\'underline\'" onmouseout="this.style.color=\'var(--text-primary)\';this.style.textDecoration=\'none\'">' + item.name + '</button>';
+        } else {
+            var style = item.type === 'video' ? 'color:var(--status-success)' : '';
+            nameCol = '<span style="' + style + '">' + item.name + '</span>';
+            if (item.extension) {
+                nameCol += ' <span class="status-badge" style="padding:0.125rem 0.5rem;font-size:0.75rem;margin-left:0.5rem;background-color:var(--bg-tertiary);color:var(--text-muted);border:1px solid var(--border-primary)">' + item.extension + '</span>';
+            }
+        }
+
+        var actionsCol = '';
+        if (item.is_dir) {
+            actionsCol = '<div style="display:inline-flex;gap:0.375rem"><button onclick="navigateTo(\'' + escapedPath + '\')" class="btn-secondary" style="padding:0.25rem 0.625rem;font-size:0.75rem;display:inline-flex;align-items:center;gap:0.25rem" title="Open folder"><svg style="width:0.875rem;height:0.875rem" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>Open</button><button onclick="scanFile(\'' + escapedPath + '\')" class="btn-primary" style="padding:0.25rem 0.5rem;font-size:0.75rem" title="Scan folder"><svg style="width:0.875rem;height:0.875rem" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></button></div>';
+        } else if (item.type === 'video') {
+            actionsCol = '<button onclick="scanFile(\'' + escapedPath + '\')" class="btn-primary" style="padding:0.25rem 0.625rem;font-size:0.75rem;display:inline-flex;align-items:center;gap:0.25rem" title="Scan this video"><svg style="width:0.875rem;height:0.875rem" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>Scan</button>';
+        } else {
+            actionsCol = '<span style="color:var(--text-muted);font-size:0.75rem">-</span>';
+        }
+
+        return '<td style="text-align:center">' + iconSvg + '</td>' +
+               '<td>' + nameCol + '</td>' +
+               '<td style="text-align:right;color:var(--text-muted);font-family:monospace;font-size:0.875rem">' + item.size_formatted + '</td>' +
+               '<td style="color:var(--text-muted);font-size:0.875rem">' + item.modified_formatted + '</td>' +
+               '<td style="text-align:right">' + actionsCol + '</td>';
+    }
+
+    // Handle browser back/forward buttons
+    window.addEventListener('popstate', function(event) {
+        const url = new URL(window.location);
+        const path = url.searchParams.get('path') || currentPath;
+        htmx.ajax('GET', `/api/filemanager/browse?path=${encodeURIComponent(path)}`, {
+            target: '#filemanager-content',
+            swap: 'innerHTML'
+        });
+    });
+</script>
+{% endblock %}

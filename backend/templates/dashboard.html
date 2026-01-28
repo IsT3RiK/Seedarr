@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Seedarr v2.0{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Dashboard Header with Action Button -->
+    <div class="dashboard-header">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="dashboard-title">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    Processing Pipeline
+                </h1>
+                <p class="dashboard-subtitle">Monitor your torrent publishing workflow</p>
+            </div>
+            <button
+                class="btn-primary"
+                hx-post="/api/dashboard/scan"
+                hx-target="#dashboard-stats"
+                hx-swap="innerHTML"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                Scan Directory Now
+            </button>
+        </div>
+    </div>
+
+    <!-- Pipeline Stats Overview (Dynamic from database) -->
+    <div id="dashboard-stats" class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Active Jobs</div>
+            <div class="stat-value">{{ stats.active_jobs if stats else 0 }}</div>
+            <div class="stat-change positive">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clip-rule="evenodd"></path>
+                </svg>
+                Currently processing
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Completed Today</div>
+            <div class="stat-value">{{ stats.completed_today if stats else 0 }}</div>
+            <div class="stat-change positive">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clip-rule="evenodd"></path>
+                </svg>
+                {% if stats and stats.completed_yesterday %}
+                    {% set change = stats.completed_today - stats.completed_yesterday %}
+                    {% if change >= 0 %}
+                        +{{ change }} from yesterday
+                    {% else %}
+                        {{ change }} from yesterday
+                    {% endif %}
+                {% else %}
+                    Today
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Queue Size</div>
+            <div class="stat-value">{{ stats.queue_size if stats else 0 }}</div>
+            <div class="stat-change">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path>
+                </svg>
+                Waiting to process
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Success Rate</div>
+            <div class="stat-value">{{ "%.1f"|format(stats.success_rate if stats else 0) }}%</div>
+            <div class="stat-change positive">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+                All time
+            </div>
+        </div>
+    </div>
+
+    <!-- 5-Stage Pipeline Visualization -->
+    <div class="dashboard-card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                Processing Pipeline
+            </h2>
+            <span class="text-muted text-sm">5 stages</span>
+        </div>
+        <div class="card-body">
+            <!-- Pipeline Stages -->
+            <div class="pipeline-stages">
+                <div class="pipeline-stage has-tooltip">
+                    <div class="stage-icon stage-scan">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="stage-info">
+                        <div class="stage-name">Scan</div>
+                        <div class="stage-description">Discover torrents</div>
+                    </div>
+                    <div class="stage-tooltip">
+                        <strong>Directory Scanning</strong><br>
+                        Scans the configured input directory for new media files (.mkv, .mp4, .avi). Detects movies and TV shows based on filename patterns and folder structure. Files are queued for processing automatically.
+                    </div>
+                </div>
+
+                <div class="pipeline-arrow">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </div>
+
+                <div class="pipeline-stage has-tooltip">
+                    <div class="stage-icon stage-analyze">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                        </svg>
+                    </div>
+                    <div class="stage-info">
+                        <div class="stage-name">Analyze</div>
+                        <div class="stage-description">Extract metadata</div>
+                    </div>
+                    <div class="stage-tooltip">
+                        <strong>MediaInfo Analysis</strong><br>
+                        Extracts technical metadata using MediaInfo: video codec (x264, HEVC), resolution (1080p, 4K), audio tracks (DTS, AAC), subtitles, and file size. This data is used for proper categorization and NFO generation.
+                    </div>
+                </div>
+
+                <div class="pipeline-arrow">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </div>
+
+                <div class="pipeline-stage has-tooltip">
+                    <div class="stage-icon stage-rename">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                    </div>
+                    <div class="stage-info">
+                        <div class="stage-name">Rename</div>
+                        <div class="stage-description">Standardize names</div>
+                    </div>
+                    <div class="stage-tooltip">
+                        <strong>Release Name Standardization</strong><br>
+                        Formats the release name according to scene naming conventions: Title.Year.Resolution.Source.Codec-GROUP. Ensures compatibility with tracker rules and proper indexing by automated tools.
+                    </div>
+                </div>
+
+                <div class="pipeline-arrow">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </div>
+
+                <div class="pipeline-stage has-tooltip">
+                    <div class="stage-icon stage-metadata">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                        </svg>
+                    </div>
+                    <div class="stage-info">
+                        <div class="stage-name">Metadata</div>
+                        <div class="stage-description">Enrich information</div>
+                    </div>
+                    <div class="stage-tooltip">
+                        <strong>TMDB Enrichment & NFO Generation</strong><br>
+                        Fetches movie/TV info from TMDB: title, year, plot, cast, ratings, poster. Generates a .nfo file with all metadata. Creates the .torrent file with correct announce URL and source tag.
+                    </div>
+                </div>
+
+                <div class="pipeline-arrow">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </div>
+
+                <div class="pipeline-stage has-tooltip">
+                    <div class="stage-icon stage-upload">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                    </div>
+                    <div class="stage-info">
+                        <div class="stage-name">Upload</div>
+                        <div class="stage-description">Publish to tracker</div>
+                    </div>
+                    <div class="stage-tooltip">
+                        <strong>Tracker Upload</strong><br>
+                        Uploads the .torrent file to the tracker via API with all metadata: category, tags, description, NFO, and MediaInfo. Uses FlareSolverr to bypass Cloudflare protection. Adds torrent to qBittorrent for seeding.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Jobs with Auto-Refresh -->
+    {% include "components/dashboard_recent_jobs.html" %}
+
+    <!-- Quick Actions -->
+    <div class="dashboard-grid">
+        <div class="col-span-12">
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Quick Actions
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <div class="space-y-2">
+                        <button
+                            class="btn-secondary w-full justify-center"
+                            hx-get="/api/dashboard/refresh-jobs"
+                            hx-target="#dashboard-recent-jobs"
+                            hx-swap="innerHTML"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            Refresh Queue
+                        </button>
+                        <a
+                            href="/settings"
+                            class="btn-secondary w-full justify-center"
+                            style="display: flex; align-items: center; text-decoration: none; color: inherit;"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                            </svg>
+                            View Settings
+                        </a>
+                        <a
+                            href="/logs"
+                            class="btn-secondary w-full justify-center"
+                            style="display: flex; align-items: center; text-decoration: none; color: inherit;"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            View Logs
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Pipeline Stages Visualization */
+    .pipeline-stages {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 0;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .pipeline-stage {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.75rem;
+        min-width: 120px;
+        position: relative;
+        cursor: help;
+    }
+
+    /* Stage Tooltips */
+    .pipeline-stage.has-tooltip .stage-tooltip {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #1e293b;
+        border: 1px solid #475569;
+        border-radius: 8px;
+        padding: 1rem;
+        width: 280px;
+        font-size: 0.8rem;
+        line-height: 1.5;
+        color: #e2e8f0;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.2s ease;
+        z-index: 100;
+        margin-bottom: 10px;
+        text-align: left;
+    }
+
+    .pipeline-stage.has-tooltip .stage-tooltip::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 8px solid transparent;
+        border-top-color: #475569;
+    }
+
+    .pipeline-stage.has-tooltip .stage-tooltip strong {
+        color: #60a5fa;
+        display: block;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .pipeline-stage.has-tooltip:hover .stage-tooltip {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .stage-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--bg-tertiary);
+        border: 2px solid var(--border-primary);
+        color: var(--accent-primary);
+        transition: all 0.3s ease;
+    }
+
+    .stage-icon:hover {
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 20px var(--shadow-glow);
+        transform: scale(1.1);
+    }
+
+    .stage-scan { background: rgba(6, 182, 212, 0.1); }
+    .stage-analyze { background: rgba(14, 165, 233, 0.1); }
+    .stage-rename { background: rgba(59, 130, 246, 0.1); }
+    .stage-metadata { background: rgba(139, 92, 246, 0.1); }
+    .stage-upload { background: rgba(16, 185, 129, 0.1); }
+
+    .stage-info {
+        text-align: center;
+    }
+
+    .stage-name {
+        font-weight: 600;
+        color: var(--text-primary);
+        font-size: 0.875rem;
+    }
+
+    .stage-description {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .pipeline-arrow {
+        color: var(--accent-primary);
+        opacity: 0.5;
+        margin: 0 0.5rem;
+    }
+
+    /* Spacing utilities */
+    .space-y-2 > * + * {
+        margin-top: 0.5rem;
+    }
+
+    .space-y-3 > * + * {
+        margin-top: 0.75rem;
+    }
+
+    .w-full {
+        width: 100%;
+    }
+
+    .justify-center {
+        justify-content: center;
+    }
+
+    /* Responsive adjustments for pipeline */
+    @media (max-width: 1024px) {
+        .pipeline-stages {
+            flex-direction: column;
+        }
+
+        .pipeline-arrow {
+            transform: rotate(90deg);
+            margin: 0.5rem 0;
+        }
+    }
+</style>
+{% endblock %}

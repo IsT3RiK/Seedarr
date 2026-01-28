@@ -1,0 +1,464 @@
+{% extends "base.html" %}
+
+{% block title %}Statistics - Seedarr v2.0{% endblock %}
+
+{% block page_title %}Upload Statistics{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+    .stat-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        text-align: center;
+    }
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .stat-label {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        margin-top: 0.5rem;
+    }
+    .stat-success { color: var(--success-color, #10b981); }
+    .stat-error { color: var(--error-color, #ef4444); }
+    .stat-info { color: var(--info-color, #3b82f6); }
+    .stat-warning { color: var(--warning-color, #f59e0b); }
+
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+
+    .period-selector {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .period-btn {
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        border: 1px solid var(--border-color);
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .period-btn:hover {
+        background: var(--bg-hover);
+    }
+    .period-btn.active {
+        background: var(--primary-color);
+        color: white;
+        border-color: var(--primary-color);
+    }
+
+    .tracker-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .tracker-table th,
+    .tracker-table td {
+        padding: 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .tracker-table th {
+        font-weight: 600;
+        color: var(--text-muted);
+        font-size: 0.875rem;
+    }
+    .tracker-table tr:hover {
+        background: var(--bg-hover);
+    }
+
+    .progress-bar-bg {
+        background: var(--bg-tertiary);
+        border-radius: 9999px;
+        height: 0.5rem;
+        overflow: hidden;
+    }
+    .progress-bar-fill {
+        height: 100%;
+        border-radius: 9999px;
+        transition: width 0.3s;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div>
+            <h1 class="dashboard-title">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                Upload Statistics
+            </h1>
+            <p class="dashboard-subtitle">Track your upload performance and trends</p>
+        </div>
+    </div>
+
+    <!-- Period Selector -->
+    <div class="period-selector">
+        <button class="period-btn active" data-days="7">7 Days</button>
+        <button class="period-btn" data-days="30">30 Days</button>
+        <button class="period-btn" data-days="90">90 Days</button>
+        <button class="period-btn" data-days="365">1 Year</button>
+    </div>
+
+    <!-- Summary Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+        <div class="stat-card">
+            <div class="stat-value stat-info" id="total-uploads">{{ summary.total_uploads }}</div>
+            <div class="stat-label">Total Uploads</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value stat-success" id="successful-uploads">{{ summary.successful_uploads }}</div>
+            <div class="stat-label">Successful</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value stat-error" id="failed-uploads">{{ summary.failed_uploads }}</div>
+            <div class="stat-label">Failed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value stat-warning" id="success-rate">{{ summary.success_rate }}%</div>
+            <div class="stat-label">Success Rate</div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+        <!-- Timeline Chart -->
+        <div class="dashboard-card">
+            <h2 class="card-title" style="font-size: 1.25rem; margin-bottom: 1rem;">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
+                </svg>
+                Daily Uploads
+            </h2>
+            <div class="chart-container">
+                <canvas id="timelineChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Success Rate Pie Chart -->
+        <div class="dashboard-card">
+            <h2 class="card-title" style="font-size: 1.25rem; margin-bottom: 1rem;">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path>
+                </svg>
+                Success Distribution
+            </h2>
+            <div class="chart-container">
+                <canvas id="pieChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tracker Breakdown -->
+    <div class="dashboard-card" style="margin-bottom: 2rem;">
+        <h2 class="card-title" style="font-size: 1.25rem; margin-bottom: 1rem;">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
+            </svg>
+            Tracker Breakdown
+        </h2>
+
+        {% if tracker_breakdown %}
+        <table class="tracker-table">
+            <thead>
+                <tr>
+                    <th>Tracker</th>
+                    <th>Total</th>
+                    <th>Successful</th>
+                    <th>Failed</th>
+                    <th>Success Rate</th>
+                    <th>Progress</th>
+                </tr>
+            </thead>
+            <tbody id="tracker-table-body">
+                {% for tracker in tracker_breakdown %}
+                <tr>
+                    <td style="font-weight: 500;">{{ tracker.tracker_name }}</td>
+                    <td>{{ tracker.total_uploads }}</td>
+                    <td style="color: var(--success-color);">{{ tracker.successful_uploads }}</td>
+                    <td style="color: var(--error-color);">{{ tracker.failed_uploads }}</td>
+                    <td>{{ tracker.success_rate }}%</td>
+                    <td style="width: 150px;">
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" style="width: {{ tracker.success_rate }}%; background: {% if tracker.success_rate >= 80 %}var(--success-color){% elif tracker.success_rate >= 50 %}var(--warning-color){% else %}var(--error-color){% endif %};"></div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="text-align: center; padding: 3rem; color: var(--text-muted);">
+            <svg class="w-12 h-12 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+            </svg>
+            <p>No tracker data yet. Statistics will appear after uploads.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Tracker Bar Chart -->
+    {% if tracker_breakdown %}
+    <div class="dashboard-card">
+        <h2 class="card-title" style="font-size: 1.25rem; margin-bottom: 1rem;">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+            Uploads by Tracker
+        </h2>
+        <div class="chart-container">
+            <canvas id="trackerChart"></canvas>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Chart data from server
+    let timelineData = {{ timeline | tojson | safe }};
+    let trackerData = {{ tracker_breakdown | tojson | safe }};
+    let summaryData = {{ summary | tojson | safe }};
+
+    // Chart instances
+    let timelineChart = null;
+    let pieChart = null;
+    let trackerChart = null;
+
+    // Theme colors
+    function getChartColors() {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+            (!document.documentElement.getAttribute('data-theme') &&
+             window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+        return {
+            text: isDark ? '#e5e7eb' : '#374151',
+            grid: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+            success: '#10b981',
+            error: '#ef4444',
+            info: '#3b82f6',
+            warning: '#f59e0b'
+        };
+    }
+
+    // Initialize charts
+    function initCharts() {
+        const colors = getChartColors();
+
+        // Timeline Chart
+        const timelineCtx = document.getElementById('timelineChart');
+        if (timelineCtx) {
+            timelineChart = new Chart(timelineCtx, {
+                type: 'line',
+                data: {
+                    labels: timelineData.map(d => d.date),
+                    datasets: [
+                        {
+                            label: 'Successful',
+                            data: timelineData.map(d => d.successful_uploads),
+                            borderColor: colors.success,
+                            backgroundColor: colors.success + '20',
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Failed',
+                            data: timelineData.map(d => d.failed_uploads),
+                            borderColor: colors.error,
+                            backgroundColor: colors.error + '20',
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: colors.text }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: colors.text },
+                            grid: { color: colors.grid }
+                        },
+                        y: {
+                            ticks: { color: colors.text },
+                            grid: { color: colors.grid },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // Pie Chart
+        const pieCtx = document.getElementById('pieChart');
+        if (pieCtx) {
+            pieChart = new Chart(pieCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Successful', 'Failed'],
+                    datasets: [{
+                        data: [summaryData.successful_uploads, summaryData.failed_uploads],
+                        backgroundColor: [colors.success, colors.error],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: colors.text }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Tracker Bar Chart
+        const trackerCtx = document.getElementById('trackerChart');
+        if (trackerCtx && trackerData.length > 0) {
+            trackerChart = new Chart(trackerCtx, {
+                type: 'bar',
+                data: {
+                    labels: trackerData.map(t => t.tracker_name),
+                    datasets: [
+                        {
+                            label: 'Successful',
+                            data: trackerData.map(t => t.successful_uploads),
+                            backgroundColor: colors.success
+                        },
+                        {
+                            label: 'Failed',
+                            data: trackerData.map(t => t.failed_uploads),
+                            backgroundColor: colors.error
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: colors.text }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: colors.text },
+                            grid: { color: colors.grid }
+                        },
+                        y: {
+                            ticks: { color: colors.text },
+                            grid: { color: colors.grid },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    // Period selector
+    document.querySelectorAll('.period-btn').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const days = this.dataset.days;
+
+            // Update active state
+            document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+
+            // Fetch new data
+            try {
+                const response = await fetch(`/api/statistics?days=${days}`);
+                const data = await response.json();
+
+                // Update summary cards
+                document.getElementById('total-uploads').textContent = data.summary.total_uploads;
+                document.getElementById('successful-uploads').textContent = data.summary.successful_uploads;
+                document.getElementById('failed-uploads').textContent = data.summary.failed_uploads;
+                document.getElementById('success-rate').textContent = data.summary.success_rate + '%';
+
+                // Update data
+                timelineData = data.timeline;
+                trackerData = data.tracker_breakdown;
+                summaryData = data.summary;
+
+                // Update charts
+                if (timelineChart) {
+                    timelineChart.data.labels = timelineData.map(d => d.date);
+                    timelineChart.data.datasets[0].data = timelineData.map(d => d.successful_uploads);
+                    timelineChart.data.datasets[1].data = timelineData.map(d => d.failed_uploads);
+                    timelineChart.update();
+                }
+
+                if (pieChart) {
+                    pieChart.data.datasets[0].data = [summaryData.successful_uploads, summaryData.failed_uploads];
+                    pieChart.update();
+                }
+
+                if (trackerChart && trackerData.length > 0) {
+                    trackerChart.data.labels = trackerData.map(t => t.tracker_name);
+                    trackerChart.data.datasets[0].data = trackerData.map(t => t.successful_uploads);
+                    trackerChart.data.datasets[1].data = trackerData.map(t => t.failed_uploads);
+                    trackerChart.update();
+                }
+
+                // Update tracker table
+                const tbody = document.getElementById('tracker-table-body');
+                if (tbody) {
+                    tbody.innerHTML = trackerData.map(t => `
+                        <tr>
+                            <td style="font-weight: 500;">${t.tracker_name}</td>
+                            <td>${t.total_uploads}</td>
+                            <td style="color: var(--success-color);">${t.successful_uploads}</td>
+                            <td style="color: var(--error-color);">${t.failed_uploads}</td>
+                            <td>${t.success_rate}%</td>
+                            <td style="width: 150px;">
+                                <div class="progress-bar-bg">
+                                    <div class="progress-bar-fill" style="width: ${t.success_rate}%; background: ${t.success_rate >= 80 ? 'var(--success-color)' : t.success_rate >= 50 ? 'var(--warning-color)' : 'var(--error-color)'};"></div>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+
+            } catch (error) {
+                console.error('Error fetching statistics:', error);
+            }
+        });
+    });
+
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', initCharts);
+
+    // Re-initialize charts on theme change
+    window.addEventListener('themeChanged', function() {
+        if (timelineChart) timelineChart.destroy();
+        if (pieChart) pieChart.destroy();
+        if (trackerChart) trackerChart.destroy();
+        initCharts();
+    });
+</script>
+{% endblock %}

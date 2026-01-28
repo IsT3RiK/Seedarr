@@ -1,0 +1,147 @@
+# La Cale Tracker Configuration
+# This file defines how to interact with the La Cale tracker API
+
+tracker:
+  name: "La Cale"
+  slug: "lacale"
+  description: "La Cale French private tracker"
+
+# Authentication configuration
+auth:
+  type: "passkey"             # bearer | passkey | cookie | api_key
+  passkey_param: "passkey"    # URL parameter name for passkey
+
+# Cloudflare bypass configuration
+cloudflare:
+  enabled: true               # La Cale uses Cloudflare protection
+  service: "flaresolverr"     # FlareSolverr service for bypass
+  timeout: 60000              # Timeout in milliseconds
+
+# API endpoints
+endpoints:
+  base: "/ajax"
+  upload: "/ajax/upload.php"
+  tags: "/ajax/tags.php"
+  categories: "/ajax/categories.php"
+  search: "/ajax/search.php"
+  health: "/ajax/ping.php"
+
+# Upload form configuration
+upload:
+  method: "POST"
+  content_type: "multipart/form-data"
+
+  # CRITICAL: La Cale requires tags as REPEATED form fields
+  # Example: tags[]=10&tags[]=15&tags[]=20 (NOT tags=["10","15","20"])
+  tags_as_repeated_fields: true
+
+  # Field mappings
+  fields:
+    torrent:
+      name: "torrent"
+      type: "file"
+      required: true
+
+    nfo:
+      name: "nfo"
+      type: "file"
+      required: true          # La Cale requires NFO
+
+    title:
+      name: "name"
+      type: "string"
+      source: "release_name"
+      required: true
+
+    category:
+      name: "category"
+      type: "string"
+      source: "category_id"
+      required: true
+
+    tags:
+      name: "tags[]"          # Repeated field notation
+      type: "repeated"
+      source: "tag_ids"
+      required: false
+
+    description:
+      name: "descr"
+      type: "string"
+      source: "description"
+      required: false
+
+    tmdb_id:
+      name: "tmdb"
+      type: "string"
+      source: "tmdb_id"
+      required: false
+
+    tmdb_type:
+      name: "tmdb_type"
+      type: "string"
+      source: "tmdb_type"
+      required: false
+
+    cover_url:
+      name: "cover"
+      type: "string"
+      source: "cover_url"
+      required: false
+
+# La Cale doesn't use the same options system as C411
+# Tags are used instead for resolution, language, etc.
+options: {}
+
+# Category configuration
+categories:
+  movie_4k: "1"
+  movie_2160p: "1"
+  movie_1080p: "1"
+  movie_720p: "1"
+  tv_1080p: "2"
+  tv_720p: "2"
+  tv_4k: "2"
+  anime: "3"
+  documentary: "4"
+  music: "5"
+  games: "6"
+  software: "7"
+  ebook: "8"
+
+# Tag groups (for reference - actual IDs come from API)
+tag_groups:
+  resolution:
+    - "4K"
+    - "1080p"
+    - "720p"
+    - "SD"
+  source:
+    - "BluRay"
+    - "WEB-DL"
+    - "WEBRip"
+    - "HDTV"
+    - "DVDRip"
+  audio:
+    - "French"
+    - "English"
+    - "Multi"
+    - "VOSTFR"
+  video:
+    - "x264"
+    - "x265"
+    - "HEVC"
+    - "HDR"
+    - "DV"
+
+# Piece size strategy
+torrent:
+  piece_size_strategy: "standard"
+  source_flag: "lacale"       # Makes torrent hash unique per tracker
+
+# Response parsing
+response:
+  success_field: "success"
+  error_field: "error"
+  torrent_id_field: "torrent_id"
+  torrent_url_template: "{tracker_url}/torrent/{torrent_id}"

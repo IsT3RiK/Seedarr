@@ -1,0 +1,980 @@
+<!-- Queue Content Component - Auto-refreshed by HTMX polling -->
+<div id="queue-content"
+     hx-get="/api/queue/refresh?search={{ search|default('', true)|urlencode }}"
+     hx-trigger="every 5s"
+     hx-swap="outerHTML">
+
+    <!-- Search Bar -->
+    <div class="queue-search-container mb-4">
+        <div class="search-box">
+            <svg class="search-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            <input type="text"
+                   id="queue-search"
+                   name="search"
+                   value="{{ search|default('', true) }}"
+                   placeholder="Search releases..."
+                   hx-get="/api/queue/refresh"
+                   hx-trigger="input changed delay:300ms, search"
+                   hx-target="#queue-content"
+                   hx-swap="outerHTML"
+                   hx-include="this"
+                   class="search-input">
+            {% if search %}
+            <button type="button" class="search-clear" onclick="clearSearch()">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+            {% endif %}
+        </div>
+        <div class="search-info text-sm text-muted">
+            {% if search %}
+                Showing {{ active_jobs|length }} of {{ total_count|default(0) }} results for "{{ search }}"
+            {% else %}
+                Showing {{ active_jobs|length }} of {{ total_count|default(active_jobs|length) }} jobs
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Pending Approval Section -->
+    {% set pending_approval = active_jobs|selectattr('status.value', 'equalto', 'pending_approval')|list %}
+    {% if pending_approval %}
+    <div class="dashboard-card mb-6" style="border: 2px solid rgba(251, 146, 60, 0.5);">
+        <div class="card-header" style="background: rgba(251, 146, 60, 0.1);">
+            <h2 class="card-title" style="color: #fb923c;">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                Pending Approval ({{ pending_approval|length }})
+            </h2>
+            <span class="text-sm text-warning">Action required</span>
+        </div>
+        <div class="card-body">
+            {% for job in pending_approval %}
+            <div class="approval-item" style="padding: 1rem; border-bottom: 1px solid var(--border-color); display: flex; gap: 1rem; align-items: flex-start;">
+                <!-- Cover Image (clickable) -->
+                <a href="/release/{{ job.id }}" class="cover-link">
+                    {% if job.cover_url %}
+                    <img src="{{ job.cover_url }}" alt="Cover" style="width: 80px; height: 120px; object-fit: cover; border-radius: 0.375rem; transition: transform 0.2s;">
+                    {% else %}
+                    <div style="width: 80px; height: 120px; background: var(--bg-tertiary); border-radius: 0.375rem; display: flex; align-items: center; justify-content: center;">
+                        <svg class="w-8 h-8 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
+                        </svg>
+                    </div>
+                    {% endif %}
+                </a>
+
+                <!-- Release Info -->
+                <div style="flex: 1;">
+                    <a href="/release/{{ job.id }}" class="release-title-link" style="text-decoration: none;">
+                        <div class="font-medium text-primary" style="font-size: 1rem; margin-bottom: 0.25rem; transition: color 0.2s;">
+                            {{ job.release_name or job.filename }}
+                        </div>
+                    </a>
+                    <div class="text-sm text-muted" style="margin-bottom: 0.5rem;">
+                        {% if job.tmdb_id %}TMDB: {{ job.tmdb_id }}{% endif %}
+                        {% if job.tmdb_type %} ({{ job.tmdb_type }}){% endif %}
+                    </div>
+
+                    <!-- Editable fields -->
+                    <div class="form-grid" style="display: grid; grid-template-columns: 1fr 150px; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <input type="text"
+                               id="release-name-{{ job.id }}"
+                               class="input input-sm input-bordered"
+                               value="{{ job.release_name or '' }}"
+                               placeholder="Release name">
+                        <input type="text"
+                               id="tmdb-id-{{ job.id }}"
+                               class="input input-sm input-bordered"
+                               value="{{ job.tmdb_id or '' }}"
+                               placeholder="TMDB ID">
+                    </div>
+
+                    <!-- Action buttons -->
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <a href="/release/{{ job.id }}" class="btn btn-sm btn-outline btn-info">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Details
+                        </a>
+                        <button class="btn btn-sm btn-success" onclick="approveRelease({{ job.id }})">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Approve
+                        </button>
+                        <button class="btn btn-sm btn-error btn-outline" onclick="rejectRelease({{ job.id }})">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                            Reject
+                        </button>
+                        <button class="btn btn-sm btn-outline" onclick="checkDuplicates({{ job.id }})">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                            Check Duplicates
+                        </button>
+                    </div>
+
+                    <!-- Duplicate check results -->
+                    <div id="duplicate-results-{{ job.id }}" style="margin-top: 0.5rem;"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Active Jobs List -->
+    <div class="dashboard-card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                Active Jobs ({{ active_jobs|rejectattr('status.value', 'equalto', 'pending_approval')|list|length }})
+            </h2>
+            <div class="refresh-indicator">
+                <span class="connection-dot connected"></span>
+                <span class="text-sm text-muted">Auto-refresh</span>
+            </div>
+        </div>
+        <div class="card-body">
+            <table class="dashboard-table">
+                <thead>
+                    <tr>
+                        <th class="job-name-header">Job Name</th>
+                        <th>Current Stage</th>
+                        <th>Duplicates</th>
+                        <th>Tracker Status</th>
+                        <th>Progress</th>
+                        <th>Started</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="queue-jobs-list">
+                    {% set processing_jobs = active_jobs|rejectattr('status.value', 'equalto', 'pending_approval')|list %}
+                    {% if processing_jobs %}
+                        {% for job in processing_jobs %}
+                        <tr class="job-row" onclick="window.location='/release/{{ job.id }}'" style="cursor: pointer;">
+                            <td class="job-name-cell">
+                                <a href="/release/{{ job.id }}" class="job-link" onclick="event.stopPropagation();">
+                                    <div class="font-medium text-primary hover:text-accent job-name-text" title="{{ job.filename }}">{{ job.filename }}</div>
+                                </a>
+                                <div class="text-sm text-muted">
+                                    {% if job.release_name %}
+                                        <span class="job-release-name" title="{{ job.release_name }}">{{ job.release_name[:50] }}{% if job.release_name|length > 50 %}...{% endif %}</span>
+                                    {% else %}
+                                        {% if job.file_size %}
+                                            {% if job.file_size > 1073741824 %}
+                                                {{ "%.1f"|format(job.file_size / 1073741824) }} GB
+                                            {% elif job.file_size > 1048576 %}
+                                                {{ "%.1f"|format(job.file_size / 1048576) }} MB
+                                            {% else %}
+                                                {{ "%.1f"|format(job.file_size / 1024) }} KB
+                                            {% endif %}
+                                        {% else %}
+                                            Size unknown
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <div class="stage-badge stage-{{ job.current_stage|lower|replace(' ', '-') }}">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                                        </svg>
+                                    </div>
+                                    <span>{{ job.current_stage }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <!-- Duplicate check status -->
+                                {% if job.duplicate_check_results %}
+                                    {% if job.duplicate_check_results.has_duplicates %}
+                                    <div id="dup-status-{{ job.id }}" class="dup-status dup-yes" data-job-id="{{ job.id }}">
+                                        <div class="dup-badge-container">
+                                            <button class="dup-badge dup-badge-yes" onclick="checkDuplicates({{ job.id }})">
+                                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                                </svg>
+                                                YES
+                                            </button>
+                                            <div class="dup-popup">
+                                                <div class="dup-popup-header">Duplicates Found</div>
+                                                <div class="dup-popup-content">
+                                                    {% for slug, data in job.duplicate_check_results.results.items() %}
+                                                        {% if data.is_duplicate and data.existing_torrents %}
+                                                        <div class="dup-tracker-block">
+                                                            <div class="dup-tracker-header">
+                                                                <span class="dup-tracker-icon">&#128279;</span>
+                                                                {{ data.tracker_name }}
+                                                                <span class="dup-count">({{ data.existing_torrents|length }})</span>
+                                                            </div>
+                                                            <ul class="dup-release-list">
+                                                                {% for torrent in data.existing_torrents[:5] %}
+                                                                <li>{{ torrent.title }}</li>
+                                                                {% endfor %}
+                                                                {% if data.existing_torrents|length > 5 %}
+                                                                <li class="dup-more-item">+{{ data.existing_torrents|length - 5 }} more...</li>
+                                                                {% endif %}
+                                                            </ul>
+                                                        </div>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% else %}
+                                    <div id="dup-status-{{ job.id }}" class="dup-status dup-no" data-job-id="{{ job.id }}">
+                                        <div class="dup-indicator" onclick="checkDuplicates({{ job.id }})" title="Click to refresh">
+                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                            </svg>
+                                            <span>NO</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                {% else %}
+                                <div id="dup-status-{{ job.id }}" class="dup-status dup-unknown" data-job-id="{{ job.id }}">
+                                    <button class="dup-check-btn" onclick="checkDuplicates({{ job.id }})" title="Check for duplicates">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        <span class="dup-label">Check</span>
+                                    </button>
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <!-- Tracker statuses -->
+                                {% if job.tracker_statuses %}
+                                <div class="tracker-status-badges" style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
+                                    {% for slug, status_data in job.tracker_statuses.items() %}
+                                    <div class="tracker-badge tracker-{{ status_data.status }}"
+                                         title="{{ status_data.error or status_data.torrent_url or '' }}"
+                                         style="padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; display: flex; align-items: center; gap: 0.25rem;
+                                         {% if status_data.status == 'success' %}background: rgba(34, 197, 94, 0.1); color: #22c55e; border: 1px solid #22c55e;
+                                         {% elif status_data.status == 'failed' %}background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid #ef4444;
+                                         {% elif status_data.status == 'skipped_duplicate' %}background: rgba(251, 146, 60, 0.1); color: #fb923c; border: 1px solid #fb923c;
+                                         {% elif status_data.status == 'retrying' %}background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid #3b82f6;
+                                         {% else %}background: rgba(156, 163, 175, 0.1); color: #9ca3af; border: 1px solid #9ca3af;{% endif %}">
+                                        {% if status_data.status == 'success' %}
+                                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                                        {% elif status_data.status == 'failed' %}
+                                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                                        {% elif status_data.status == 'skipped_duplicate' %}
+                                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-14a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2h-2zm1 14a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg>
+                                        {% else %}
+                                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path></svg>
+                                        {% endif %}
+                                        {{ slug }}
+                                        {% if status_data.status == 'failed' %}
+                                        <button class="btn-retry-tracker" onclick="retryTracker({{ job.id }}, '{{ slug }}')" title="Retry {{ slug }}">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <span class="text-muted text-sm">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="progress-container">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: {{ job.progress }}%"></div>
+                                    </div>
+                                    <div class="text-sm text-muted mt-1">{{ job.progress }}%</div>
+                                </div>
+                            </td>
+                            <td class="text-muted">
+                                {% if job.created_at %}
+                                    {{ job.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                {% else %}
+                                    Unknown
+                                {% endif %}
+                            </td>
+                            <td onclick="event.stopPropagation();">
+                                <div class="flex gap-2">
+                                    <a
+                                        href="/release/{{ job.id }}"
+                                        class="btn-icon btn-details"
+                                        title="View details"
+                                    >
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                    </a>
+                                    <button
+                                        class="btn-icon btn-process"
+                                        title="Process this job"
+                                        hx-post="/api/queue/process/{{ job.id }}"
+                                        hx-target="#process-result"
+                                        hx-swap="innerHTML"
+                                    >
+                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </button>
+                                    <button
+                                        class="btn-icon btn-delete"
+                                        title="Delete from queue"
+                                        hx-delete="/api/queue/delete/{{ job.id }}"
+                                        hx-target="#queue-content"
+                                        hx-swap="outerHTML"
+                                        hx-confirm="Are you sure you want to delete this job?"
+                                    >
+                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                        <!-- Infinite scroll trigger -->
+                        {% if has_more %}
+                        <tr id="load-more-trigger"
+                            hx-get="/api/queue/load-more?offset={{ next_offset }}&limit={{ limit }}&search={{ search|default('', true)|urlencode }}"
+                            hx-trigger="intersect once threshold:0.5"
+                            hx-swap="outerHTML"
+                            hx-target="this">
+                            <td colspan="7" class="text-center py-4">
+                                <div class="loading-indicator">
+                                    <svg class="animate-spin h-5 w-5 text-accent inline-block mr-2" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Loading more...
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-8">
+                                <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                                </svg>
+                                <div class="text-lg font-medium mb-2">No active jobs</div>
+                                <div class="text-sm">Use the File Manager to scan files into the queue</div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+// Approve release with corrections
+async function approveRelease(releaseId) {
+    const releaseName = document.getElementById(`release-name-${releaseId}`)?.value;
+    const tmdbId = document.getElementById(`tmdb-id-${releaseId}`)?.value;
+
+    const body = {};
+    if (releaseName) body.final_release_name = releaseName;
+    if (tmdbId) body.tmdb_id = tmdbId;
+
+    try {
+        const response = await fetch(`/api/releases/${releaseId}/approve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            showNotification('success', `Release approved${result.auto_resume ? ' - processing resumed' : ''}`);
+            // Trigger HTMX refresh
+            htmx.trigger('#queue-content', 'htmx:load');
+        } else {
+            showNotification('error', result.message || 'Approval failed');
+        }
+    } catch (error) {
+        showNotification('error', `Error: ${error.message}`);
+    }
+}
+
+// Reject release
+async function rejectRelease(releaseId) {
+    if (!confirm('Are you sure you want to reject this release?')) return;
+
+    try {
+        const response = await fetch(`/api/releases/${releaseId}/reject`, {
+            method: 'POST'
+        });
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            showNotification('success', 'Release rejected');
+            htmx.trigger('#queue-content', 'htmx:load');
+        } else {
+            showNotification('error', result.message || 'Rejection failed');
+        }
+    } catch (error) {
+        showNotification('error', `Error: ${error.message}`);
+    }
+}
+
+// Check duplicates for a release
+async function checkDuplicates(releaseId) {
+    const resultsDiv = document.getElementById(`duplicate-results-${releaseId}`);
+    const statusDiv = document.getElementById(`dup-status-${releaseId}`);
+
+    // Show loading state
+    if (resultsDiv) {
+        resultsDiv.innerHTML = '<div class="loading-spinner"></div> Checking...';
+    }
+    if (statusDiv) {
+        statusDiv.className = 'dup-status dup-checking';
+        statusDiv.innerHTML = '<div class="dup-spinner"></div>';
+    }
+
+    try {
+        const response = await fetch(`/api/releases/${releaseId}/check-duplicates`, {
+            method: 'POST'
+        });
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            // Update the table cell with duplicate status
+            if (statusDiv) {
+                updateDuplicateStatusCell(statusDiv, result);
+            }
+
+            // Update the detailed results div (for pending approval section)
+            if (resultsDiv) {
+                let html = '<div style="margin-top: 0.5rem; font-size: 0.875rem;">';
+                if (result.has_duplicates) {
+                    html += '<div style="color: #fb923c; font-weight: 600;">Duplicates found!</div>';
+                } else {
+                    html += '<div style="color: #22c55e; font-weight: 600;">No duplicates found</div>';
+                }
+                for (const [slug, data] of Object.entries(result.results)) {
+                    const icon = data.is_duplicate ? '!' : (data.error ? '?' : '+');
+                    const color = data.is_duplicate ? '#fb923c' : (data.error ? '#9ca3af' : '#22c55e');
+                    html += `<div style="color: ${color}; margin-left: 1rem;">${icon} ${data.tracker_name}: ${data.message}</div>`;
+                }
+                html += '</div>';
+                resultsDiv.innerHTML = html;
+            }
+
+            showNotification(result.has_duplicates ? 'warning' : 'success',
+                result.has_duplicates ? 'Duplicates found!' : 'No duplicates found');
+        } else {
+            if (statusDiv) {
+                statusDiv.className = 'dup-status dup-error';
+                statusDiv.innerHTML = '<span class="dup-icon">?</span><span class="dup-label">Error</span>';
+            }
+            if (resultsDiv) {
+                resultsDiv.innerHTML = `<div style="color: #ef4444;">${result.message}</div>`;
+            }
+            showNotification('error', result.message);
+        }
+    } catch (error) {
+        if (statusDiv) {
+            statusDiv.className = 'dup-status dup-error';
+            statusDiv.innerHTML = '<span class="dup-icon">?</span><span class="dup-label">Error</span>';
+        }
+        if (resultsDiv) {
+            resultsDiv.innerHTML = `<div style="color: #ef4444;">Error: ${error.message}</div>`;
+        }
+        showNotification('error', `Error: ${error.message}`);
+    }
+}
+
+// Update the duplicate status cell in the table
+function updateDuplicateStatusCell(statusDiv, result) {
+    if (result.has_duplicates) {
+        // Build tooltip content with tracker info
+        let tooltipContent = '';
+        for (const [slug, data] of Object.entries(result.results)) {
+            if (data.is_duplicate && data.existing_torrents) {
+                tooltipContent += `<div class="dup-tracker"><strong>${data.tracker_name}</strong></div>`;
+                for (const torrent of data.existing_torrents.slice(0, 3)) {
+                    tooltipContent += `<div class="dup-torrent">${torrent.title}</div>`;
+                }
+                if (data.existing_torrents.length > 3) {
+                    tooltipContent += `<div class="dup-more">+${data.existing_torrents.length - 3} more...</div>`;
+                }
+            }
+        }
+
+        statusDiv.className = 'dup-status dup-yes';
+        statusDiv.innerHTML = `
+            <div class="dup-indicator">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                </svg>
+                <span>YES</span>
+            </div>
+            <div class="dup-tooltip">${tooltipContent}</div>
+        `;
+    } else {
+        statusDiv.className = 'dup-status dup-no';
+        statusDiv.innerHTML = `
+            <div class="dup-indicator">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+                <span>NO</span>
+            </div>
+        `;
+    }
+}
+
+// Retry failed tracker
+async function retryTracker(releaseId, trackerSlug) {
+    try {
+        const response = await fetch(`/api/releases/${releaseId}/retry-tracker/${trackerSlug}`, {
+            method: 'POST'
+        });
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            showNotification('success', `Retrying upload to ${trackerSlug}`);
+            htmx.trigger('#queue-content', 'htmx:load');
+        } else {
+            showNotification('error', result.message || 'Retry failed');
+        }
+    } catch (error) {
+        showNotification('error', `Error: ${error.message}`);
+    }
+}
+
+// Show notification
+function showNotification(type, message) {
+    const container = document.getElementById('process-result');
+    if (container) {
+        const alertClass = type === 'success' ? 'alert-success' :
+                          type === 'warning' ? 'alert-warning' :
+                          'alert-error';
+        container.innerHTML = `<div class="alert ${alertClass}"><span>${message}</span></div>`;
+        setTimeout(() => { container.innerHTML = ''; }, 5000);
+    }
+}
+
+// Clear search and refresh queue
+function clearSearch() {
+    const searchInput = document.getElementById('queue-search');
+    if (searchInput) {
+        searchInput.value = '';
+        // Trigger HTMX request with empty search
+        htmx.ajax('GET', '/api/queue/refresh', {target: '#queue-content', swap: 'outerHTML'});
+    }
+}
+</script>
+
+<style>
+.btn-retry-tracker {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0.125rem;
+    margin-left: 0.25rem;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+.btn-retry-tracker:hover {
+    opacity: 1;
+}
+.tracker-badge {
+    cursor: default;
+}
+.tracker-badge[title]:hover {
+    opacity: 0.8;
+}
+.approval-item:last-child {
+    border-bottom: none;
+}
+
+/* Duplicate Status Styles */
+.dup-status {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.dup-check-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.dup-check-btn:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--accent-color);
+}
+
+.dup-checking {
+    color: var(--text-muted);
+}
+.dup-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--accent-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.dup-yes .dup-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    background: rgba(251, 146, 60, 0.15);
+    border: 1px solid #fb923c;
+    border-radius: 0.25rem;
+    color: #fb923c;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.dup-no .dup-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid #22c55e;
+    border-radius: 0.25rem;
+    color: #22c55e;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.dup-error .dup-icon {
+    color: var(--text-muted);
+}
+
+/* Duplicate Badge Container */
+.dup-badge-container {
+    position: relative;
+    display: inline-block;
+}
+
+.dup-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid;
+    transition: all 0.2s;
+}
+
+.dup-badge-yes {
+    background: rgba(251, 146, 60, 0.15);
+    border-color: #fb923c;
+    color: #fb923c;
+}
+.dup-badge-yes:hover {
+    background: rgba(251, 146, 60, 0.25);
+}
+
+/* Popup container */
+.dup-popup {
+    display: none;
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+    z-index: 10000;
+    width: 400px;
+    background: #0f172a;
+    border: 2px solid #fb923c;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+}
+
+.dup-badge-container:hover .dup-popup {
+    display: block;
+}
+
+/* Arrow */
+.dup-popup::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: 20px;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-bottom: 10px solid #fb923c;
+}
+.dup-popup::after {
+    content: '';
+    position: absolute;
+    top: -7px;
+    left: 22px;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid #0f172a;
+}
+
+/* Header */
+.dup-popup-header {
+    background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+    color: #000;
+    padding: 10px 15px;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+/* Content */
+.dup-popup-content {
+    padding: 10px 0;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* Tracker block */
+.dup-tracker-block {
+    padding: 8px 15px;
+}
+.dup-tracker-block:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dup-tracker-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #60a5fa;
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+
+.dup-tracker-icon {
+    font-size: 14px;
+}
+
+.dup-count {
+    color: #9ca3af;
+    font-weight: 400;
+    font-size: 12px;
+}
+
+/* Release list */
+.dup-release-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.dup-release-list li {
+    padding: 6px 10px;
+    margin: 4px 0;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    border-left: 3px solid #fb923c;
+    color: #e2e8f0;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 11px;
+    word-break: break-all;
+    line-height: 1.4;
+}
+
+.dup-release-list li:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.dup-more-item {
+    color: #9ca3af !important;
+    font-style: italic;
+    border-left-color: #6b7280 !important;
+}
+
+/* Clickable row styles */
+.job-row {
+    transition: background-color 0.2s;
+}
+.job-row:hover {
+    background-color: rgba(59, 130, 246, 0.1);
+}
+.job-link {
+    text-decoration: none;
+}
+.job-link:hover .text-primary {
+    color: var(--accent-color, #3b82f6) !important;
+}
+
+/* Pending approval clickable styles */
+.cover-link {
+    display: block;
+    transition: transform 0.2s;
+}
+.cover-link:hover {
+    transform: scale(1.02);
+}
+.cover-link:hover img {
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+.release-title-link:hover .text-primary {
+    color: var(--accent-color, #3b82f6) !important;
+}
+
+/* Details button style */
+.btn-info {
+    border-color: #3b82f6;
+    color: #3b82f6;
+}
+.btn-info:hover {
+    background-color: #3b82f6;
+    color: white;
+}
+
+/* Details icon button in table */
+.btn-details {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 0.375rem;
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    transition: all 0.2s;
+}
+.btn-details:hover {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: #3b82f6;
+}
+
+/* Search Bar Styles */
+.queue-search-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.search-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+    max-width: 400px;
+}
+
+.search-icon {
+    position: absolute;
+    left: 12px;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.625rem 2.5rem 0.625rem 2.5rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.search-input::placeholder {
+    color: var(--text-muted);
+}
+
+.search-clear {
+    position: absolute;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.search-clear:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.search-info {
+    margin-left: 4px;
+}
+
+/* Job Name Column - Truncation */
+.job-name-header {
+    width: 35%;
+    min-width: 200px;
+}
+
+.job-name-cell {
+    max-width: 350px;
+    min-width: 200px;
+}
+
+.job-name-text {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+}
+
+.job-release-name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+}
+
+/* Loading Indicator Animation */
+.loading-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    padding: 1rem;
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+</style>

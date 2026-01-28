@@ -1,0 +1,655 @@
+/* WireGuard-Inspired Dashboard Styles */
+/* Dark theme with cyan/blue accents, modern and clean design */
+
+/* ============================================
+   CSS Custom Properties - Dark Theme Colors
+   ============================================ */
+:root {
+    /* Dark Theme Base Colors */
+    --bg-primary: #0f172a;        /* Deep slate background */
+    --bg-secondary: #1e293b;      /* Lighter slate for cards */
+    --bg-tertiary: #334155;       /* Even lighter for hover states */
+
+    /* WireGuard-Inspired Accent Colors */
+    --accent-primary: #06b6d4;    /* Cyan - main accent */
+    --accent-secondary: #0ea5e9;  /* Sky blue - secondary accent */
+    --accent-hover: #22d3ee;      /* Lighter cyan for hovers */
+
+    /* Status Colors */
+    --status-success: #10b981;    /* Green */
+    --status-warning: #f59e0b;    /* Amber */
+    --status-error: #ef4444;      /* Red */
+    --status-info: #3b82f6;       /* Blue */
+
+    /* Text Colors */
+    --text-primary: #f1f5f9;      /* Light slate for primary text */
+    --text-secondary: #cbd5e1;    /* Medium slate for secondary text */
+    --text-muted: #94a3b8;        /* Muted slate for less important text */
+
+    /* Border Colors */
+    --border-primary: #334155;    /* Subtle borders */
+    --border-accent: #06b6d4;     /* Accent borders */
+
+    /* Shadow Colors */
+    --shadow-sm: rgba(0, 0, 0, 0.1);
+    --shadow-md: rgba(0, 0, 0, 0.2);
+    --shadow-lg: rgba(0, 0, 0, 0.3);
+    --shadow-glow: rgba(6, 182, 212, 0.3);
+}
+
+/* ============================================
+   Base Dark Theme Styles
+   ============================================ */
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
+}
+
+/* ============================================
+   Dashboard Container
+   ============================================ */
+.dashboard-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* ============================================
+   Dashboard Header
+   ============================================ */
+.dashboard-header {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid var(--border-primary);
+}
+
+.dashboard-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dashboard-subtitle {
+    font-size: 1rem;
+    color: var(--text-muted);
+}
+
+/* ============================================
+   Dashboard Cards
+   ============================================ */
+.dashboard-card {
+    background-color: var(--bg-secondary);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border-primary);
+    transition: all 0.3s ease;
+}
+
+.dashboard-card:hover {
+    border-color: var(--accent-primary);
+    box-shadow: 0 4px 12px var(--shadow-glow);
+    transform: translateY(-2px);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-body {
+    color: var(--text-secondary);
+}
+
+/* ============================================
+   Stats Cards
+   ============================================ */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background-color: var(--bg-secondary);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    border: 1px solid var(--border-primary);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--accent-primary);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.stat-card:hover::before {
+    opacity: 1;
+}
+
+.stat-card:hover {
+    border-color: var(--accent-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow-md);
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.stat-change {
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.stat-change.positive {
+    color: var(--status-success);
+}
+
+.stat-change.negative {
+    color: var(--status-error);
+}
+
+/* ============================================
+   Status Badges
+   ============================================ */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.status-badge.active {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: var(--status-success);
+    border: 1px solid var(--status-success);
+}
+
+.status-badge.inactive {
+    background-color: rgba(148, 163, 184, 0.1);
+    color: var(--text-muted);
+    border: 1px solid var(--text-muted);
+}
+
+.status-badge.warning {
+    background-color: rgba(245, 158, 11, 0.1);
+    color: var(--status-warning);
+    border: 1px solid var(--status-warning);
+}
+
+.status-badge.error {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: var(--status-error);
+    border: 1px solid var(--status-error);
+}
+
+.status-badge.pending {
+    background-color: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.5);
+}
+
+.status-badge.processing {
+    background-color: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.5);
+}
+
+.connection-dot.waiting {
+    background-color: #f59e0b;
+    animation: pulse 2s infinite;
+}
+
+.connection-dot.processing {
+    background-color: #3b82f6;
+    animation: pulse 1s infinite;
+}
+
+.connection-dot.error {
+    background-color: #ef4444;
+}
+
+/* ============================================
+   Buttons - WireGuard Style
+   ============================================ */
+.btn-primary {
+    background-color: var(--accent-primary);
+    color: var(--bg-primary);
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.5rem;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-primary:hover {
+    background-color: var(--accent-hover);
+    box-shadow: 0 0 20px var(--shadow-glow);
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background-color: transparent;
+    color: var(--accent-primary);
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--accent-primary);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+    background-color: rgba(6, 182, 212, 0.1);
+    border-color: var(--accent-hover);
+}
+
+.btn-danger {
+    background-color: var(--status-error);
+    color: white;
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.5rem;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-danger:hover {
+    background-color: #dc2626;
+    transform: translateY(-1px);
+}
+
+/* ============================================
+   Tables - Dark Theme
+   ============================================ */
+.dashboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: var(--bg-secondary);
+    border-radius: 0.75rem;
+    overflow: hidden;
+}
+
+.dashboard-table thead {
+    background-color: var(--bg-tertiary);
+}
+
+.dashboard-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    font-size: 0.875rem;
+    letter-spacing: 0.05em;
+}
+
+.dashboard-table td {
+    padding: 1rem;
+    border-top: 1px solid var(--border-primary);
+    color: var(--text-secondary);
+}
+
+.dashboard-table tbody tr {
+    transition: background-color 0.2s ease;
+}
+
+.dashboard-table tbody tr:hover {
+    background-color: var(--bg-tertiary);
+}
+
+/* ============================================
+   Forms - Dark Theme
+   ============================================ */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: 0.5rem;
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
+}
+
+.form-input::placeholder {
+    color: var(--text-muted);
+}
+
+/* ============================================
+   Progress Bars
+   ============================================ */
+.progress-bar {
+    width: 100%;
+    height: 0.5rem;
+    background-color: var(--bg-tertiary);
+    border-radius: 9999px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+    border-radius: 9999px;
+    transition: width 0.3s ease;
+}
+
+/* ============================================
+   Alerts & Notifications
+   ============================================ */
+.alert {
+    padding: 1rem 1.25rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.alert-info {
+    background-color: rgba(59, 130, 246, 0.1);
+    border-left: 4px solid var(--status-info);
+    color: var(--status-info);
+}
+
+.alert-success {
+    background-color: rgba(16, 185, 129, 0.1);
+    border-left: 4px solid var(--status-success);
+    color: var(--status-success);
+}
+
+.alert-warning {
+    background-color: rgba(245, 158, 11, 0.1);
+    border-left: 4px solid var(--status-warning);
+    color: var(--status-warning);
+}
+
+.alert-error {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-left: 4px solid var(--status-error);
+    color: var(--status-error);
+}
+
+/* ============================================
+   Loading Spinner
+   ============================================ */
+.loading-spinner {
+    border: 3px solid var(--bg-tertiary);
+    border-top: 3px solid var(--accent-primary);
+    border-radius: 50%;
+    width: 2.5rem;
+    height: 2.5rem;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ============================================
+   Connection Status Indicator
+   ============================================ */
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.connection-dot {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+.connection-dot.connected {
+    background-color: var(--status-success);
+}
+
+.connection-dot.disconnected {
+    background-color: var(--status-error);
+    animation: none;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* ============================================
+   Responsive Grid
+   ============================================ */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 1.5rem;
+}
+
+.col-span-12 { grid-column: span 12; }
+.col-span-6 { grid-column: span 6; }
+.col-span-4 { grid-column: span 4; }
+.col-span-3 { grid-column: span 3; }
+
+@media (max-width: 1024px) {
+    .col-span-6 { grid-column: span 12; }
+    .col-span-4 { grid-column: span 12; }
+    .col-span-3 { grid-column: span 12; }
+}
+
+/* ============================================
+   Utility Classes
+   ============================================ */
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted { color: var(--text-muted); }
+.text-accent { color: var(--accent-primary); }
+
+.bg-primary { background-color: var(--bg-primary); }
+.bg-secondary { background-color: var(--bg-secondary); }
+.bg-tertiary { background-color: var(--bg-tertiary); }
+
+.border-accent { border-color: var(--accent-primary); }
+
+.shadow-sm { box-shadow: 0 1px 2px var(--shadow-sm); }
+.shadow-md { box-shadow: 0 4px 6px var(--shadow-md); }
+.shadow-lg { box-shadow: 0 10px 15px var(--shadow-lg); }
+
+.rounded { border-radius: 0.375rem; }
+.rounded-lg { border-radius: 0.75rem; }
+.rounded-full { border-radius: 9999px; }
+
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 0.5rem; }
+.gap-4 { gap: 1rem; }
+
+.mt-2 { margin-top: 0.5rem; }
+.mt-4 { margin-top: 1rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-4 { margin-bottom: 1rem; }
+
+.p-2 { padding: 0.5rem; }
+.p-4 { padding: 1rem; }
+
+/* ============================================
+   Scrollbar Styling - Dark Theme
+   ============================================ */
+::-webkit-scrollbar {
+    width: 0.75rem;
+    height: 0.75rem;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--bg-tertiary);
+    border-radius: 0.375rem;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-primary);
+}
+
+/* ============================================
+   Code Blocks (for configuration display)
+   ============================================ */
+.code-block {
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 0.875rem;
+    color: var(--accent-primary);
+    overflow-x: auto;
+}
+
+/* ============================================
+   WireGuard-Specific Elements
+   ============================================ */
+.peer-card {
+    background-color: var(--bg-secondary);
+    border-left: 4px solid var(--accent-primary);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.peer-card:hover {
+    background-color: var(--bg-tertiary);
+    box-shadow: 0 4px 12px var(--shadow-md);
+}
+
+.peer-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.peer-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.peer-ip {
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    color: var(--accent-primary);
+    font-size: 0.875rem;
+}
+
+/* ============================================
+   Responsive Design
+   ============================================ */
+@media (max-width: 768px) {
+    .dashboard-container {
+        padding: 1rem;
+    }
+
+    .dashboard-title {
+        font-size: 1.875rem;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-card {
+        padding: 1rem;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+    }
+}
+
+/* ============================================
+   Dark Theme Compatibility
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+    /* Additional dark mode adjustments if needed */
+    /* The entire theme is already dark, so this just ensures consistency */
+}

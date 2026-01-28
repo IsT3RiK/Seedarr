@@ -1,0 +1,1280 @@
+{% extends "base.html" %}
+
+{% block title %}Trackers - Seedarr v2.0{% endblock %}
+
+{% block page_title %}Tracker Management{% endblock %}
+
+{% block extra_head %}
+<style>
+    .tracker-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    .tracker-card.disabled {
+        opacity: 0.6;
+    }
+    .tracker-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+    .tracker-name {
+        font-size: 1.25rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .tracker-badges {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .tracker-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    .detail-item {
+        display: flex;
+        flex-direction: column;
+    }
+    .detail-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+    }
+    .detail-value {
+        font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+        font-size: 0.875rem;
+        color: var(--text-primary);
+        word-break: break-all;
+    }
+    .tracker-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+    }
+    .modal-box {
+        max-width: 640px;
+    }
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+    .form-grid .full-width {
+        grid-column: 1 / -1;
+    }
+    @media (max-width: 640px) {
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Toggle Switch Styles */
+    .toggle-switch {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+    }
+    .toggle-switch input {
+        display: none;
+    }
+    .toggle-slider {
+        position: relative;
+        width: 44px;
+        height: 24px;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: 24px;
+        transition: all 0.3s ease;
+    }
+    .toggle-slider::before {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 18px;
+        height: 18px;
+        background: var(--text-muted);
+        border-radius: 50%;
+        transition: all 0.3s ease;
+    }
+    .toggle-switch input:checked + .toggle-slider {
+        background: rgba(34, 197, 94, 0.2);
+        border-color: var(--status-success);
+    }
+    .toggle-switch input:checked + .toggle-slider::before {
+        transform: translateX(20px);
+        background: var(--status-success);
+    }
+    .toggle-label {
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        min-width: 70px;
+    }
+    .toggle-switch input:checked ~ .toggle-label {
+        color: var(--status-success);
+    }
+    .toggle-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.75rem;
+        background: var(--bg-tertiary);
+        border-radius: 0.375rem;
+        margin-right: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div>
+            <h1 class="dashboard-title">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
+                </svg>
+                Tracker Management
+            </h1>
+            <p class="dashboard-subtitle">Configure multiple trackers for cross-seeding</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <button onclick="openProwlarrModal()" class="btn-secondary">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                Import from Prowlarr
+            </button>
+            <button onclick="openAddTrackerModal()" class="btn-primary">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Add Tracker
+            </button>
+        </div>
+    </div>
+
+    <!-- Message Container -->
+    <div id="message-container" class="mb-6"></div>
+
+    <!-- Trackers List -->
+    <div id="trackers-list">
+        {% if trackers %}
+            {% for tracker in trackers %}
+            <div class="tracker-card {% if not tracker.enabled %}disabled{% endif %}" id="tracker-{{ tracker.id }}">
+                <div class="tracker-header">
+                    <div class="tracker-name">
+                        {% if tracker.adapter_type == 'lacale' %}
+                        <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                        </svg>
+                        {% elif tracker.adapter_type == 'c411' %}
+                        <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path>
+                        </svg>
+                        {% else %}
+                        <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                        </svg>
+                        {% endif %}
+                        {{ tracker.name }}
+                    </div>
+                    <div class="tracker-badges">
+                        {% if tracker.enabled %}
+                        <span class="status-badge" style="background: rgba(34, 197, 94, 0.1); color: var(--status-success); border: 1px solid var(--status-success);">
+                            Enabled
+                        </span>
+                        {% else %}
+                        <span class="status-badge" style="background: rgba(239, 68, 68, 0.1); color: var(--status-error); border: 1px solid var(--status-error);">
+                            Disabled
+                        </span>
+                        {% endif %}
+                        {% if tracker.upload_enabled %}
+                        <span class="status-badge" style="background: rgba(59, 130, 246, 0.1); color: var(--status-info); border: 1px solid var(--status-info);">
+                            Upload Active
+                        </span>
+                        {% endif %}
+                        {% if tracker.requires_cloudflare %}
+                        <span class="status-badge" style="background: rgba(251, 146, 60, 0.1); color: var(--status-warning); border: 1px solid var(--status-warning);">
+                            CloudFlare
+                        </span>
+                        {% endif %}
+                        <span class="status-badge" style="background: rgba(156, 163, 175, 0.1); color: var(--text-muted); border: 1px solid var(--border-color);">
+                            {{ tracker.adapter_type }}
+                        </span>
+                        {% if tracker.upload_config %}
+                        <span class="status-badge" style="background: rgba(168, 85, 247, 0.1); color: rgb(168, 85, 247); border: 1px solid rgb(168, 85, 247);">
+                            Custom Upload
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="tracker-details">
+                    <div class="detail-item">
+                        <span class="detail-label">Slug</span>
+                        <span class="detail-value">{{ tracker.slug }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">URL</span>
+                        <span class="detail-value">{{ tracker.tracker_url }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Source Flag</span>
+                        <span class="detail-value">{{ tracker.source_flag or '-' }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Piece Size</span>
+                        <span class="detail-value">{{ tracker.piece_size_strategy or 'auto' }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Priority</span>
+                        <span class="detail-value">{{ tracker.priority }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Default Category</span>
+                        <span class="detail-value">{{ tracker.default_category_id or '-' }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Description Template</span>
+                        <span class="detail-value">
+                            {% if tracker.default_template_id %}
+                                {% for template in bbcode_templates %}
+                                    {% if template.id == tracker.default_template_id %}
+                                        {{ template.name }}
+                                    {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                <span style="color: var(--text-muted);">Global Default</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="detail-item" style="grid-column: 1 / -1;">
+                        <span class="detail-label">Naming Template</span>
+                        <span class="detail-value">
+                            {% if tracker.naming_template %}
+                                {{ tracker.naming_template }}
+                            {% else %}
+                                <span style="color: var(--text-muted);">None (uses original filename)</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="tracker-actions">
+                    <!-- Toggle Switches -->
+                    <div class="toggle-group">
+                        <label class="toggle-switch" onclick="event.preventDefault(); toggleTracker({{ tracker.id }})">
+                            <input type="checkbox" {% if tracker.enabled %}checked{% endif %}>
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label">Enabled</span>
+                        </label>
+                        <label class="toggle-switch" onclick="event.preventDefault(); toggleUpload({{ tracker.id }})">
+                            <input type="checkbox" {% if tracker.upload_enabled %}checked{% endif %}>
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label">Upload</span>
+                        </label>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <button onclick="testTracker({{ tracker.id }})" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Test
+                    </button>
+                    <button onclick="editTracker({{ tracker.id }})" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                        Edit
+                    </button>
+                    <button onclick="openUploadConfigModal({{ tracker.id }}, '{{ tracker.name }}')" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                        </svg>
+                        Upload Config
+                    </button>
+                    <button onclick="deleteTracker({{ tracker.id }}, '{{ tracker.name }}')" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--status-error);">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        Delete
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="dashboard-card" style="text-align: center; padding: 3rem;">
+            <svg class="w-16 h-16 mx-auto mb-4" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
+            </svg>
+            <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">No Trackers Configured</h3>
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">Add your first tracker to start cross-seeding</p>
+            <button onclick="openAddTrackerModal()" class="btn-primary">
+                Add Your First Tracker
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add/Edit Tracker Modal -->
+<dialog id="tracker-modal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg mb-4" id="modal-title">Add Tracker</h3>
+
+        <form id="tracker-form" onsubmit="submitTrackerForm(event)">
+            <input type="hidden" id="tracker-id" name="tracker_id" value="">
+
+            <div class="form-grid">
+                <!-- Name -->
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Name *</span></label>
+                    <input type="text" id="tracker-name" name="name" class="input input-bordered" required placeholder="La Cale">
+                </div>
+
+                <!-- Slug -->
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Slug *</span></label>
+                    <input type="text" id="tracker-slug" name="slug" class="input input-bordered" required placeholder="lacale">
+                </div>
+
+                <!-- URL -->
+                <div class="form-control full-width">
+                    <label class="label"><span class="label-text">Tracker URL *</span></label>
+                    <input type="url" id="tracker-url" name="tracker_url" class="input input-bordered" required placeholder="https://lacale.example.com">
+                </div>
+
+                <!-- Passkey -->
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Passkey</span></label>
+                    <input type="password" id="tracker-passkey" name="passkey" class="input input-bordered" placeholder="Your passkey">
+                </div>
+
+                <!-- API Key -->
+                <div class="form-control">
+                    <label class="label"><span class="label-text">API Key</span></label>
+                    <input type="password" id="tracker-apikey" name="api_key" class="input input-bordered" placeholder="Bearer token (C411)">
+                </div>
+
+                <!-- Adapter Type -->
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Adapter Type</span></label>
+                    <select id="tracker-adapter" name="adapter_type" class="select select-bordered">
+                        {% for adapter in adapter_types %}
+                        <option value="{{ adapter.value }}">{{ adapter.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Piece Size Strategy -->
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Piece Size Strategy</span></label>
+                    <select id="tracker-piecesize" name="piece_size_strategy" class="select select-bordered">
+                        {% for strategy in piece_size_strategies %}
+                        <option value="{{ strategy.value }}">{{ strategy.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Source Flag -->
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Source Flag</span></label>
+                    <input type="text" id="tracker-source" name="source_flag" class="input input-bordered" placeholder="lacale">
+                </div>
+
+                <!-- Priority -->
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Priority</span></label>
+                    <input type="number" id="tracker-priority" name="priority" class="input input-bordered" value="0" min="0">
+                </div>
+
+                <!-- Default Category -->
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Default Category ID</span></label>
+                    <input type="text" id="tracker-category" name="default_category_id" class="input input-bordered" placeholder="1">
+                </div>
+
+                <!-- Default Subcategory -->
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Default Subcategory ID</span></label>
+                    <input type="text" id="tracker-subcategory" name="default_subcategory_id" class="input input-bordered" placeholder="10">
+                </div>
+
+                <!-- BBCode Template -->
+                <div class="form-control full-width">
+                    <label class="label"><span class="label-text">Description Template</span></label>
+                    <select id="tracker-template" name="default_template_id" class="select select-bordered">
+                        <option value="">-- Use Global Default --</option>
+                        {% for template in bbcode_templates %}
+                        <option value="{{ template.id }}">
+                            {{ template.name }}{% if template.is_default %} (Global Default){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <label class="label"><span class="label-text-alt">Template used for upload descriptions on this tracker</span></label>
+                </div>
+
+                <!-- Naming Template -->
+                <div class="form-control full-width">
+                    <label class="label"><span class="label-text">Naming Template</span></label>
+                    <select id="tracker-naming-template-select" class="select select-bordered" onchange="updateNamingTemplateFromSelect()">
+                        <option value="">-- No template (use original filename) --</option>
+                        {% for template in naming_templates %}
+                        <option value="{{ template.template }}" data-name="{{ template.name }}">
+                            {{ template.name }}{% if template.is_default %} (Default){% endif %}
+                        </option>
+                        {% endfor %}
+                        <option value="__custom__">-- Custom template --</option>
+                    </select>
+                    <input type="text" id="tracker-naming-template" name="naming_template" class="input input-bordered mt-2" style="display: none;"
+                           placeholder="{titre}.{annee}.{langue}.{resolution}.{source}.{codec_audio}.{codec_video}-{group}">
+                    <label class="label">
+                        <span class="label-text-alt" style="line-height: 1.4;">
+                            Variables: {titre}, {titre_fr}, {titre_en}, {annee}, {langue}, {resolution}, {source}, {codec_audio}, {codec_video}, {group}, {hdr}, {saison}, {episode}<br>
+                            <em>Select a naming template or "Custom" to enter your own format. <a href="/templates" style="color: var(--accent-color);">Manage templates</a></em>
+                        </span>
+                    </label>
+                </div>
+
+                <!-- Announce URL Template -->
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Announce URL Format</span></label>
+                    <select id="tracker-announce-preset" class="select select-bordered" onchange="applyAnnouncePreset(this.value)">
+                        <option value="">-- Select a format --</option>
+                        <option value="{url}/announce?passkey={passkey}">Standard (?passkey=)</option>
+                        <option value="{url}/announce/{passkey}">Path-based (/passkey)</option>
+                        <option value="{url}/announce/{passkey}/announce">Unit3D style</option>
+                        <option value="{url}/{passkey}/announce">Gazelle style</option>
+                        <option value="custom">Custom...</option>
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Announce URL Template</span></label>
+                    <input type="text" id="tracker-announce" name="announce_url_template" class="input input-bordered" placeholder="{url}/announce?passkey={passkey}">
+                    <label class="label"><span class="label-text-alt">Variables: {url}, {passkey}</span></label>
+                </div>
+
+                <!-- Checkboxes -->
+                <div class="form-control">
+                    <label class="cursor-pointer label justify-start gap-2">
+                        <input type="checkbox" id="tracker-cloudflare" name="requires_cloudflare" class="checkbox checkbox-primary">
+                        <span class="label-text">Requires CloudFlare</span>
+                    </label>
+                </div>
+
+                <div class="form-control">
+                    <label class="cursor-pointer label justify-start gap-2">
+                        <input type="checkbox" id="tracker-upload" name="upload_enabled" class="checkbox checkbox-primary" checked>
+                        <span class="label-text">Upload Enabled</span>
+                    </label>
+                </div>
+
+                <div class="form-control">
+                    <label class="cursor-pointer label justify-start gap-2">
+                        <input type="checkbox" id="tracker-enabled" name="enabled" class="checkbox checkbox-primary" checked>
+                        <span class="label-text">Tracker Enabled</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="modal-action">
+                <button type="button" class="btn" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
+
+<!-- Upload Config Modal -->
+<dialog id="upload-config-modal" class="modal">
+    <div class="modal-box" style="max-width: 900px;">
+        <h3 class="font-bold text-lg mb-4" id="upload-config-title">
+            <svg class="w-6 h-6 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+            </svg>
+            Upload Configuration
+        </h3>
+
+        <input type="hidden" id="upload-config-tracker-id" value="">
+
+        <!-- Template Selection -->
+        <div class="form-control mb-4">
+            <label class="label"><span class="label-text">Start from Template</span></label>
+            <select id="upload-template-select" class="select select-bordered" onchange="loadTemplate(this.value)">
+                <option value="">-- Select a template --</option>
+            </select>
+            <label class="label"><span class="label-text-alt">Choose a template to pre-fill the configuration</span></label>
+        </div>
+
+        <!-- Current Config Status -->
+        <div id="upload-config-status" class="mb-4" style="padding: 0.75rem; border-radius: 0.5rem; background: var(--bg-secondary);">
+            <span id="upload-config-status-text">No custom upload configuration</span>
+        </div>
+
+        <!-- JSON Editor -->
+        <div class="form-control mb-4">
+            <label class="label">
+                <span class="label-text">Configuration JSON</span>
+                <span class="label-text-alt">
+                    <button type="button" class="btn btn-xs btn-ghost" onclick="formatJson()">Format JSON</button>
+                </span>
+            </label>
+            <textarea
+                id="upload-config-json"
+                class="textarea textarea-bordered"
+                style="font-family: 'Monaco', 'Menlo', 'Consolas', monospace; min-height: 300px; font-size: 0.75rem;"
+                placeholder="Paste or edit JSON configuration here..."
+            ></textarea>
+        </div>
+
+        <!-- Validation Result -->
+        <div id="upload-config-validation" class="mb-4" style="display: none;">
+            <div id="validation-errors" style="color: var(--status-error); font-size: 0.875rem;"></div>
+        </div>
+
+        <!-- Help Section -->
+        <details class="mb-4">
+            <summary style="cursor: pointer; color: var(--text-muted); font-size: 0.875rem;">Configuration Help</summary>
+            <div style="margin-top: 0.5rem; padding: 1rem; background: var(--bg-secondary); border-radius: 0.5rem; font-size: 0.75rem;">
+                <p><strong>type</strong>: Upload method - "rest_api", "multipart_form", or "json_api"</p>
+                <p><strong>endpoint</strong>: API endpoint path (e.g., "/api/torrents")</p>
+                <p><strong>auth</strong>: Authentication config - "bearer", "header", or "query_param"</p>
+                <p><strong>fields</strong>: Mapping of form fields to release data</p>
+                <p><strong>response</strong>: How to parse the API response</p>
+                <hr style="margin: 0.5rem 0; border-color: var(--border-color);">
+                <p><strong>Field sources</strong>: torrent_data, nfo_data, release_name, description, category_id, subcategory_id, tag_ids, tmdb_id, tmdb_type, cover_url</p>
+            </div>
+        </details>
+
+        <div class="modal-action">
+            <button type="button" class="btn btn-error btn-outline" onclick="deleteUploadConfig()" id="delete-config-btn" style="margin-right: auto;">
+                Delete Config
+            </button>
+            <button type="button" class="btn" onclick="closeUploadConfigModal()">Cancel</button>
+            <button type="button" class="btn btn-outline" onclick="validateUploadConfig()">Validate</button>
+            <button type="button" class="btn btn-primary" onclick="saveUploadConfig()">Save</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
+
+<!-- Prowlarr Import Modal -->
+<dialog id="prowlarr-modal" class="modal">
+    <div class="modal-box" style="max-width: 800px;">
+        <h3 class="font-bold text-lg mb-4">
+            <svg class="w-6 h-6 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            Import from Prowlarr
+        </h3>
+
+        <div id="prowlarr-status" style="margin-bottom: 1rem; padding: 0.75rem; border-radius: 0.5rem; background: var(--bg-secondary);">
+            <div class="loading-spinner" style="display: inline-block; margin-right: 0.5rem;"></div>
+            <span>Checking Prowlarr connection...</span>
+        </div>
+
+        <div id="prowlarr-content" style="display: none;">
+            <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.875rem;">
+                Select indexers to import as trackers. Only indexers not already imported will be selectable.
+            </p>
+
+            <div style="margin-bottom: 1rem;">
+                <label class="cursor-pointer label justify-start gap-2">
+                    <input type="checkbox" id="select-all-indexers" class="checkbox checkbox-primary" onchange="toggleAllIndexers(this.checked)">
+                    <span class="label-text">Select All Available</span>
+                </label>
+            </div>
+
+            <div id="indexers-list" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 0.5rem;">
+                <!-- Indexers will be loaded here -->
+            </div>
+
+            <div id="selected-count" style="margin-top: 1rem; color: var(--text-muted); font-size: 0.875rem;">
+                0 indexers selected
+            </div>
+        </div>
+
+        <div id="prowlarr-error" style="display: none; color: var(--status-error);">
+            <p id="prowlarr-error-message"></p>
+            <p style="margin-top: 0.5rem; font-size: 0.875rem;">
+                <a href="/settings" style="color: var(--status-info); text-decoration: underline;">Configure Prowlarr in Settings</a>
+            </p>
+        </div>
+
+        <div class="modal-action">
+            <button type="button" class="btn" onclick="closeProwlarrModal()">Cancel</button>
+            <button type="button" id="import-btn" class="btn btn-primary" onclick="importSelectedIndexers()" disabled>
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                </svg>
+                Import Selected
+            </button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const modal = document.getElementById('tracker-modal');
+    let currentTrackerId = null;
+
+    function openAddTrackerModal() {
+        currentTrackerId = null;
+        document.getElementById('modal-title').textContent = 'Add Tracker';
+        document.getElementById('tracker-form').reset();
+        document.getElementById('tracker-id').value = '';
+        document.getElementById('tracker-enabled').checked = true;
+        document.getElementById('tracker-upload').checked = true;
+        document.getElementById('tracker-announce-preset').value = '';
+        modal.showModal();
+    }
+
+    function closeModal() {
+        modal.close();
+    }
+
+    async function editTracker(id) {
+        currentTrackerId = id;
+        document.getElementById('modal-title').textContent = 'Edit Tracker';
+
+        try {
+            const response = await fetch(`/api/trackers/${id}`);
+            if (!response.ok) throw new Error('Failed to load tracker');
+
+            const tracker = await response.json();
+
+            document.getElementById('tracker-id').value = tracker.id;
+            document.getElementById('tracker-name').value = tracker.name || '';
+            document.getElementById('tracker-slug').value = tracker.slug || '';
+            document.getElementById('tracker-url').value = tracker.tracker_url || '';
+            document.getElementById('tracker-passkey').value = '';  // Don't show masked value
+            document.getElementById('tracker-apikey').value = '';
+            document.getElementById('tracker-adapter').value = tracker.adapter_type || 'generic';
+            document.getElementById('tracker-piecesize').value = tracker.piece_size_strategy || 'auto';
+            document.getElementById('tracker-source').value = tracker.source_flag || '';
+            document.getElementById('tracker-priority').value = tracker.priority || 0;
+            document.getElementById('tracker-category').value = tracker.default_category_id || '';
+            document.getElementById('tracker-subcategory').value = tracker.default_subcategory_id || '';
+            document.getElementById('tracker-template').value = tracker.default_template_id || '';
+            updateNamingTemplateSelectFromValue(tracker.naming_template || '');
+            document.getElementById('tracker-announce').value = tracker.announce_url_template || '';
+            updateAnnouncePresetFromValue(tracker.announce_url_template || '');
+            document.getElementById('tracker-cloudflare').checked = tracker.requires_cloudflare;
+            document.getElementById('tracker-upload').checked = tracker.upload_enabled;
+            document.getElementById('tracker-enabled').checked = tracker.enabled;
+
+            modal.showModal();
+        } catch (error) {
+            showMessage('error', `Failed to load tracker: ${error.message}`);
+        }
+    }
+
+    async function submitTrackerForm(event) {
+        event.preventDefault();
+
+        const formData = new FormData(event.target);
+        const data = {
+            name: formData.get('name'),
+            slug: formData.get('slug'),
+            tracker_url: formData.get('tracker_url'),
+            adapter_type: formData.get('adapter_type'),
+            piece_size_strategy: formData.get('piece_size_strategy'),
+            source_flag: formData.get('source_flag') || null,
+            priority: parseInt(formData.get('priority') || '0'),
+            default_category_id: formData.get('default_category_id') || null,
+            default_subcategory_id: formData.get('default_subcategory_id') || null,
+            default_template_id: formData.get('default_template_id') ? parseInt(formData.get('default_template_id')) : null,
+            naming_template: formData.get('naming_template') || null,
+            announce_url_template: formData.get('announce_url_template') || null,
+            requires_cloudflare: formData.get('requires_cloudflare') === 'on',
+            upload_enabled: formData.get('upload_enabled') === 'on',
+            enabled: formData.get('enabled') === 'on',
+        };
+
+        // Only include credentials if provided (for updates)
+        const passkey = formData.get('passkey');
+        const api_key = formData.get('api_key');
+        if (passkey) data.passkey = passkey;
+        if (api_key) data.api_key = api_key;
+
+        const trackerId = formData.get('tracker_id');
+        const isEdit = trackerId && trackerId !== '';
+
+        try {
+            const url = isEdit ? `/api/trackers/${trackerId}` : '/api/trackers';
+            const method = isEdit ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to save tracker');
+            }
+
+            showMessage('success', `Tracker ${isEdit ? 'updated' : 'created'} successfully`);
+            closeModal();
+            location.reload();
+
+        } catch (error) {
+            showMessage('error', error.message);
+        }
+    }
+
+    async function toggleTracker(id) {
+        try {
+            const response = await fetch(`/api/trackers/${id}/toggle`, { method: 'POST' });
+            if (!response.ok) throw new Error('Failed to toggle tracker');
+
+            const tracker = await response.json();
+            showMessage('success', `Tracker ${tracker.enabled ? 'enabled' : 'disabled'}`);
+            location.reload();
+        } catch (error) {
+            showMessage('error', error.message);
+        }
+    }
+
+    async function toggleUpload(id) {
+        try {
+            const response = await fetch(`/api/trackers/${id}/toggle-upload`, { method: 'POST' });
+            if (!response.ok) throw new Error('Failed to toggle upload');
+
+            const tracker = await response.json();
+            showMessage('success', `Upload ${tracker.upload_enabled ? 'enabled' : 'disabled'} for ${tracker.name}`);
+            location.reload();
+        } catch (error) {
+            showMessage('error', error.message);
+        }
+    }
+
+    async function deleteTracker(id, name) {
+        if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
+
+        try {
+            const response = await fetch(`/api/trackers/${id}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error('Failed to delete tracker');
+
+            showMessage('success', 'Tracker deleted');
+            location.reload();
+        } catch (error) {
+            showMessage('error', error.message);
+        }
+    }
+
+    async function testTracker(id) {
+        showMessage('info', 'Testing tracker connection...');
+
+        try {
+            const response = await fetch(`/api/trackers/${id}/test`, { method: 'POST' });
+            const result = await response.json();
+
+            if (result.success) {
+                showMessage('success', result.message);
+            } else {
+                showMessage('error', result.message);
+            }
+        } catch (error) {
+            showMessage('error', `Test failed: ${error.message}`);
+        }
+    }
+
+    function showMessage(type, message) {
+        const container = document.getElementById('message-container');
+        const alertClass = type === 'success' ? 'alert-success' :
+                         type === 'error' ? 'alert-error' :
+                         type === 'info' ? 'alert-info' : 'alert-warning';
+
+        container.innerHTML = `
+            <div class="alert ${alertClass}">
+                <span>${message}</span>
+            </div>
+        `;
+
+        if (type !== 'info') {
+            setTimeout(() => { container.innerHTML = ''; }, 5000);
+        }
+    }
+
+    // Auto-generate slug from name
+    document.getElementById('tracker-name').addEventListener('input', function() {
+        if (!currentTrackerId) {  // Only for new trackers
+            const slug = this.value.toLowerCase()
+                .replace(/[^a-z0-9]+/g, '')
+                .substring(0, 50);
+            document.getElementById('tracker-slug').value = slug;
+        }
+    });
+
+    // Announce URL preset templates
+    const announcePresets = {
+        '{url}/announce?passkey={passkey}': 'Standard (?passkey=)',
+        '{url}/announce/{passkey}': 'Path-based (/passkey)',
+        '{url}/announce/{passkey}/announce': 'Unit3D style',
+        '{url}/{passkey}/announce': 'Gazelle style'
+    };
+
+    function applyAnnouncePreset(value) {
+        const input = document.getElementById('tracker-announce');
+        if (value === 'custom') {
+            input.value = '';
+            input.focus();
+        } else if (value) {
+            input.value = value;
+        }
+    }
+
+    function updateAnnouncePresetFromValue(value) {
+        const select = document.getElementById('tracker-announce-preset');
+        if (!value) {
+            select.value = '';
+        } else if (announcePresets[value]) {
+            select.value = value;
+        } else {
+            select.value = 'custom';
+        }
+    }
+
+    // ========================================
+    // Naming Template Functions
+    // ========================================
+
+    function updateNamingTemplateFromSelect() {
+        const select = document.getElementById('tracker-naming-template-select');
+        const input = document.getElementById('tracker-naming-template');
+        const selectedValue = select.value;
+
+        if (selectedValue === '__custom__') {
+            // Show custom input
+            input.style.display = 'block';
+            input.value = '';
+            input.focus();
+        } else if (selectedValue === '') {
+            // No template - hide input
+            input.style.display = 'none';
+            input.value = '';
+        } else {
+            // Template selected - hide input and store template value
+            input.style.display = 'none';
+            input.value = selectedValue;
+        }
+    }
+
+    function updateNamingTemplateSelectFromValue(value) {
+        const select = document.getElementById('tracker-naming-template-select');
+        const input = document.getElementById('tracker-naming-template');
+
+        if (!value) {
+            select.value = '';
+            input.style.display = 'none';
+            input.value = '';
+        } else {
+            // Check if value matches any option
+            let found = false;
+            for (let option of select.options) {
+                if (option.value === value && option.value !== '__custom__') {
+                    select.value = value;
+                    input.style.display = 'none';
+                    input.value = value;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                // Custom value
+                select.value = '__custom__';
+                input.style.display = 'block';
+                input.value = value;
+            }
+        }
+    }
+
+    // ========================================
+    // Prowlarr Integration Functions
+    // ========================================
+
+    const prowlarrModal = document.getElementById('prowlarr-modal');
+    let prowlarrIndexers = [];
+
+    async function openProwlarrModal() {
+        prowlarrModal.showModal();
+
+        // Reset state
+        document.getElementById('prowlarr-status').style.display = 'block';
+        document.getElementById('prowlarr-content').style.display = 'none';
+        document.getElementById('prowlarr-error').style.display = 'none';
+        document.getElementById('indexers-list').innerHTML = '';
+
+        try {
+            // Check Prowlarr status first
+            const statusResponse = await fetch('/api/prowlarr/status');
+            const statusData = await statusResponse.json();
+
+            if (statusData.status === 'not_configured') {
+                showProwlarrError('Prowlarr is not configured. Please add your Prowlarr URL and API key in Settings.');
+                return;
+            }
+
+            if (statusData.status === 'error') {
+                showProwlarrError(`Cannot connect to Prowlarr: ${statusData.message}`);
+                return;
+            }
+
+            // Load indexers
+            const indexersResponse = await fetch('/api/prowlarr/indexers');
+            const indexersData = await indexersResponse.json();
+
+            if (indexersData.status !== 'success') {
+                showProwlarrError(indexersData.message || 'Failed to load indexers');
+                return;
+            }
+
+            prowlarrIndexers = indexersData.indexers;
+            renderIndexersList(prowlarrIndexers);
+
+            document.getElementById('prowlarr-status').style.display = 'none';
+            document.getElementById('prowlarr-content').style.display = 'block';
+
+        } catch (error) {
+            showProwlarrError(`Error: ${error.message}`);
+        }
+    }
+
+    function closeProwlarrModal() {
+        prowlarrModal.close();
+    }
+
+    function showProwlarrError(message) {
+        document.getElementById('prowlarr-status').style.display = 'none';
+        document.getElementById('prowlarr-error').style.display = 'block';
+        document.getElementById('prowlarr-error-message').textContent = message;
+    }
+
+    function renderIndexersList(indexers) {
+        const container = document.getElementById('indexers-list');
+
+        if (indexers.length === 0) {
+            container.innerHTML = `
+                <div style="padding: 2rem; text-align: center; color: var(--text-muted);">
+                    No indexers found in Prowlarr
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        for (const indexer of indexers) {
+            const isImported = indexer.imported;
+            const isEnabled = indexer.enabled;
+
+            html += `
+                <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 1rem; ${isImported ? 'opacity: 0.5;' : ''}">
+                    <input
+                        type="checkbox"
+                        class="checkbox checkbox-primary indexer-checkbox"
+                        data-id="${indexer.prowlarr_id}"
+                        ${isImported ? 'disabled' : ''}
+                        onchange="updateSelectedCount()"
+                    >
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                            ${indexer.name}
+                            ${isEnabled ? '<span style="font-size: 0.625rem; background: rgba(34, 197, 94, 0.2); color: var(--status-success); padding: 0.125rem 0.375rem; border-radius: 0.25rem;">ENABLED</span>' : '<span style="font-size: 0.625rem; background: rgba(239, 68, 68, 0.2); color: var(--status-error); padding: 0.125rem 0.375rem; border-radius: 0.25rem;">DISABLED</span>'}
+                            ${isImported ? '<span style="font-size: 0.625rem; background: rgba(59, 130, 246, 0.2); color: var(--status-info); padding: 0.125rem 0.375rem; border-radius: 0.25rem;">IMPORTED</span>' : ''}
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">
+                            ${indexer.definition || 'Unknown'} | ${indexer.protocol || 'torrent'} | ${indexer.privacy || 'private'}
+                        </div>
+                        ${indexer.url ? `<div style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">${indexer.url}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
+    }
+
+    function toggleAllIndexers(checked) {
+        const checkboxes = document.querySelectorAll('.indexer-checkbox:not(:disabled)');
+        checkboxes.forEach(cb => cb.checked = checked);
+        updateSelectedCount();
+    }
+
+    function updateSelectedCount() {
+        const checkboxes = document.querySelectorAll('.indexer-checkbox:checked');
+        const count = checkboxes.length;
+        document.getElementById('selected-count').textContent = `${count} indexer${count !== 1 ? 's' : ''} selected`;
+        document.getElementById('import-btn').disabled = count === 0;
+    }
+
+    async function importSelectedIndexers() {
+        const checkboxes = document.querySelectorAll('.indexer-checkbox:checked');
+        const ids = Array.from(checkboxes).map(cb => parseInt(cb.dataset.id));
+
+        if (ids.length === 0) {
+            showMessage('error', 'No indexers selected');
+            return;
+        }
+
+        document.getElementById('import-btn').disabled = true;
+        document.getElementById('import-btn').innerHTML = `
+            <div class="loading-spinner" style="display: inline-block; margin-right: 0.5rem;"></div>
+            Importing...
+        `;
+
+        try {
+            const response = await fetch('/api/prowlarr/import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ indexer_ids: ids })
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                const imported = result.summary.imported_count;
+                const skipped = result.summary.skipped_count;
+                const errors = result.summary.error_count;
+
+                let message = `Imported ${imported} tracker${imported !== 1 ? 's' : ''}`;
+                if (skipped > 0) message += `, ${skipped} skipped`;
+                if (errors > 0) message += `, ${errors} failed`;
+
+                showMessage('success', message);
+                closeProwlarrModal();
+                location.reload();
+            } else {
+                showMessage('error', result.message || 'Import failed');
+                document.getElementById('import-btn').disabled = false;
+                document.getElementById('import-btn').innerHTML = `
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                    </svg>
+                    Import Selected
+                `;
+            }
+        } catch (error) {
+            showMessage('error', `Import failed: ${error.message}`);
+            document.getElementById('import-btn').disabled = false;
+        }
+    }
+
+    // ========================================
+    // Upload Configuration Functions
+    // ========================================
+
+    const uploadConfigModal = document.getElementById('upload-config-modal');
+    let uploadTemplates = {};
+    let currentUploadConfigTrackerId = null;
+
+    async function openUploadConfigModal(trackerId, trackerName) {
+        currentUploadConfigTrackerId = trackerId;
+        document.getElementById('upload-config-tracker-id').value = trackerId;
+        document.getElementById('upload-config-title').innerHTML = `
+            <svg class="w-6 h-6 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+            </svg>
+            Upload Configuration - ${trackerName}
+        `;
+
+        // Reset state
+        document.getElementById('upload-config-json').value = '';
+        document.getElementById('upload-config-validation').style.display = 'none';
+        document.getElementById('delete-config-btn').style.display = 'none';
+
+        uploadConfigModal.showModal();
+
+        try {
+            // Load templates
+            const templatesResponse = await fetch('/api/trackers/upload-templates');
+            const templatesData = await templatesResponse.json();
+            uploadTemplates = templatesData.templates;
+
+            // Populate template select
+            const select = document.getElementById('upload-template-select');
+            select.innerHTML = '<option value="">-- Select a template --</option>';
+            for (const [key, template] of Object.entries(uploadTemplates)) {
+                select.innerHTML += `<option value="${key}">${template.name} - ${template.description}</option>`;
+            }
+
+            // Load current config for this tracker
+            const configResponse = await fetch(`/api/trackers/${trackerId}/upload-config`);
+            const configData = await configResponse.json();
+
+            if (configData.has_config && configData.upload_config) {
+                document.getElementById('upload-config-json').value = JSON.stringify(configData.upload_config, null, 2);
+                document.getElementById('upload-config-status-text').textContent = 'Custom upload configuration is active';
+                document.getElementById('upload-config-status').style.background = 'rgba(34, 197, 94, 0.1)';
+                document.getElementById('upload-config-status').style.color = 'var(--status-success)';
+                document.getElementById('delete-config-btn').style.display = 'block';
+            } else {
+                document.getElementById('upload-config-status-text').textContent = 'No custom upload configuration - using adapter_type';
+                document.getElementById('upload-config-status').style.background = 'var(--bg-secondary)';
+                document.getElementById('upload-config-status').style.color = 'var(--text-muted)';
+            }
+
+        } catch (error) {
+            showMessage('error', `Failed to load upload configuration: ${error.message}`);
+        }
+    }
+
+    function closeUploadConfigModal() {
+        uploadConfigModal.close();
+    }
+
+    function loadTemplate(templateKey) {
+        if (!templateKey) return;
+
+        const template = uploadTemplates[templateKey];
+        if (template && template.config) {
+            document.getElementById('upload-config-json').value = JSON.stringify(template.config, null, 2);
+            document.getElementById('upload-config-validation').style.display = 'none';
+        }
+    }
+
+    function formatJson() {
+        const textarea = document.getElementById('upload-config-json');
+        try {
+            const parsed = JSON.parse(textarea.value);
+            textarea.value = JSON.stringify(parsed, null, 2);
+            document.getElementById('upload-config-validation').style.display = 'none';
+        } catch (error) {
+            document.getElementById('upload-config-validation').style.display = 'block';
+            document.getElementById('validation-errors').textContent = `JSON Parse Error: ${error.message}`;
+        }
+    }
+
+    async function validateUploadConfig() {
+        const textarea = document.getElementById('upload-config-json');
+        const trackerId = document.getElementById('upload-config-tracker-id').value;
+
+        let config;
+        try {
+            config = JSON.parse(textarea.value);
+        } catch (error) {
+            document.getElementById('upload-config-validation').style.display = 'block';
+            document.getElementById('validation-errors').innerHTML = `<strong>JSON Parse Error:</strong> ${error.message}`;
+            return false;
+        }
+
+        try {
+            const response = await fetch(`/api/trackers/${trackerId}/upload-config/validate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+
+            const result = await response.json();
+
+            if (result.valid) {
+                document.getElementById('upload-config-validation').style.display = 'block';
+                document.getElementById('validation-errors').innerHTML = '<span style="color: var(--status-success);">Configuration is valid!</span>';
+                return true;
+            } else {
+                document.getElementById('upload-config-validation').style.display = 'block';
+                document.getElementById('validation-errors').innerHTML = '<strong>Validation Errors:</strong><ul style="margin-left: 1rem;">' +
+                    result.errors.map(e => `<li>${e}</li>`).join('') + '</ul>';
+                return false;
+            }
+        } catch (error) {
+            document.getElementById('upload-config-validation').style.display = 'block';
+            document.getElementById('validation-errors').textContent = `Validation request failed: ${error.message}`;
+            return false;
+        }
+    }
+
+    async function saveUploadConfig() {
+        const textarea = document.getElementById('upload-config-json');
+        const trackerId = document.getElementById('upload-config-tracker-id').value;
+
+        let config;
+        try {
+            config = JSON.parse(textarea.value);
+        } catch (error) {
+            showMessage('error', `Invalid JSON: ${error.message}`);
+            return;
+        }
+
+        // Validate first
+        const isValid = await validateUploadConfig();
+        if (!isValid) {
+            showMessage('error', 'Please fix validation errors before saving');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/trackers/${trackerId}/upload-config`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config: config })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to save configuration');
+            }
+
+            const result = await response.json();
+            showMessage('success', result.message || 'Upload configuration saved');
+            closeUploadConfigModal();
+            location.reload();
+
+        } catch (error) {
+            showMessage('error', error.message);
+        }
+    }
+
+    async function deleteUploadConfig() {
+        const trackerId = document.getElementById('upload-config-tracker-id').value;
+
+        if (!confirm('Are you sure you want to delete the upload configuration? The tracker will use its adapter_type for uploads.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/trackers/${trackerId}/upload-config`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to delete configuration');
+            }
+
+            const result = await response.json();
+            showMessage('success', result.message || 'Upload configuration deleted');
+            closeUploadConfigModal();
+            location.reload();
+
+        } catch (error) {
+            showMessage('error', error.message);
+        }
+    }
+</script>
+{% endblock %}

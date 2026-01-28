@@ -1,0 +1,964 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Seedarr v2.0{% endblock %}
+
+{% block page_title %}Application Settings{% endblock %}
+
+{% block extra_head %}
+<style>
+    .setting-row {
+        margin-bottom: 1.5rem;
+    }
+    .masked-input {
+        font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    }
+    @media (min-width: 1024px) {
+        .settings-grid-2 { grid-template-columns: 1fr 1fr !important; }
+        .settings-grid-3 { grid-template-columns: 1fr 1fr 1fr !important; }
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(4px);
+    }
+    .modal-content {
+        background: var(--bg-primary);
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        max-width: 500px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+        border: 1px solid var(--border-color);
+    }
+
+    /* Import preview table */
+    .import-preview-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .import-preview-table th,
+    .import-preview-table td {
+        padding: 0.5rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .import-preview-table th {
+        font-weight: 600;
+        color: var(--text-muted);
+    }
+    .import-preview-table .field-name {
+        font-weight: 500;
+    }
+    .import-preview-table .field-value {
+        font-family: monospace;
+        font-size: 0.875rem;
+        max-width: 250px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .import-preview-table .sensitive {
+        color: var(--warning-color, #f59e0b);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Settings Header -->
+    <div class="dashboard-header">
+        <div>
+            <h1 class="dashboard-title">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Application Settings
+            </h1>
+            <p class="dashboard-subtitle">Configure Seedarr v2.0 runtime settings</p>
+        </div>
+    </div>
+
+    <!-- Success/Error Messages -->
+    <div id="message-container" class="mb-6"></div>
+
+        <!-- Settings Form -->
+        <form
+            id="settings-form"
+            hx-put="/api/settings/save"
+            hx-target="#message-container"
+            hx-swap="innerHTML"
+            hx-on::after-request="handleResponse(event)"
+            class="space-y-6"
+        >
+            <!-- Tracker Management Link -->
+            <div class="dashboard-card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h2 class="card-title" style="font-size: 1.5rem; margin-bottom: 0.5rem;">
+                            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
+                            </svg>
+                            Tracker Management
+                        </h2>
+                        <p style="color: var(--text-muted); font-size: 0.875rem;">
+                            Configure multiple trackers for cross-seeding (La Cale, C411, etc.)
+                        </p>
+                    </div>
+                    <a href="/trackers" class="btn-primary" style="display: inline-flex; align-items: center;">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        Manage Trackers
+                    </a>
+                </div>
+            </div>
+
+            <!-- External Services Section -->
+            <div class="dashboard-card">
+                <h2 class="card-title" style="font-size: 1.5rem; margin-bottom: 1rem;">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    External Services
+                </h2>
+
+                <div class="settings-grid-2" style="display: grid; gap: 1.5rem; grid-template-columns: 1fr;">
+                    <!-- FlareSolverr -->
+                    <div class="setting-row">
+                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span class="form-label" style="margin: 0; font-weight: 600;">FlareSolverr URL</span>
+                            <button
+                                type="button"
+                                onclick="testConnection('flaresolverr')"
+                                class="btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;"
+                            >
+                                Test
+                            </button>
+                        </label>
+                        <input
+                            type="url"
+                            name="flaresolverr_url"
+                            value="{{ settings.flaresolverr_url or '' }}"
+                            placeholder="http://localhost:8191"
+                            class="form-input"
+                        />
+                        <label style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-muted);">
+                            <span>Cloudflare bypass service</span>
+                        </label>
+                    </div>
+
+                    <!-- qBittorrent -->
+                    <div class="setting-row">
+                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span class="form-label" style="margin: 0; font-weight: 600;">qBittorrent Host</span>
+                            <button
+                                type="button"
+                                onclick="testConnection('qbittorrent')"
+                                class="btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;"
+                            >
+                                Test
+                            </button>
+                        </label>
+                        <input
+                            type="text"
+                            name="qbittorrent_host"
+                            value="{{ settings.qbittorrent_host or '' }}"
+                            placeholder="localhost:8080"
+                            class="form-input"
+                        />
+                        <label style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-muted);">
+                            <span>qBittorrent Web UI host:port</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-grid-2" style="display: grid; gap: 1.5rem; grid-template-columns: 1fr;">
+                    <div class="setting-row">
+                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span class="form-label" style="margin: 0; font-weight: 600;">qBittorrent Username</span>
+                        </label>
+                        <input
+                            type="text"
+                            name="qbittorrent_username"
+                            value="{{ settings.qbittorrent_username or '' }}"
+                            placeholder="admin"
+                            class="form-input"
+                        />
+                    </div>
+
+                    <div class="setting-row">
+                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span class="form-label" style="margin: 0; font-weight: 600;">qBittorrent Password</span>
+                        </label>
+                        <input
+                            type="password"
+                            name="qbittorrent_password"
+                            value="{{ settings.qbittorrent_password or '' }}"
+                            placeholder="Enter password"
+                            class="form-input masked-input"
+                        />
+                    </div>
+                </div>
+
+                <div class="setting-row">
+                    <label class="form-label">
+                        <span style="font-weight: 600;">TMDB API Key</span>
+                        <button
+                            type="button"
+                            onclick="testConnection('tmdb')"
+                            class="btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;"
+                        >
+                            Test
+                        </button>
+                    </label>
+                    <input
+                        type="password"
+                        name="tmdb_api_key"
+                        value="{{ settings.tmdb_api_key or '' }}"
+                        placeholder="Enter TMDB API key"
+                        class="form-input masked-input"
+                    />
+                    <label style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-muted);">
+                        <span>API key for The Movie Database metadata fetching</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Prowlarr Integration Section -->
+            <div class="dashboard-card">
+                <h2 class="card-title" style="font-size: 1.5rem; margin-bottom: 1rem;">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    Prowlarr Integration
+                </h2>
+                <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.875rem;">
+                    Connect to Prowlarr to import indexers and check for duplicates before uploading.
+                </p>
+
+                <div class="settings-grid-2" style="display: grid; gap: 1.5rem; grid-template-columns: 1fr;">
+                    <div class="setting-row">
+                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span class="form-label" style="margin: 0; font-weight: 600;">Prowlarr URL</span>
+                            <button
+                                type="button"
+                                onclick="testConnection('prowlarr')"
+                                class="btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;"
+                            >
+                                Test
+                            </button>
+                        </label>
+                        <input
+                            type="url"
+                            name="prowlarr_url"
+                            value="{{ settings.prowlarr_url or '' }}"
+                            placeholder="http://localhost:9696"
+                            class="form-input"
+                        />
+                        <label style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-muted);">
+                            <span>Prowlarr instance URL (e.g., http://localhost:9696)</span>
+                        </label>
+                    </div>
+
+                    <div class="setting-row">
+                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span class="form-label" style="margin: 0; font-weight: 600;">Prowlarr API Key</span>
+                        </label>
+                        <input
+                            type="password"
+                            name="prowlarr_api_key"
+                            value="{{ settings.prowlarr_api_key or '' }}"
+                            placeholder="Enter Prowlarr API key"
+                            class="form-input masked-input"
+                        />
+                        <label style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-muted);">
+                            <span>API key from Prowlarr Settings > General > Security</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Prowlarr Status -->
+                <div id="prowlarr-status" style="margin-top: 1rem; padding: 0.75rem; border-radius: 0.5rem; background: var(--bg-secondary);">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span id="prowlarr-status-icon" style="color: var(--text-muted);">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </span>
+                        <span id="prowlarr-status-text" style="font-size: 0.875rem; color: var(--text-muted);">
+                            Click "Test" to check Prowlarr connection
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Directory Paths Section -->
+            <div class="dashboard-card">
+                <h2 class="card-title" style="font-size: 1.5rem; margin-bottom: 1rem;">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                    </svg>
+                    Directory Paths
+                </h2>
+
+                <div class="setting-row">
+                    <label class="form-label">
+                        <span style="font-weight: 600;">Input Media Path</span>
+                    </label>
+                    <input
+                        type="text"
+                        name="input_media_path"
+                        value="{{ settings.input_media_path or '' }}"
+                        placeholder="/path/to/input/media"
+                        class="form-input" style="font-family: 'Monaco', 'Menlo', 'Consolas', monospace;"
+                    />
+                    <label style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-muted);">
+                        <span>Directory where media files are scanned</span>
+                    </label>
+                </div>
+
+                <div class="setting-row">
+                    <label class="form-label">
+                        <span style="font-weight: 600;">Output Directory</span>
+                    </label>
+                    <input
+                        type="text"
+                        name="output_dir"
+                        value="{{ settings.output_dir or '' }}"
+                        placeholder="Leave empty to save in same folder as source"
+                        class="form-input" style="font-family: 'Monaco', 'Menlo', 'Consolas', monospace;"
+                    />
+                    <label style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-muted);">
+                        <span>Directory for generated files (.torrent, .nfo). Leave empty to use same folder as source file.</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Application Settings Section -->
+            <div class="dashboard-card">
+                <h2 class="card-title" style="font-size: 1.5rem; margin-bottom: 1rem;">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                    </svg>
+                    Application Settings
+                </h2>
+
+                <div class="settings-grid-3" style="display: grid; gap: 1.5rem; grid-template-columns: 1fr;">
+                    <div class="setting-row">
+                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span class="form-label" style="margin: 0; font-weight: 600;">Log Level</span>
+                        </label>
+                        <select
+                            name="log_level"
+                            class="form-select"
+                        >
+                            {% for level in log_levels %}
+                            <option value="{{ level }}" {% if settings.log_level == level %}selected{% endif %}>
+                                {{ level }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="setting-row">
+                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span class="form-label" style="margin: 0; font-weight: 600;">TMDB Cache TTL (days)</span>
+                        </label>
+                        <input
+                            type="number"
+                            name="tmdb_cache_ttl_days"
+                            value="{{ settings.tmdb_cache_ttl_days or 30 }}"
+                            min="1"
+                            max="365"
+                            class="form-input"
+                        />
+                    </div>
+
+                    <div class="setting-row">
+                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span class="form-label" style="margin: 0; font-weight: 600;">Tag Sync Interval (hours)</span>
+                        </label>
+                        <input
+                            type="number"
+                            name="tag_sync_interval_hours"
+                            value="{{ settings.tag_sync_interval_hours or 24 }}"
+                            min="1"
+                            max="168"
+                            class="form-input"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="flex justify-end gap-4">
+                <button
+                    type="button"
+                    onclick="location.reload()"
+                    class="btn-secondary"
+                >
+                    Reset
+                </button>
+                <button
+                    type="submit"
+                    class="btn-primary"
+                    id="save-button"
+                >
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                    </svg>
+                    Save Settings
+                </button>
+            </div>
+        </form>
+
+        <!-- Import/Export Section -->
+        <div class="dashboard-card" style="margin-top: 1.5rem;">
+            <h2 class="text-2xl font-bold mb-4 flex items-center">
+                <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                </svg>
+                Import / Export Configuration
+            </h2>
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                Backup and restore your application settings. Export creates a JSON file that can be imported later.
+            </p>
+
+            <!-- Warning about sensitive data -->
+            <div class="alert alert-warning" style="margin-bottom: 1rem;">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <span>
+                    <strong>Security Notice:</strong> Export includes ALL settings including sensitive data (API keys, passwords, passkeys) for full backup capability. Store exported files securely.
+                </span>
+            </div>
+
+            <div class="flex gap-4 flex-wrap">
+                <!-- Export Button -->
+                <button
+                    type="button"
+                    onclick="showExportDialog()"
+                    class="btn-secondary"
+                >
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                    Export Settings
+                </button>
+
+                <!-- Import Button -->
+                <input type="file" id="import-file" accept=".json" class="hidden" onchange="handleFileSelect(this)">
+                <button
+                    type="button"
+                    onclick="document.getElementById('import-file').click()"
+                    class="btn-secondary"
+                >
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                    </svg>
+                    Import Settings
+                </button>
+            </div>
+        </div>
+
+        <!-- Export Confirmation Modal -->
+        <div id="export-modal" class="modal-overlay" style="display: none;">
+            <div class="modal-content">
+                <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Export Settings</h3>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                    This will export all your settings to a JSON file, including:
+                </p>
+                <ul style="list-style: disc; margin-left: 1.5rem; margin-bottom: 1rem; color: var(--text-muted);">
+                    <li>Tracker configuration (URL, passkey)</li>
+                    <li>External service URLs (FlareSolverr, qBittorrent, Prowlarr)</li>
+                    <li>API keys (TMDB, Prowlarr)</li>
+                    <li>Passwords (qBittorrent)</li>
+                    <li>Directory paths</li>
+                    <li>Application settings</li>
+                </ul>
+                <div class="alert alert-warning" style="margin-bottom: 1rem;">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    <span>The exported file contains sensitive credentials. Do not share it publicly!</span>
+                </div>
+                <div class="flex gap-4 justify-end">
+                    <button type="button" onclick="closeExportModal()" class="btn-secondary">Cancel</button>
+                    <button type="button" onclick="exportSettings()" class="btn-primary">Export</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import Preview Modal -->
+        <div id="import-modal" class="modal-overlay" style="display: none;">
+            <div class="modal-content" style="max-width: 600px;">
+                <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Import Preview</h3>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                    Review the settings that will be imported:
+                </p>
+                <div id="import-preview" style="max-height: 300px; overflow-y: auto; margin-bottom: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 0.5rem; font-family: monospace; font-size: 0.875rem;">
+                    <!-- Preview content will be inserted here -->
+                </div>
+                <div id="import-validation" style="margin-bottom: 1rem;"></div>
+                <div class="flex gap-4 justify-end">
+                    <button type="button" onclick="closeImportModal()" class="btn-secondary">Cancel</button>
+                    <button type="button" onclick="confirmImport()" class="btn-primary" id="confirm-import-btn">Import</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Info -->
+        <div style="margin-top: 2rem; text-align: center; color: var(--text-muted); font-size: 0.875rem;">
+            <p>Last Updated: {{ settings.updated_at or 'Never' }}</p>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Handle form response
+    function handleResponse(event) {
+        const xhr = event.detail.xhr;
+        const button = document.getElementById('save-button');
+        const messageContainer = document.getElementById('message-container');
+
+        if (xhr.status === 200) {
+            // Success
+            messageContainer.innerHTML = `
+                <div class="alert alert-success">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>Settings saved successfully!</span>
+                </div>
+            `;
+
+            // Auto-hide success message after 3 seconds
+            setTimeout(() => {
+                messageContainer.innerHTML = '';
+            }, 3000);
+        } else {
+            // Error
+            let errorMessage = 'Failed to save settings';
+            try {
+                const response = JSON.parse(xhr.responseText);
+                errorMessage = response.detail || errorMessage;
+            } catch (e) {
+                // Use default error message
+            }
+
+            messageContainer.innerHTML = `
+                <div class="alert alert-error">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>${errorMessage}</span>
+                </div>
+            `;
+        }
+    }
+
+    // Test service connection
+    async function testConnection(service) {
+        const messageContainer = document.getElementById('message-container');
+
+        messageContainer.innerHTML = `
+            <div class="alert alert-info">
+                <div class="loading-spinner"></div>
+                <span>Testing ${service} connection...</span>
+            </div>
+        `;
+
+        try {
+            // Build the URL with service parameter
+            let url = `/api/settings/test-connection?service=${service}`;
+
+            // Include current form values for each service
+            if (service === 'tmdb') {
+                const apiKeyInput = document.querySelector('[name="tmdb_api_key"]');
+                if (apiKeyInput && apiKeyInput.value) {
+                    url += `&api_key=${encodeURIComponent(apiKeyInput.value)}`;
+                }
+            } else if (service === 'flaresolverr') {
+                const urlInput = document.querySelector('[name="flaresolverr_url"]');
+                if (urlInput && urlInput.value) {
+                    url += `&url=${encodeURIComponent(urlInput.value)}`;
+                }
+            } else if (service === 'qbittorrent') {
+                const hostInput = document.querySelector('[name="qbittorrent_host"]');
+                const usernameInput = document.querySelector('[name="qbittorrent_username"]');
+                const passwordInput = document.querySelector('[name="qbittorrent_password"]');
+                if (hostInput && hostInput.value) {
+                    url += `&host=${encodeURIComponent(hostInput.value)}`;
+                }
+                if (usernameInput && usernameInput.value) {
+                    url += `&username=${encodeURIComponent(usernameInput.value)}`;
+                }
+                if (passwordInput && passwordInput.value) {
+                    url += `&password=${encodeURIComponent(passwordInput.value)}`;
+                }
+            } else if (service === 'prowlarr') {
+                const prowlarrUrlInput = document.querySelector('[name="prowlarr_url"]');
+                const prowlarrApiKeyInput = document.querySelector('[name="prowlarr_api_key"]');
+                if (prowlarrUrlInput && prowlarrUrlInput.value) {
+                    url += `&url=${encodeURIComponent(prowlarrUrlInput.value)}`;
+                }
+                if (prowlarrApiKeyInput && prowlarrApiKeyInput.value) {
+                    url += `&api_key=${encodeURIComponent(prowlarrApiKeyInput.value)}`;
+                }
+            }
+
+            const response = await fetch(url, {
+                method: 'POST'
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                messageContainer.innerHTML = `
+                    <div class="alert alert-info">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>${result.message}</span>
+                    </div>
+                `;
+            } else {
+                messageContainer.innerHTML = `
+                    <div class="alert alert-warning">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                        <span>${result.detail || 'Connection test failed'}</span>
+                    </div>
+                `;
+            }
+
+            // Auto-hide message after 5 seconds
+            setTimeout(() => {
+                messageContainer.innerHTML = '';
+            }, 5000);
+
+        } catch (error) {
+            messageContainer.innerHTML = `
+                <div class="alert alert-error">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>Error testing connection: ${error.message}</span>
+                </div>
+            `;
+        }
+    }
+
+    // Sensitive fields that need masking in preview
+    const sensitiveFields = ['tracker_passkey', 'tmdb_api_key', 'prowlarr_api_key', 'qbittorrent_password'];
+
+    // Field labels for better display
+    const fieldLabels = {
+        'tracker_url': 'Tracker URL',
+        'tracker_passkey': 'Tracker Passkey',
+        'flaresolverr_url': 'FlareSolverr URL',
+        'qbittorrent_host': 'qBittorrent Host',
+        'qbittorrent_username': 'qBittorrent Username',
+        'qbittorrent_password': 'qBittorrent Password',
+        'tmdb_api_key': 'TMDB API Key',
+        'prowlarr_url': 'Prowlarr URL',
+        'prowlarr_api_key': 'Prowlarr API Key',
+        'input_media_path': 'Input Media Path',
+        'output_dir': 'Output Directory',
+        'log_level': 'Log Level',
+        'tmdb_cache_ttl_days': 'TMDB Cache TTL',
+        'tag_sync_interval_hours': 'Tag Sync Interval'
+    };
+
+    // Store pending import data
+    let pendingImportFile = null;
+
+    // Show export confirmation dialog
+    function showExportDialog() {
+        document.getElementById('export-modal').style.display = 'flex';
+    }
+
+    // Close export modal
+    function closeExportModal() {
+        document.getElementById('export-modal').style.display = 'none';
+    }
+
+    // Close import modal
+    function closeImportModal() {
+        document.getElementById('import-modal').style.display = 'none';
+        pendingImportFile = null;
+        document.getElementById('import-file').value = '';
+    }
+
+    // Close modals on escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeExportModal();
+            closeImportModal();
+        }
+    });
+
+    // Export settings to JSON file
+    async function exportSettings() {
+        closeExportModal();
+        const messageContainer = document.getElementById('message-container');
+
+        messageContainer.innerHTML = `
+            <div class="alert alert-info">
+                <div class="loading-spinner"></div>
+                <span>Exporting settings...</span>
+            </div>
+        `;
+
+        try {
+            const response = await fetch('/api/settings/export', {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+
+                // Create and download file
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `seedarr-settings-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                messageContainer.innerHTML = `
+                    <div class="alert alert-success">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>Settings exported successfully! Store the file securely.</span>
+                    </div>
+                `;
+            } else {
+                const error = await response.json();
+                messageContainer.innerHTML = `
+                    <div class="alert alert-error">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>Export failed: ${error.detail || 'Unknown error'}</span>
+                    </div>
+                `;
+            }
+
+            setTimeout(() => { messageContainer.innerHTML = ''; }, 5000);
+        } catch (error) {
+            messageContainer.innerHTML = `
+                <div class="alert alert-error">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>Export failed: ${error.message}</span>
+                </div>
+            `;
+        }
+    }
+
+    // Handle file selection - show preview before import
+    async function handleFileSelect(input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        pendingImportFile = file;
+
+        try {
+            const content = await file.text();
+            const data = JSON.parse(content);
+
+            // Extract settings
+            const settings = data.settings || data;
+            const version = data.version || 'Unknown';
+            const exportedAt = data.exported_at ? new Date(data.exported_at).toLocaleString() : 'Unknown';
+
+            // Build preview table
+            let previewHtml = `
+                <div style="margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);">
+                    <small style="color: var(--text-muted);">
+                        File: ${file.name}<br>
+                        Version: ${version}<br>
+                        Exported: ${exportedAt}
+                    </small>
+                </div>
+                <table class="import-preview-table">
+                    <thead>
+                        <tr>
+                            <th>Setting</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            // Count valid fields
+            let validFields = 0;
+            const excludedFields = ['id', 'created_at', 'updated_at', 'announce_url'];
+
+            for (const [key, value] of Object.entries(settings)) {
+                if (excludedFields.includes(key) || value === null || value === undefined) continue;
+
+                validFields++;
+                const label = fieldLabels[key] || key;
+                const isSensitive = sensitiveFields.includes(key);
+
+                // Mask sensitive values
+                let displayValue = value;
+                if (isSensitive && typeof value === 'string' && value.length > 0) {
+                    displayValue = value.substring(0, 4) + '****' + value.substring(value.length - 4);
+                }
+
+                previewHtml += `
+                    <tr>
+                        <td class="field-name${isSensitive ? ' sensitive' : ''}">${label}${isSensitive ? ' *' : ''}</td>
+                        <td class="field-value" title="${value}">${displayValue}</td>
+                    </tr>
+                `;
+            }
+
+            previewHtml += `
+                    </tbody>
+                </table>
+            `;
+
+            if (validFields === 0) {
+                previewHtml = '<div class="alert alert-warning">No valid settings found in this file.</div>';
+                document.getElementById('confirm-import-btn').disabled = true;
+            } else {
+                document.getElementById('confirm-import-btn').disabled = false;
+            }
+
+            document.getElementById('import-preview').innerHTML = previewHtml;
+
+            // Validation message
+            let validationHtml = '';
+            if (validFields > 0) {
+                const hasSensitive = Object.keys(settings).some(k => sensitiveFields.includes(k) && settings[k]);
+                if (hasSensitive) {
+                    validationHtml = `
+                        <div class="alert alert-info">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span>This import includes ${validFields} settings. Fields marked with * contain sensitive data.</span>
+                        </div>
+                    `;
+                } else {
+                    validationHtml = `
+                        <div class="alert alert-info">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span>This import includes ${validFields} settings.</span>
+                        </div>
+                    `;
+                }
+            }
+            document.getElementById('import-validation').innerHTML = validationHtml;
+
+            // Show modal
+            document.getElementById('import-modal').style.display = 'flex';
+
+        } catch (error) {
+            const messageContainer = document.getElementById('message-container');
+            messageContainer.innerHTML = `
+                <div class="alert alert-error">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>Invalid file format: ${error.message}</span>
+                </div>
+            `;
+            setTimeout(() => { messageContainer.innerHTML = ''; }, 5000);
+            input.value = '';
+        }
+    }
+
+    // Confirm and execute import
+    async function confirmImport() {
+        if (!pendingImportFile) return;
+
+        closeImportModal();
+        const messageContainer = document.getElementById('message-container');
+
+        messageContainer.innerHTML = `
+            <div class="alert alert-info">
+                <div class="loading-spinner"></div>
+                <span>Importing settings...</span>
+            </div>
+        `;
+
+        try {
+            const formData = new FormData();
+            formData.append('file', pendingImportFile);
+
+            const response = await fetch('/api/settings/import', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                messageContainer.innerHTML = `
+                    <div class="alert alert-success">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>${result.message} (${result.imported_count} fields). Reloading...</span>
+                    </div>
+                `;
+
+                // Reload page to show updated settings
+                setTimeout(() => { location.reload(); }, 1500);
+            } else {
+                messageContainer.innerHTML = `
+                    <div class="alert alert-error">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>Import failed: ${result.detail || 'Unknown error'}</span>
+                    </div>
+                `;
+                setTimeout(() => { messageContainer.innerHTML = ''; }, 5000);
+            }
+        } catch (error) {
+            messageContainer.innerHTML = `
+                <div class="alert alert-error">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>Import failed: ${error.message}</span>
+                </div>
+            `;
+        }
+
+        // Reset file input and pending file
+        pendingImportFile = null;
+        document.getElementById('import-file').value = '';
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,187 @@
+# ==============================================================================
+# Python Project .gitignore
+# ==============================================================================
+# Comprehensive exclusion patterns covering all essential categories for Python
+# development including bytecode, environments, sensitive data, and more.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Python Bytecode
+# ------------------------------------------------------------------------------
+# Compiled Python files and cache directories
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.so
+
+# ------------------------------------------------------------------------------
+# Virtual Environments
+# ------------------------------------------------------------------------------
+# Python virtual environment directories
+venv/
+env/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+.Python
+pyvenv.cfg
+
+# ------------------------------------------------------------------------------
+# Sensitive Data
+# ------------------------------------------------------------------------------
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.cert
+secrets/
+credentials.json
+*.p12
+
+# ------------------------------------------------------------------------------
+# Databases
+# ------------------------------------------------------------------------------
+# Local database files
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-shm
+*.db-wal
+
+# ------------------------------------------------------------------------------
+# Logs
+# ------------------------------------------------------------------------------
+# Log files and debug outputs
+*.log
+logs/
+*.log.*
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ------------------------------------------------------------------------------
+# IDE Configurations
+# ------------------------------------------------------------------------------
+# Editor and IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+.vscode-test/
+
+# ------------------------------------------------------------------------------
+# OS Files
+# ------------------------------------------------------------------------------
+# Operating system generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# ------------------------------------------------------------------------------
+# Project Temporary Files
+# ------------------------------------------------------------------------------
+# Build outputs, distributions, and temporary files
+*.tmp
+*.temp
+.cache/
+.pytest_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+*.py,cover
+.hypothesis/
+*.egg
+*.egg-info/
+dist/
+build/
+wheels/
+*.manifest
+*.spec
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+pip-wheel-metadata/
+share/python-wheels/
+
+# ------------------------------------------------------------------------------
+# Testing
+# ------------------------------------------------------------------------------
+# Test related files
+.tox/
+.nox/
+coverage.xml
+*.coveragerc
+nosetests.xml
+test-results/
+.pytest_cache/
+
+# ------------------------------------------------------------------------------
+# Documentation
+# ------------------------------------------------------------------------------
+# Generated documentation
+docs/_build/
+docs/_static/
+docs/_templates/
+site/
+.mkdocs_cache/
+target/
+
+# ------------------------------------------------------------------------------
+# Jupyter Notebooks
+# ------------------------------------------------------------------------------
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ------------------------------------------------------------------------------
+# Package Managers
+# ------------------------------------------------------------------------------
+# pip and package manager files
+Pipfile.lock
+poetry.lock
+pdm.lock
+
+# ------------------------------------------------------------------------------
+# Auto Claude (Project Specific)
+# ------------------------------------------------------------------------------
+# Auto Claude data directory
+.auto-claude/
+nul
+
+# ------------------------------------------------------------------------------
+# Miscellaneous
+# ------------------------------------------------------------------------------
+# Other common exclusions
+*.bak
+*.orig
+*.rej
+*.swn
+.direnv/
+.envrc
+celerybeat-schedule
+celerybeat.pid
+*.sage.py

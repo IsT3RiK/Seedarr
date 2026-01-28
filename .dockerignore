@@ -1,0 +1,84 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Testing
+tests/
+pytest.ini
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+.nox/
+
+# Documentation
+docs/
+*.md
+README*
+LICENSE
+CHANGELOG*
+
+# Data (exclude from image, mount as volumes)
+backend/data/*.db
+backend/data/*.db-journal
+backend/data/*.db-shm
+backend/data/*.db-wal
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.*
+
+# Auto-claude
+.auto-claude/
+.auto-claude-security.json
+.auto-claude-status
+.claude_settings.json
+
+# Verification and summary files
+IMPLEMENTATION-COMPLETE.md
+SUBTASK-*-SUMMARY.md
+TEST_SUITE_SUMMARY.md
+VERIFICATION_INSTRUCTIONS.md

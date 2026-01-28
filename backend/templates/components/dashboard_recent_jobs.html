@@ -1,0 +1,94 @@
+<!-- Dashboard Recent Jobs Component - Auto-refreshed by HTMX polling -->
+<div id="dashboard-recent-jobs"
+     class="dashboard-card"
+     hx-get="/api/dashboard/refresh-jobs"
+     hx-trigger="every 5s"
+     hx-swap="outerHTML">
+    <div class="card-header">
+        <h2 class="card-title">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            Recent Jobs
+        </h2>
+        <div class="flex items-center gap-2">
+            <span class="connection-dot connected"></span>
+            <span class="text-sm text-muted">Live</span>
+            <a href="/queue" class="text-accent hover:text-accent-hover text-sm ml-2">View all</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <table class="dashboard-table">
+            <thead>
+                <tr>
+                    <th>Job Name</th>
+                    <th>Current Stage</th>
+                    <th>Progress</th>
+                    <th>Status</th>
+                    <th>Started</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if recent_jobs %}
+                    {% for job in recent_jobs %}
+                    <tr>
+                        <td>
+                            <div class="font-medium text-primary">{{ job.filename or 'Unknown' }}</div>
+                            <div class="text-sm text-muted">
+                                {% if job.file_size %}
+                                    {% if job.file_size > 1073741824 %}
+                                        {{ "%.1f"|format(job.file_size / 1073741824) }} GB
+                                    {% elif job.file_size > 1048576 %}
+                                        {{ "%.1f"|format(job.file_size / 1048576) }} MB
+                                    {% else %}
+                                        {{ "%.1f"|format(job.file_size / 1024) }} KB
+                                    {% endif %}
+                                {% else %}
+                                    Size unknown
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="flex items-center gap-2">
+                                <svg class="w-5 h-5 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                                <span>{{ job.current_stage }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {{ job.progress }}%"></div>
+                            </div>
+                            <div class="text-xs text-muted mt-1">{{ job.progress }}%</div>
+                        </td>
+                        <td>
+                            <span class="status-badge {% if job.status.name == 'UPLOADED' %}active{% elif job.status.name == 'FAILED' %}error{% elif job.status.name == 'PENDING' %}pending{% else %}processing{% endif %}">
+                                <span class="connection-dot {% if job.status.name == 'UPLOADED' %}connected{% elif job.status.name == 'FAILED' %}error{% elif job.status.name == 'PENDING' %}waiting{% else %}processing{% endif %}"></span>
+                                {{ job.current_stage }}
+                            </span>
+                        </td>
+                        <td class="text-muted">
+                            {% if job.created_at %}
+                                {{ job.created_at.strftime('%Y-%m-%d %H:%M') }}
+                            {% else %}
+                                Unknown
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-8">
+                            <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                            </svg>
+                            <div class="text-lg font-medium mb-2">No recent jobs</div>
+                            <div class="text-sm">Start processing torrents to see them here</div>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>

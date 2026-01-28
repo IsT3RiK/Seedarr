@@ -1,0 +1,220 @@
+<!-- Approval List Component - Releases pending user approval -->
+<div id="approval-list"
+     hx-get="/api/releases/pending-approval"
+     hx-trigger="every 5s"
+     hx-swap="outerHTML">
+
+    <!-- Pending Approval Section -->
+    <div class="dashboard-card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Pending Approval ({{ pending_releases|length }})
+            </h2>
+            <div class="refresh-indicator">
+                <span class="connection-dot connected"></span>
+                <span class="text-sm text-muted">Auto-refresh</span>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if pending_releases %}
+                {% for release in pending_releases %}
+                <div class="approval-card bg-base-200 rounded-lg p-4 mb-4" id="approval-{{ release.id }}">
+                    <div class="flex flex-col lg:flex-row gap-4">
+                        <!-- Cover Image (if available) -->
+                        {% if release.cover_url %}
+                        <div class="flex-shrink-0">
+                            <img src="{{ release.cover_url }}" alt="Cover" class="w-24 h-36 object-cover rounded">
+                        </div>
+                        {% endif %}
+
+                        <!-- Release Info -->
+                        <div class="flex-grow">
+                            <div class="flex justify-between items-start mb-3">
+                                <div>
+                                    <h3 class="text-lg font-medium text-primary">{{ release.filename }}</h3>
+                                    <p class="text-sm text-muted">{{ release.file_path }}</p>
+                                </div>
+                                <span class="badge badge-warning">
+                                    <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    Pending
+                                </span>
+                            </div>
+
+                            <!-- Editable Fields -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label class="label text-sm text-muted">Release Name</label>
+                                    <input type="text"
+                                           id="release-name-{{ release.id }}"
+                                           class="input input-bordered w-full"
+                                           value="{{ release.release_name or '' }}"
+                                           placeholder="Enter release name...">
+                                </div>
+                                <div>
+                                    <label class="label text-sm text-muted">TMDB ID</label>
+                                    <div class="flex gap-2">
+                                        <input type="text"
+                                               id="tmdb-id-{{ release.id }}"
+                                               class="input input-bordered flex-grow"
+                                               value="{{ release.tmdb_id or '' }}"
+                                               placeholder="TMDB ID">
+                                        <span class="badge badge-outline">{{ release.tmdb_type or 'movie' }}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Category and Meta Info -->
+                            <div class="flex flex-wrap gap-2 mb-4 text-sm">
+                                <span class="badge badge-ghost">
+                                    Category: {{ release.category_id or 'Auto' }}
+                                </span>
+                                {% if release.approval_requested_at %}
+                                <span class="badge badge-ghost">
+                                    Requested: {{ release.approval_requested_at.strftime('%Y-%m-%d %H:%M') }}
+                                </span>
+                                {% endif %}
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="flex gap-2">
+                                <button class="btn btn-success btn-sm"
+                                        onclick="approveRelease({{ release.id }})"
+                                        title="Approve and continue pipeline">
+                                    <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    Approve
+                                </button>
+                                <button class="btn btn-error btn-sm"
+                                        onclick="rejectRelease({{ release.id }})"
+                                        title="Reject and cancel">
+                                    <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    Reject
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Result Message -->
+                    <div id="approval-result-{{ release.id }}" class="mt-3 hidden"></div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="text-center text-muted py-8">
+                    <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div class="text-lg font-medium mb-2">No releases pending approval</div>
+                    <div class="text-sm">Releases will appear here when they need review before upload</div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+async function approveRelease(releaseId) {
+    const releaseName = document.getElementById(`release-name-${releaseId}`).value;
+    const tmdbId = document.getElementById(`tmdb-id-${releaseId}`).value;
+    const resultDiv = document.getElementById(`approval-result-${releaseId}`);
+
+    try {
+        const payload = {};
+        if (releaseName) payload.final_release_name = releaseName;
+        if (tmdbId) payload.tmdb_id = tmdbId;
+
+        const response = await fetch(`/api/releases/${releaseId}/approve`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        resultDiv.classList.remove('hidden');
+        if (data.status === 'success') {
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span>Release approved! ${data.auto_resume ? 'Pipeline resuming...' : 'Please resume manually.'}</span>
+                </div>
+            `;
+            // Fade out the card after success
+            setTimeout(() => {
+                document.getElementById(`approval-${releaseId}`).style.opacity = '0.5';
+            }, 1000);
+        } else {
+            resultDiv.innerHTML = `
+                <div class="alert alert-error">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span>${data.message}</span>
+                </div>
+            `;
+        }
+    } catch (error) {
+        resultDiv.classList.remove('hidden');
+        resultDiv.innerHTML = `
+            <div class="alert alert-error">
+                <span>Error: ${error.message}</span>
+            </div>
+        `;
+    }
+}
+
+async function rejectRelease(releaseId) {
+    const reason = prompt('Enter rejection reason (optional):');
+    const resultDiv = document.getElementById(`approval-result-${releaseId}`);
+
+    try {
+        const payload = {};
+        if (reason) payload.reason = reason;
+
+        const response = await fetch(`/api/releases/${releaseId}/reject`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        resultDiv.classList.remove('hidden');
+        if (data.status === 'success') {
+            resultDiv.innerHTML = `
+                <div class="alert alert-warning">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span>Release rejected.</span>
+                </div>
+            `;
+            setTimeout(() => {
+                document.getElementById(`approval-${releaseId}`).style.opacity = '0.5';
+            }, 1000);
+        } else {
+            resultDiv.innerHTML = `
+                <div class="alert alert-error">
+                    <span>${data.message}</span>
+                </div>
+            `;
+        }
+    } catch (error) {
+        resultDiv.classList.remove('hidden');
+        resultDiv.innerHTML = `
+            <div class="alert alert-error">
+                <span>Error: ${error.message}</span>
+            </div>
+        `;
+    }
+}
+</script>

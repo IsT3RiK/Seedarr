@@ -1,0 +1,18 @@
+<!-- Docker Log Viewer Component -->
+<!-- Used by API endpoints to render Docker container logs for HTMX injection -->
+
+<div class="docker-log-viewer" id="docker-log-viewer">
+    {% if docker_logs %}
+        {% for entry in docker_logs %}
+            <div class="log-entry">
+                <span class="log-timestamp">[{{ entry.timestamp }}]</span>
+                <span class="log-message">{{ entry.message }}</span>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="log-entry">
+            <span class="log-timestamp">[--]</span>
+            <span class="log-message">No Docker logs available. Start the container to see logs.</span>
+        </div>
+    {% endif %}
+</div>

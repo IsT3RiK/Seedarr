@@ -1,0 +1,285 @@
+# C411 Tracker Configuration
+# This file defines how to interact with the C411 tracker API
+
+tracker:
+  name: "C411"
+  slug: "c411"
+  description: "C411 French private tracker"
+
+# Authentication configuration
+auth:
+  type: "bearer"              # bearer | passkey | cookie | api_key
+  header: "Authorization"     # HTTP header name
+  prefix: "Bearer "           # Prefix before the token
+
+# Cloudflare bypass configuration
+cloudflare:
+  enabled: false              # C411 doesn't use Cloudflare
+
+# API endpoints
+endpoints:
+  base: "/api"
+  upload: "/api/torrents"
+  categories: "/api/categories"
+  tags: "/api/tags"
+  search: "/api/torrents/search"
+  health: "/api/health"
+
+# Upload form configuration
+upload:
+  method: "POST"
+  content_type: "multipart/form-data"
+
+  # Field mappings: how to map internal data to API fields
+  fields:
+    torrent:
+      name: "torrent"
+      type: "file"
+      required: true
+
+    nfo:
+      name: "nfo"
+      type: "file"
+      required: false
+
+    title:
+      name: "title"
+      type: "string"
+      source: "release_name"
+      sanitize:
+        replace_spaces: "."
+        max_length: 255
+
+    category:
+      name: "categoryId"
+      type: "string"
+      source: "category_id"
+      required: true
+
+    subcategory:
+      name: "subcategoryId"
+      type: "string"
+      source: "subcategory_id"
+      required: true
+
+    options:
+      name: "options"
+      type: "json"
+      source: "options"
+
+    tmdb_data:
+      name: "tmdbData"
+      type: "json"
+      source: "tmdb_data"
+
+    rawg_data:
+      name: "rawgData"
+      type: "json"
+      source: "rawg_data"
+      required: false
+
+    is_exclusive:
+      name: "isExclusive"
+      type: "boolean"
+      source: "is_exclusive"
+      default: false
+
+    uploader_note:
+      name: "uploaderNote"
+      type: "string"
+      source: "uploader_note"
+      required: false
+
+# Options mapping (for build_options)
+options:
+  language:
+    type: "1"
+    multi_select: true
+    default: [4]
+    auto_multi: true
+    auto_multi_value: 4
+    detection_patterns:
+      "vof": "french"
+      "vff": "french"
+      "vfi": "french"
+      "vf2": "french"
+      "vfq": "quebec"
+      "vostfr": "vostfr"
+      "french": "french"
+      "truefrench": "french"
+      "english": "english"
+      "multi": "multi"
+    multi_expands_to: ["french", "english"]
+    default_detection: "multi"
+    mappings:
+      english: 1
+      anglais: 1
+      en: 1
+      french: 2
+      vff: 2
+      francais: 2
+      fr: 2
+      multi: 4
+      multi_french: 4
+      multilingual: 4
+      quebec: 6
+      vfq: 6
+      quebecois: 6
+      vostfr: 8
+      subfrench: 8
+
+  quality:
+    type: "2"
+    multi_select: false
+    default: 25
+    mappings:
+      # Light encodings (reduced bitrate) - MUST be checked first
+      4klight: 415
+      2160p_light: 415
+      4k_light: 415
+      hdlight_1080: 413
+      1080p_light: 413
+      hdlight_720: 414
+      720p_light: 414
+      # BluRay 4K
+      2160p_bluray: 10
+      4k_bluray: 10
+      uhd_bluray: 10
+      # BluRay Remux
+      remux: 12
+      # WEB-DL 4K
+      2160p_web: 26
+      4k_web: 26
+      # WEB-DL 1080p
+      1080p_web: 25
+      1080p_webrip: 25
+      # WEB-DL 720p
+      720p_web: 24
+      # HDRip 1080p
+      1080p_hdrip: 16
+      1080p_bdrip: 16
+      # HDRip 720p
+      720p_hdrip: 15
+      720p_bdrip: 15
+      # BluRay 1080p
+      1080p_bluray: 11
+      # BluRay 720p
+      720p_bluray: 13
+      # HDTV
+      1080p_hdtv: 17
+      1080i_hdtv: 17
+      720p_hdtv: 14
+      # DVD
+      dvdrip: 18
+      dvd: 18
+      # CAM/TS
+      cam: 19
+      ts: 20
+      hdts: 20
+    resolution_fallback:
+      2160p: 26
+      4k: 26
+      1080p: 25
+      720p: 24
+      480p: 18
+
+  genre:
+    type: "5"
+    multi_select: true
+    # TMDB genre ID to C411 genre ID
+    tmdb_mappings:
+      28: 39     # Action
+      12: 44     # Adventure -> Aventure
+      16: 41     # Animation
+      35: 49     # Comedy -> Comedie
+      80: 81     # Crime -> Policier
+      99: 56     # Documentary -> Documentaire
+      18: 57     # Drama -> Drame
+      10751: 61  # Family -> Famille
+      14: 62     # Fantasy -> Fantastique
+      36: 67     # History -> Historique
+      27: 59     # Horror -> Epouvante & Horreur
+      10402: 73  # Music -> Musical
+      9648: 58   # Mystery -> Enquete
+      10749: 84  # Romance
+      878: 86    # Science Fiction
+      10770: 93  # TV Movie -> Varietes TV
+      53: 92     # Thriller
+      10752: 66  # War -> Guerre
+      37: 95     # Western
+    # Genre name fallback (French and English)
+    name_mappings:
+      action: 39
+      animation: 41
+      aventure: 44
+      adventure: 44
+      comedie: 49
+      comedy: 49
+      crime: 81
+      documentaire: 56
+      documentary: 56
+      drame: 57
+      drama: 57
+      familial: 61
+      famille: 61
+      family: 61
+      fantastique: 62
+      fantasy: 62
+      guerre: 66
+      war: 66
+      histoire: 67
+      historique: 67
+      history: 67
+      horreur: 59
+      horror: 59
+      epouvante: 59
+      musique: 73
+      music: 73
+      musical: 73
+      mystere: 58
+      mystery: 58
+      romance: 84
+      science_fiction: 86
+      thriller: 92
+      telefilm_tv: 93
+      tv_movie: 93
+      western: 95
+
+  season:
+    type: "7"
+    complete_value: 118    # Serie integrale
+    base_value: 120        # S01 = 121, S02 = 122, etc.
+    max_value: 150         # S30
+
+  episode:
+    type: "6"
+    complete_value: 96     # Saison complete
+    base_value: 96         # E01 = 97, E02 = 98, etc.
+    max_value: 116         # E20
+
+# Category configuration
+categories:
+  # Map media_type_resolution to category IDs
+  movie_4k: "42"
+  movie_2160p: "42"
+  movie_1080p: "6"
+  movie_720p: "6"
+  tv_1080p: "7"
+  tv_720p: "7"
+  tv_4k: "43"
+  tv_2160p: "43"
+  anime_1080p: "8"
+  anime_720p: "8"
+  documentary: "9"
+
+# Piece size strategy
+torrent:
+  piece_size_strategy: "c411"  # c411 | auto | standard
+  source_flag: "C411"          # Makes torrent hash unique per tracker
+
+# Response parsing
+response:
+  success_field: "success"
+  error_field: "error"
+  torrent_id_field: "data.id"
+  torrent_url_template: "{tracker_url}/torrent/{torrent_id}"

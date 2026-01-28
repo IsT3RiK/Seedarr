@@ -1,0 +1,121 @@
+<!-- Reusable History Table Component -->
+<!-- Used by API endpoints to render table rows for HTMX injection -->
+
+<thead>
+    <tr>
+        <th>Job Name</th>
+        <th>Final Status</th>
+        <th>Duration</th>
+        <th>Size</th>
+        <th>Completed</th>
+        <th>Actions</th>
+    </tr>
+</thead>
+<tbody>
+    {% if completed_jobs %}
+        {% for job in completed_jobs %}
+        <tr {% if job.status and job.status.value == 'FAILED' %}class="row-error"{% endif %}>
+            <td>
+                <div class="font-medium text-primary">{{ job.filename or 'Unknown' }}</div>
+                <div class="text-sm text-muted">
+                    {% if job.file_size %}
+                        {% if job.file_size > 1073741824 %}
+                            {{ "%.1f"|format(job.file_size / 1073741824) }} GB
+                        {% elif job.file_size > 1048576 %}
+                            {{ "%.1f"|format(job.file_size / 1048576) }} MB
+                        {% else %}
+                            {{ "%.1f"|format(job.file_size / 1024) }} KB
+                        {% endif %}
+                    {% else %}
+                        Size unknown
+                    {% endif %}
+                </div>
+            </td>
+            <td>
+                {% if job.status and job.status.value == 'UPLOADED' %}
+                <span class="status-badge success">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                    </svg>
+                    Successful
+                </span>
+                {% elif job.status and job.status.value == 'FAILED' %}
+                <span class="status-badge error">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                    </svg>
+                    Failed
+                </span>
+                {% else %}
+                <span class="status-badge">{{ job.status.value if job.status else 'Unknown' }}</span>
+                {% endif %}
+            </td>
+            <td class="text-muted">
+                {% if job.created_at and job.updated_at %}
+                    {% set duration = (job.updated_at - job.created_at).total_seconds() %}
+                    {% if duration > 3600 %}
+                        {{ "%.0f"|format(duration / 3600) }}h {{ "%.0f"|format((duration % 3600) / 60) }}m
+                    {% else %}
+                        {{ "%.0f"|format(duration / 60) }}m {{ "%.0f"|format(duration % 60) }}s
+                    {% endif %}
+                {% else %}
+                    Unknown
+                {% endif %}
+            </td>
+            <td class="text-muted">
+                {% if job.file_size %}
+                    {% if job.file_size > 1073741824 %}
+                        {{ "%.1f"|format(job.file_size / 1073741824) }} GB
+                    {% elif job.file_size > 1048576 %}
+                        {{ "%.1f"|format(job.file_size / 1048576) }} MB
+                    {% else %}
+                        {{ "%.1f"|format(job.file_size / 1024) }} KB
+                    {% endif %}
+                {% else %}
+                    Unknown
+                {% endif %}
+            </td>
+            <td>
+                {% if job.updated_at %}
+                    <div class="text-sm text-muted">{{ job.updated_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                {% else %}
+                    <div class="text-sm text-muted">Unknown</div>
+                {% endif %}
+            </td>
+            <td>
+                <div class="flex gap-2">
+                    <button class="btn-icon" title="View Details" hx-get="/api/history/details/{{ job.id }}" hx-target="#details-modal" hx-swap="innerHTML">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path>
+                            <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                    {% if job.status and job.status.value == 'FAILED' %}
+                    <button class="btn-icon" title="Retry" hx-post="/api/history/retry?job_id={{ job.id }}" hx-target="#history-table" hx-swap="innerHTML">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                    {% else %}
+                    <button class="btn-icon" title="Reprocess" hx-post="/api/history/reprocess?job_id={{ job.id }}" hx-target="#history-table" hx-swap="innerHTML">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                    {% endif %}
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    {% else %}
+        <tr>
+            <td colspan="6" class="text-center text-muted py-8">
+                <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <div class="text-lg font-medium mb-2">No jobs found</div>
+                <div class="text-sm">No jobs match the selected filter</div>
+            </td>
+        </tr>
+    {% endif %}
+</tbody>
