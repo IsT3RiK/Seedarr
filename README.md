@@ -83,6 +83,13 @@ Apres le premier lancement, configurez l'application via l'interface web:
 Documentation Swagger: http://localhost:8000/docs
 
 ---
+<img width="2251" height="1301" alt="Screenshot_61" src="https://github.com/user-attachments/assets/f4dd0d30-6a89-47f4-b32b-00e43e25b41f" />
+
+<img width="2267" height="1308" alt="Screenshot_2" src="https://github.com/user-attachments/assets/f33129f0-5037-4e8f-bdf6-4cf5b6333da9" />
+
+<img width="2262" height="1307" alt="Screenshot_4" src="https://github.com/user-attachments/assets/8eca60df-f13b-4238-bd9d-4375f761f286" />
+
+<img width="2263" height="1314" alt="Screenshot_5" src="https://github.com/user-attachments/assets/00f7b655-7980-4cce-932b-beccadfe39eb" />
 
 ## Developpement
 
