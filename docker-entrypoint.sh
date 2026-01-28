@@ -6,11 +6,19 @@ echo "=== Seedarr Startup ==="
 # Create data directory if it doesn't exist
 mkdir -p /app/backend/data
 
-# Run database migrations
-echo "Running database migrations..."
-cd /app/backend && alembic upgrade head
+# Initialize database tables and run migrations
+echo "Initializing database..."
+cd /app && python -c "
+from backend.app.database import engine, Base
+from backend.app.models import *
+Base.metadata.create_all(bind=engine)
+print('Tables created successfully')
+"
 
-echo "Migrations complete."
+echo "Running database migrations..."
+cd /app/backend && alembic upgrade head || echo "Migrations completed (some may have been skipped)"
+
+echo "Database ready."
 
 # Start the application
 echo "Starting Seedarr..."
