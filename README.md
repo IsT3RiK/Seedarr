@@ -18,7 +18,7 @@ Application web pour automatiser la publication de torrents sur trackers prives.
 
 ```bash
 git clone https://github.com/IsT3RiK/Seedarr.git
-cd seedarr
+cd Seedarr
 cp .env.example .env
 docker compose up -d
 ```
@@ -75,7 +75,7 @@ Documentation Swagger: http://localhost:8000/docs
 
 ```bash
 git clone https://github.com/IsT3RiK/Seedarr.git
-cd seedarr
+cd Seedarr
 
 python -m venv venv
 venv\Scripts\activate  # Windows
