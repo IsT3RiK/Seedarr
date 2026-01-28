@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
 echo "=== Seedarr Startup ==="
@@ -18,5 +18,5 @@ print('Database initialized successfully!')
 "
 
 echo "Starting Seedarr..."
-cd /app
-exec uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+cd /app/backend
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000
