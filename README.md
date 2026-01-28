@@ -20,7 +20,7 @@ Application web pour automatiser la publication de torrents sur trackers prives.
 git clone https://github.com/IsT3RiK/Seedarr.git
 cd seedarr
 cp .env.example .env
-docker-compose up -d
+docker compose up -d
 ```
 
 Accessible sur http://localhost:8000
