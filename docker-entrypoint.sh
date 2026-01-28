@@ -3,6 +3,9 @@ set -e
 
 echo "=== Seedarr Startup ==="
 
+# Create data directory if it doesn't exist
+mkdir -p /app/backend/data
+
 # Run database migrations
 echo "Running database migrations..."
 cd /app/backend && alembic upgrade head
