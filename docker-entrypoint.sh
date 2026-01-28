@@ -8,13 +8,15 @@ mkdir -p /app/backend/data
 
 # Initialize database with all tables
 echo "Initializing database..."
-cd /app
-python3 << 'PYTHON'
-import os
-os.environ.setdefault('DATABASE_URL', 'sqlite:////app/backend/data/seedarr.db')
+cd /app/backend
+export PYTHONPATH=/app/backend
 
-from backend.app.database import engine, Base
-from backend.app.models import *
+python3 << 'PYTHON'
+import sys
+sys.path.insert(0, '/app/backend')
+
+from app.database import engine, Base
+from app.models import *
 
 print("Creating all tables...")
 Base.metadata.create_all(bind=engine)
@@ -22,4 +24,5 @@ print("Database initialized successfully!")
 PYTHON
 
 echo "Starting Seedarr..."
+cd /app
 exec uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
