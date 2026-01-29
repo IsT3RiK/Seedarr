@@ -7,10 +7,11 @@ This module provides API endpoints for managing all template types:
 - NFO templates (technical information files)
 """
 
+import json
 import logging
 import os
-from typing import Optional
-from fastapi import APIRouter, Depends, Request, HTTPException
+from typing import Optional, List
+from fastapi import APIRouter, Depends, Request, HTTPException, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -89,6 +90,23 @@ class TemplateUpdate(BBCodeTemplateUpdate):
 class TemplatePreviewRequest(BaseModel):
     """Request model for previewing a template."""
     content: str = Field(..., min_length=1)
+
+
+# Export/Import Models
+class TemplateExportData(BaseModel):
+    """Single template data for export."""
+    name: str
+    description: Optional[str] = None
+    content: Optional[str] = None  # Used for BBCode and NFO
+    template: Optional[str] = None  # Used for Naming
+
+
+class TemplateExport(BaseModel):
+    """Export format for templates."""
+    type: str  # "bbcode", "naming", "nfo"
+    version: str = "1.0"
+    template: Optional[TemplateExportData] = None  # Single template
+    templates: Optional[List[TemplateExportData]] = None  # Multiple templates
 
 
 # ============== Page Routes ==============
@@ -800,4 +818,375 @@ async def set_default_nfo_template(template_id: int, db: Session = Depends(get_d
     return {
         "status": "success",
         "message": f"Template '{template.name}' is now the default"
+    }
+
+
+# ============================================================================
+# Template Export/Import API
+# ============================================================================
+
+@router.get("/api/templates/bbcode/{template_id}/export")
+async def export_bbcode_template(template_id: int, db: Session = Depends(get_db)):
+    """Export a single BBCode template as JSON."""
+    template = BBCodeTemplate.get_by_id(db, template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    export_data = {
+        "type": "bbcode",
+        "version": "1.0",
+        "template": {
+            "name": template.name,
+            "description": template.description,
+            "content": template.content,
+        }
+    }
+
+    # Sanitize filename
+    safe_name = "".join(c for c in template.name if c.isalnum() or c in (' ', '-', '_')).strip()
+    safe_name = safe_name.replace(' ', '_')
+
+    return JSONResponse(
+        content=export_data,
+        headers={
+            "Content-Disposition": f'attachment; filename="bbcode_{safe_name}.json"'
+        }
+    )
+
+
+@router.get("/api/templates/naming/{template_id}/export")
+async def export_naming_template(template_id: int, db: Session = Depends(get_db)):
+    """Export a single Naming template as JSON."""
+    template = NamingTemplate.get_by_id(db, template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    export_data = {
+        "type": "naming",
+        "version": "1.0",
+        "template": {
+            "name": template.name,
+            "description": template.description,
+            "template": template.template,
+        }
+    }
+
+    safe_name = "".join(c for c in template.name if c.isalnum() or c in (' ', '-', '_')).strip()
+    safe_name = safe_name.replace(' ', '_')
+
+    return JSONResponse(
+        content=export_data,
+        headers={
+            "Content-Disposition": f'attachment; filename="naming_{safe_name}.json"'
+        }
+    )
+
+
+@router.get("/api/templates/nfo/{template_id}/export")
+async def export_nfo_template(template_id: int, db: Session = Depends(get_db)):
+    """Export a single NFO template as JSON."""
+    template = NFOTemplate.get_by_id(db, template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    export_data = {
+        "type": "nfo",
+        "version": "1.0",
+        "template": {
+            "name": template.name,
+            "description": template.description,
+            "content": template.content,
+        }
+    }
+
+    safe_name = "".join(c for c in template.name if c.isalnum() or c in (' ', '-', '_')).strip()
+    safe_name = safe_name.replace(' ', '_')
+
+    return JSONResponse(
+        content=export_data,
+        headers={
+            "Content-Disposition": f'attachment; filename="nfo_{safe_name}.json"'
+        }
+    )
+
+
+@router.get("/api/templates/export-all/{template_type}")
+async def export_all_templates(template_type: str, db: Session = Depends(get_db)):
+    """Export all templates of a given type as JSON."""
+    if template_type not in ["bbcode", "naming", "nfo"]:
+        raise HTTPException(status_code=400, detail="Invalid template type. Must be 'bbcode', 'naming', or 'nfo'")
+
+    templates_list = []
+
+    if template_type == "bbcode":
+        all_templates = BBCodeTemplate.get_all(db)
+        for t in all_templates:
+            templates_list.append({
+                "name": t.name,
+                "description": t.description,
+                "content": t.content,
+            })
+    elif template_type == "naming":
+        all_templates = NamingTemplate.get_all(db)
+        for t in all_templates:
+            templates_list.append({
+                "name": t.name,
+                "description": t.description,
+                "template": t.template,
+            })
+    elif template_type == "nfo":
+        all_templates = NFOTemplate.get_all(db)
+        for t in all_templates:
+            templates_list.append({
+                "name": t.name,
+                "description": t.description,
+                "content": t.content,
+            })
+
+    export_data = {
+        "type": template_type,
+        "version": "1.0",
+        "templates": templates_list
+    }
+
+    return JSONResponse(
+        content=export_data,
+        headers={
+            "Content-Disposition": f'attachment; filename="{template_type}_templates_all.json"'
+        }
+    )
+
+
+@router.post("/api/templates/bbcode/import")
+async def import_bbcode_templates(
+    file: UploadFile = File(...),
+    conflict_mode: str = Form("rename"),
+    db: Session = Depends(get_db)
+):
+    """Import BBCode template(s) from JSON file."""
+    if conflict_mode not in ["rename", "skip", "overwrite"]:
+        raise HTTPException(status_code=400, detail="Invalid conflict_mode. Must be 'rename', 'skip', or 'overwrite'")
+
+    try:
+        content = await file.read()
+        data = json.loads(content.decode('utf-8'))
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON file")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
+
+    # Validate format
+    if data.get("type") != "bbcode":
+        raise HTTPException(status_code=400, detail="Invalid template type. Expected 'bbcode'")
+
+    # Get templates to import (single or multiple)
+    templates_to_import = []
+    if data.get("template"):
+        templates_to_import = [data["template"]]
+    elif data.get("templates"):
+        templates_to_import = data["templates"]
+    else:
+        raise HTTPException(status_code=400, detail="No template data found in file")
+
+    imported = []
+    skipped = []
+
+    for tpl in templates_to_import:
+        if not tpl.get("name") or not tpl.get("content"):
+            skipped.append({"name": tpl.get("name", "unknown"), "reason": "Missing name or content"})
+            continue
+
+        name = tpl["name"]
+        existing = BBCodeTemplate.get_by_name(db, name)
+
+        if existing:
+            if conflict_mode == "skip":
+                skipped.append({"name": name, "reason": "Already exists"})
+                continue
+            elif conflict_mode == "rename":
+                # Find a unique name
+                counter = 1
+                new_name = f"{name} (imported)"
+                while BBCodeTemplate.get_by_name(db, new_name):
+                    counter += 1
+                    new_name = f"{name} (imported {counter})"
+                name = new_name
+            elif conflict_mode == "overwrite":
+                db.delete(existing)
+                db.flush()
+
+        new_template = BBCodeTemplate(
+            name=name,
+            description=tpl.get("description"),
+            content=tpl["content"],
+            is_default=False,
+        )
+        db.add(new_template)
+        imported.append(name)
+
+    db.commit()
+
+    logger.info(f"Imported {len(imported)} BBCode template(s): {imported}")
+
+    return {
+        "status": "success",
+        "imported": imported,
+        "skipped": skipped,
+        "message": f"Imported {len(imported)} template(s)"
+    }
+
+
+@router.post("/api/templates/naming/import")
+async def import_naming_templates(
+    file: UploadFile = File(...),
+    conflict_mode: str = Form("rename"),
+    db: Session = Depends(get_db)
+):
+    """Import Naming template(s) from JSON file."""
+    if conflict_mode not in ["rename", "skip", "overwrite"]:
+        raise HTTPException(status_code=400, detail="Invalid conflict_mode. Must be 'rename', 'skip', or 'overwrite'")
+
+    try:
+        content = await file.read()
+        data = json.loads(content.decode('utf-8'))
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON file")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
+
+    # Validate format
+    if data.get("type") != "naming":
+        raise HTTPException(status_code=400, detail="Invalid template type. Expected 'naming'")
+
+    # Get templates to import
+    templates_to_import = []
+    if data.get("template"):
+        templates_to_import = [data["template"]]
+    elif data.get("templates"):
+        templates_to_import = data["templates"]
+    else:
+        raise HTTPException(status_code=400, detail="No template data found in file")
+
+    imported = []
+    skipped = []
+
+    for tpl in templates_to_import:
+        if not tpl.get("name") or not tpl.get("template"):
+            skipped.append({"name": tpl.get("name", "unknown"), "reason": "Missing name or template"})
+            continue
+
+        name = tpl["name"]
+        existing = NamingTemplate.get_by_name(db, name)
+
+        if existing:
+            if conflict_mode == "skip":
+                skipped.append({"name": name, "reason": "Already exists"})
+                continue
+            elif conflict_mode == "rename":
+                counter = 1
+                new_name = f"{name} (imported)"
+                while NamingTemplate.get_by_name(db, new_name):
+                    counter += 1
+                    new_name = f"{name} (imported {counter})"
+                name = new_name
+            elif conflict_mode == "overwrite":
+                db.delete(existing)
+                db.flush()
+
+        new_template = NamingTemplate(
+            name=name,
+            description=tpl.get("description"),
+            template=tpl["template"],
+            is_default=False,
+        )
+        db.add(new_template)
+        imported.append(name)
+
+    db.commit()
+
+    logger.info(f"Imported {len(imported)} Naming template(s): {imported}")
+
+    return {
+        "status": "success",
+        "imported": imported,
+        "skipped": skipped,
+        "message": f"Imported {len(imported)} template(s)"
+    }
+
+
+@router.post("/api/templates/nfo/import")
+async def import_nfo_templates(
+    file: UploadFile = File(...),
+    conflict_mode: str = Form("rename"),
+    db: Session = Depends(get_db)
+):
+    """Import NFO template(s) from JSON file."""
+    if conflict_mode not in ["rename", "skip", "overwrite"]:
+        raise HTTPException(status_code=400, detail="Invalid conflict_mode. Must be 'rename', 'skip', or 'overwrite'")
+
+    try:
+        content = await file.read()
+        data = json.loads(content.decode('utf-8'))
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON file")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
+
+    # Validate format
+    if data.get("type") != "nfo":
+        raise HTTPException(status_code=400, detail="Invalid template type. Expected 'nfo'")
+
+    # Get templates to import
+    templates_to_import = []
+    if data.get("template"):
+        templates_to_import = [data["template"]]
+    elif data.get("templates"):
+        templates_to_import = data["templates"]
+    else:
+        raise HTTPException(status_code=400, detail="No template data found in file")
+
+    imported = []
+    skipped = []
+
+    for tpl in templates_to_import:
+        if not tpl.get("name") or not tpl.get("content"):
+            skipped.append({"name": tpl.get("name", "unknown"), "reason": "Missing name or content"})
+            continue
+
+        name = tpl["name"]
+        existing = NFOTemplate.get_by_name(db, name)
+
+        if existing:
+            if conflict_mode == "skip":
+                skipped.append({"name": name, "reason": "Already exists"})
+                continue
+            elif conflict_mode == "rename":
+                counter = 1
+                new_name = f"{name} (imported)"
+                while NFOTemplate.get_by_name(db, new_name):
+                    counter += 1
+                    new_name = f"{name} (imported {counter})"
+                name = new_name
+            elif conflict_mode == "overwrite":
+                db.delete(existing)
+                db.flush()
+
+        new_template = NFOTemplate(
+            name=name,
+            description=tpl.get("description"),
+            content=tpl["content"],
+            is_default=False,
+        )
+        db.add(new_template)
+        imported.append(name)
+
+    db.commit()
+
+    logger.info(f"Imported {len(imported)} NFO template(s): {imported}")
+
+    return {
+        "status": "success",
+        "imported": imported,
+        "skipped": skipped,
+        "message": f"Imported {len(imported)} template(s)"
     }

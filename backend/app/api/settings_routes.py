@@ -687,11 +687,68 @@ async def test_connection(
                     # Check response status
                     if response.status_code == 200:
                         logger.info(f"✓ TMDB connection test successful ({credential_type})")
+
+                        # Fetch sample movie data (Harry Potter 3) for template preview
+                        sample_data = None
+                        try:
+                            # Harry Potter and the Prisoner of Azkaban - TMDB ID 673
+                            movie_response = await client.get(
+                                "https://api.themoviedb.org/3/movie/673",
+                                params={**params, "language": "fr-FR", "append_to_response": "credits,videos"},
+                                headers=headers
+                            )
+                            if movie_response.status_code == 200:
+                                movie = movie_response.json()
+                                credits = movie.get('credits', {})
+                                cast = credits.get('cast', [])[:6]
+                                crew = credits.get('crew', [])
+                                directors = [c['name'] for c in crew if c.get('job') == 'Director']
+                                videos = movie.get('videos', {}).get('results', [])
+                                trailer = next((v for v in videos if v.get('type') == 'Trailer' and v.get('site') == 'YouTube'), None)
+
+                                sample_data = {
+                                    "title": movie.get('title', ''),
+                                    "original_title": movie.get('original_title', ''),
+                                    "year": movie.get('release_date', '')[:4] if movie.get('release_date') else '',
+                                    "release_date": movie.get('release_date', ''),
+                                    "poster_url": f"https://image.tmdb.org/t/p/w500{movie.get('poster_path')}" if movie.get('poster_path') else '',
+                                    "backdrop_url": f"https://image.tmdb.org/t/p/original{movie.get('backdrop_path')}" if movie.get('backdrop_path') else '',
+                                    "rating": str(round(movie.get('vote_average', 0), 1)),
+                                    "rating_10": f"{round(movie.get('vote_average', 0), 1)}/10",
+                                    "genres": ', '.join([g['name'] for g in movie.get('genres', [])]),
+                                    "overview": movie.get('overview', ''),
+                                    "tagline": movie.get('tagline', ''),
+                                    "runtime": f"{movie.get('runtime', 0) // 60}h et {movie.get('runtime', 0) % 60}min" if movie.get('runtime') else '',
+                                    "country": ', '.join([c['iso_3166_1'] for c in movie.get('production_countries', [])[:2]]),
+                                    "director": ', '.join(directors),
+                                    "tmdb_id": str(movie.get('id', '')),
+                                    "imdb_id": movie.get('imdb_id', ''),
+                                    "tmdb_url": f"https://www.themoviedb.org/movie/{movie.get('id')}",
+                                    "trailer_url": f"https://www.youtube.com/watch?v={trailer['key']}" if trailer else '',
+                                    "cast_names": ', '.join([c['name'] for c in cast]),
+                                }
+                                # Add individual cast members
+                                for i, actor in enumerate(cast, 1):
+                                    sample_data[f"cast_{i}_name"] = actor.get('name', '')
+                                    sample_data[f"cast_{i}_character"] = actor.get('character', '')
+                                    profile = f"https://image.tmdb.org/t/p/w185{actor['profile_path']}" if actor.get('profile_path') else ''
+                                    sample_data[f"cast_{i}_photo"] = f"[img]{profile}[/img]" if profile else ''
+                                    # Card format: inline display for grid layout
+                                    if profile:
+                                        sample_data[f"cast_{i}_card"] = f"[inline][img]{profile}[/img]\n[color=#eab308]{actor.get('name', '')}[/color][/inline]"
+                                    else:
+                                        sample_data[f"cast_{i}_card"] = actor.get('name', '')
+
+                                logger.info("✓ Sample movie data fetched (Harry Potter 3)")
+                        except Exception as e:
+                            logger.warning(f"Could not fetch sample movie data: {e}")
+
                         return {
                             "service": service,
                             "status": "success",
                             "message": f"Successfully authenticated with TMDB using {credential_type} credentials",
-                            "credential_type": credential_type
+                            "credential_type": credential_type,
+                            "sample_data": sample_data
                         }
                     elif response.status_code == 401:
                         logger.warning(f"✗ TMDB authentication failed ({credential_type})")

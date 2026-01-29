@@ -37,12 +37,24 @@
             <div class="templates-sidebar">
                 <div class="sidebar-header">
                     <h2>Templates BBCode</h2>
-                    <button class="btn btn-primary btn-sm" onclick="createNewBBCodeTemplate()">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                        </svg>
-                        Nouveau
-                    </button>
+                    <div class="header-actions">
+                        <button class="btn btn-sm" onclick="openImportModal('bbcode')" title="Importer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                            </svg>
+                        </button>
+                        <button class="btn btn-sm" onclick="exportAllTemplates('bbcode')" title="Exporter tout">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="createNewBBCodeTemplate()">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                            </svg>
+                            Nouveau
+                        </button>
+                    </div>
                 </div>
                 <div class="templates-list" id="bbcode-templates-list">
                     {% for template in bbcode_templates %}
@@ -114,9 +126,23 @@
                     </details>
                 </div>
 
-                <!-- BBCode Editor -->
-                <div class="editor-area">
-                    <textarea id="bbcode-template-content" class="code-editor" placeholder="Entrez votre template BBCode ici..."></textarea>
+                <!-- BBCode Editor with Preview -->
+                <div class="editor-preview-container">
+                    <div class="editor-pane">
+                        <div class="pane-header">
+                            <span class="pane-title">Code BBCode</span>
+                        </div>
+                        <textarea id="bbcode-template-content" class="code-editor" placeholder="Entrez votre template BBCode ici..."></textarea>
+                    </div>
+                    <div class="preview-pane">
+                        <div class="pane-header">
+                            <span class="pane-title">Apercu</span>
+                            <span class="preview-badge">Live</span>
+                        </div>
+                        <div id="bbcode-preview" class="bbcode-preview-content">
+                            <p class="preview-placeholder">L'apercu s'affichera ici...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -129,12 +155,24 @@
             <div class="templates-sidebar">
                 <div class="sidebar-header">
                     <h2>Templates Nommage</h2>
-                    <button class="btn btn-primary btn-sm" onclick="createNewNamingTemplate()">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                        </svg>
-                        Nouveau
-                    </button>
+                    <div class="header-actions">
+                        <button class="btn btn-sm" onclick="openImportModal('naming')" title="Importer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                            </svg>
+                        </button>
+                        <button class="btn btn-sm" onclick="exportAllTemplates('naming')" title="Exporter tout">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="createNewNamingTemplate()">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                            </svg>
+                            Nouveau
+                        </button>
+                    </div>
                 </div>
                 <div class="templates-list" id="naming-templates-list">
                     {% for template in naming_templates %}
@@ -242,12 +280,24 @@
             <div class="templates-sidebar">
                 <div class="sidebar-header">
                     <h2>Templates NFO</h2>
-                    <button class="btn btn-primary btn-sm" onclick="createNewNFOTemplate()">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                        </svg>
-                        Nouveau
-                    </button>
+                    <div class="header-actions">
+                        <button class="btn btn-sm" onclick="openImportModal('nfo')" title="Importer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                            </svg>
+                        </button>
+                        <button class="btn btn-sm" onclick="exportAllTemplates('nfo')" title="Exporter tout">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="createNewNFOTemplate()">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                            </svg>
+                            Nouveau
+                        </button>
+                    </div>
                 </div>
                 <div class="templates-list" id="nfo-templates-list">
                     {% for template in nfo_templates %}
@@ -324,6 +374,69 @@
                     <textarea id="nfo-template-content" class="code-editor nfo-editor" placeholder="Entrez votre template NFO ici..."></textarea>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Import Modal -->
+<div id="import-modal" class="import-modal-overlay">
+    <div class="import-modal-backdrop" onclick="closeImportModal()"></div>
+    <div class="import-modal-content">
+        <div class="import-modal-header">
+            <h3 id="import-modal-title">Importer des templates</h3>
+            <button class="import-modal-close" onclick="closeImportModal()">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div class="import-modal-body">
+            <input type="hidden" id="import-type">
+
+            <div class="drop-zone" id="drop-zone">
+                <svg class="drop-zone-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+                <p class="drop-zone-text">Glissez un fichier JSON ici</p>
+                <p class="drop-zone-subtext">ou</p>
+                <label class="btn btn-secondary drop-zone-btn">
+                    <span>Parcourir</span>
+                    <input type="file" accept=".json" id="import-file" onchange="handleFileSelect(event)" hidden>
+                </label>
+            </div>
+
+            <div id="import-file-info" class="import-file-info" style="display: none;">
+                <div class="file-info-header">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <span id="import-file-name"></span>
+                    <button class="btn-icon" onclick="clearImportFile()" title="Supprimer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div id="import-preview" class="import-preview"></div>
+            </div>
+
+            <div class="conflict-options">
+                <label class="conflict-label">En cas de conflit de nom :</label>
+                <select id="conflict-mode" class="conflict-select">
+                    <option value="rename">Renommer (ajouter suffix)</option>
+                    <option value="skip">Ignorer</option>
+                    <option value="overwrite">Ecraser l'existant</option>
+                </select>
+            </div>
+        </div>
+        <div class="import-modal-footer">
+            <button class="btn btn-secondary" onclick="closeImportModal()">Annuler</button>
+            <button class="btn btn-primary" onclick="confirmImport()" id="btn-confirm-import" disabled>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                </svg>
+                Importer
+            </button>
         </div>
     </div>
 </div>
@@ -417,6 +530,8 @@
     align-items: center;
     padding: 1rem;
     border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
+    gap: 0.5rem;
 }
 
 .sidebar-header h2 {
@@ -424,6 +539,12 @@
     font-weight: 600;
     margin: 0;
     color: var(--text-primary);
+}
+
+.header-actions {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
 }
 
 .templates-list {
@@ -688,6 +809,233 @@ button.var-chip-nfo:hover {
     min-height: 400px;
 }
 
+/* Editor with Preview Container */
+.editor-preview-container {
+    flex: 1;
+    display: flex;
+    gap: 1px;
+    background: var(--border-color, #334155);
+    min-height: 400px;
+}
+
+.editor-pane,
+.preview-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary, #1e293b);
+    min-width: 0;
+}
+
+.pane-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    background: rgba(15, 23, 42, 0.5);
+    border-bottom: 1px solid var(--border-color, #334155);
+}
+
+.pane-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-muted, #64748b);
+}
+
+.preview-badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    background: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+    animation: pulse-badge 2s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.editor-pane .code-editor {
+    flex: 1;
+    border-radius: 0;
+}
+
+.bbcode-preview-content {
+    flex: 1;
+    padding: 1rem;
+    overflow-y: auto;
+    background: #0f172a;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--text-secondary, #94a3b8);
+}
+
+.preview-placeholder {
+    color: var(--text-muted, #64748b);
+    font-style: italic;
+}
+
+/* BBCode Preview Styles */
+.bbcode-preview-content .bb-bold { font-weight: bold; }
+.bbcode-preview-content .bb-italic { font-style: italic; }
+.bbcode-preview-content .bb-underline { text-decoration: underline; }
+.bbcode-preview-content .bb-strike { text-decoration: line-through; }
+.bbcode-preview-content .bb-center { text-align: center; display: block; }
+.bbcode-preview-content .bb-left { text-align: left; display: block; }
+.bbcode-preview-content .bb-right { text-align: right; display: block; }
+.bbcode-preview-content .bb-quote {
+    border-left: 3px solid var(--accent-color, #eab308);
+    padding: 0.5rem 1rem;
+    margin: 0.5rem 0;
+    background: rgba(234, 179, 8, 0.1);
+    font-style: italic;
+}
+.bbcode-preview-content .bb-code {
+    font-family: 'Consolas', monospace;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    display: block;
+    white-space: pre-wrap;
+    margin: 0.5rem 0;
+}
+.bbcode-preview-content .bb-spoiler {
+    background: #333;
+    color: #333;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.125rem;
+    cursor: pointer;
+}
+.bbcode-preview-content .bb-spoiler:hover {
+    color: #fff;
+}
+.bbcode-preview-content .bb-color { }
+.bbcode-preview-content .bb-size { }
+.bbcode-preview-content .bb-url {
+    color: #60a5fa;
+    text-decoration: underline;
+}
+.bbcode-preview-content .bb-img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.25rem;
+}
+
+/* Poster images (w500) - larger, centered */
+.bbcode-preview-content .bb-img[src*="w500"],
+.bbcode-preview-content .bb-img[src*="original"] {
+    max-width: 300px;
+    display: block;
+    margin: 0.5rem auto;
+}
+
+/* Cast/profile images (w185) - smaller for cast grid */
+.bbcode-preview-content .bb-img[src*="w185"] {
+    width: 80px;
+    height: 120px;
+    object-fit: cover;
+    display: block;
+    margin: 0 auto 0.25rem auto;
+    border-radius: 0.375rem;
+}
+
+/* Cast card container */
+.bb-cast-card {
+    display: inline-block;
+    width: 100px;
+    text-align: center;
+    vertical-align: top;
+    margin: 0.5rem;
+    font-size: 0.8rem;
+}
+
+.bb-cast-card img {
+    width: 80px;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 0.375rem;
+    margin-bottom: 0.25rem;
+}
+
+.bb-cast-card .cast-name {
+    color: var(--accent-color, #eab308);
+    font-weight: 500;
+}
+.bbcode-preview-content .bb-list {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+}
+.bbcode-preview-content .bb-hr {
+    border: none;
+    border-top: 1px solid var(--border-color, #334155);
+    margin: 1rem 0;
+}
+.bbcode-preview-content .bb-var {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-family: 'Consolas', monospace;
+    font-size: 0.85em;
+}
+
+.bbcode-preview-content .bb-var-unknown {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
+
+/* Headings */
+.bbcode-preview-content .bb-h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-primary, #fff);
+    margin: 1rem 0 0.5rem 0;
+    line-height: 1.3;
+}
+.bbcode-preview-content .bb-h2 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: var(--text-primary, #fff);
+    margin: 0.875rem 0 0.4rem 0;
+    line-height: 1.3;
+}
+.bbcode-preview-content .bb-h3 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--text-primary, #fff);
+    margin: 0.75rem 0 0.3rem 0;
+    line-height: 1.3;
+}
+.bbcode-preview-content .bb-h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-secondary, #94a3b8);
+    margin: 0.5rem 0 0.25rem 0;
+    line-height: 1.3;
+}
+
+/* Inline block for cast cards grid */
+.bbcode-preview-content .bb-inline {
+    display: inline-block;
+    vertical-align: top;
+    text-align: center;
+    width: 120px;
+    margin: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.bbcode-preview-content .bb-inline .bb-img {
+    width: 100px;
+    height: 150px;
+    object-fit: cover;
+    display: block;
+    margin: 0 auto 0.25rem auto;
+}
+
 .code-editor {
     flex: 1;
     width: 100%;
@@ -853,10 +1201,247 @@ button.var-chip-nfo:hover {
         min-width: 100%;
         max-height: 250px;
     }
+    .editor-preview-container {
+        flex-direction: column;
+    }
+    .editor-pane,
+    .preview-pane {
+        min-height: 250px;
+    }
+}
+
+/* Import Modal Styles */
+.import-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+}
+
+.import-modal-overlay.active {
+    display: flex !important;
+}
+
+.import-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9998;
+}
+
+.import-modal-content {
+    position: relative;
+    z-index: 10000;
+    background: var(--bg-secondary, #1e293b);
+    border: 1px solid var(--border-color, #334155);
+    border-radius: 0.75rem;
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.import-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border-color, #334155);
+}
+
+.import-modal-header h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary, #fff);
+}
+
+.import-modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-muted, #64748b);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+    transition: all 0.15s;
+}
+
+.import-modal-close:hover {
+    color: var(--text-primary, #fff);
+    background: var(--bg-tertiary, #334155);
+}
+
+.import-modal-body {
+    padding: 1.25rem;
+    overflow-y: auto;
+}
+
+.import-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--border-color, #334155);
+}
+
+/* Drop Zone */
+.drop-zone {
+    border: 2px dashed var(--border-color);
+    border-radius: 0.75rem;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.drop-zone:hover,
+.drop-zone.drag-over {
+    border-color: var(--accent-color);
+    background: rgba(234, 179, 8, 0.05);
+}
+
+.drop-zone-icon {
+    width: 3rem;
+    height: 3rem;
+    color: var(--text-muted);
+    margin: 0 auto 0.75rem;
+}
+
+.drop-zone-text {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.drop-zone-subtext {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.drop-zone-btn {
+    cursor: pointer;
+}
+
+/* Import File Info */
+.import-file-info {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--bg-tertiary);
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-color);
+}
+
+.file-info-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.file-info-header span {
+    flex: 1;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.btn-icon {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+    transition: all 0.15s;
+}
+
+.btn-icon:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* Import Preview */
+.import-preview {
+    font-size: 0.85rem;
+}
+
+.import-preview-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border-radius: 0.375rem;
+    margin-bottom: 0.25rem;
+}
+
+.import-preview-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.import-preview-item .preview-icon {
+    width: 1rem;
+    height: 1rem;
+    color: var(--accent-color);
+}
+
+.import-preview-item .preview-name {
+    flex: 1;
+    color: var(--text-secondary);
+}
+
+.import-preview-item .preview-desc {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+/* Conflict Options */
+.conflict-options {
+    margin-top: 1rem;
+}
+
+.conflict-label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.conflict-select {
+    width: 100%;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    padding: 0.625rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.conflict-select:focus {
+    outline: none;
+    border-color: var(--accent-color);
 }
 </style>
 
 <script>
+{% raw %}
 // ============================================================================
 // Tab Management
 // ============================================================================
@@ -924,6 +1509,9 @@ async function loadBBCodeTemplate(id) {
             // Update buttons
             document.getElementById('btn-bbcode-default').style.display = t.is_default ? 'none' : 'flex';
             document.getElementById('btn-bbcode-delete').style.display = t.is_default ? 'none' : 'flex';
+
+            // Update preview
+            updateBBCodePreview();
         }
     } catch (error) {
         showToast('Erreur: ' + error.message, 'error');
@@ -943,6 +1531,8 @@ function createNewBBCodeTemplate() {
     document.getElementById('btn-bbcode-default').style.display = 'none';
     document.getElementById('btn-bbcode-delete').style.display = 'none';
     document.getElementById('bbcode-template-name').focus();
+
+    updateBBCodePreview();
 }
 
 async function saveBBCodeTemplate() {
@@ -1025,6 +1615,132 @@ function insertBBCodeVariable(varName) {
     editor.value = text.substring(0, start) + varText + text.substring(start);
     editor.focus();
     editor.setSelectionRange(start + varText.length, start + varText.length);
+    updateBBCodePreview();
+}
+
+// BBCode Preview Sample Data (matches actual template variables)
+// Default fallback data
+const defaultSampleData = {
+    // MediaInfo (not from TMDB)
+    'quality': '1080p BluRay',
+    'format': 'MKV',
+    'video_codec': 'H.264/AVC',
+    'video_bitrate': '12.5 Mb/s',
+    'hdr': '',
+    'resolution': '1920x1080',
+    'duration': '2h 21min 47s',
+    'audio_list': 'French DTS-HD MA 5.1, English DTS-HD MA 5.1',
+    'audio_table': '[table][tr][td]French[/td][td]DTS-HD MA[/td][td]5.1[/td][/tr][tr][td]English[/td][td]DTS-HD MA[/td][td]5.1[/td][/tr][/table]',
+    'languages': 'MULTi (VFF, VO)',
+    'subtitles': 'Francais, English',
+    'subtitles_table': '[table][tr][td]Francais[/td][td]SRT[/td][/tr][tr][td]English[/td][td]SRT[/td][/tr][/table]',
+    'file_size': '8.2 Go',
+    'file_count': '1',
+    'source': 'BluRay',
+    'release_name': 'Harry.Potter.and.the.Prisoner.of.Azkaban.2004.MULTi.1080p.BluRay.x264-FW',
+    'release_team': 'FW',
+};
+
+// Try to load TMDB data from localStorage (set by Settings > Test TMDB API)
+let bbcodeSampleData = { ...defaultSampleData };
+try {
+    const storedData = localStorage.getItem('tmdb_preview_data');
+    if (storedData) {
+        const tmdbData = JSON.parse(storedData);
+        bbcodeSampleData = { ...defaultSampleData, ...tmdbData };
+        console.log('Loaded TMDB preview data:', tmdbData.title);
+    } else {
+        console.log('No TMDB preview data found. Go to Settings and click "Test" on TMDB API to load sample data.');
+    }
+} catch (e) {
+    console.warn('Could not load TMDB preview data:', e);
+}
+
+function updateBBCodePreview() {
+    const content = document.getElementById('bbcode-template-content').value;
+    const preview = document.getElementById('bbcode-preview');
+
+    if (!content.trim()) {
+        preview.innerHTML = '<p class="preview-placeholder">L\'apercu s\'affichera ici...</p>';
+        return;
+    }
+
+    // Step 1: Replace variables with their actual values
+    let processed = content;
+    for (const [key, value] of Object.entries(bbcodeSampleData)) {
+        const regex = new RegExp('\\{\\{' + key + '\\}\\}', 'gi');
+        processed = processed.replace(regex, value || '');
+    }
+
+    // Step 2: Mark remaining unknown variables with a placeholder
+    processed = processed.replace(/\{\{(\w+)\}\}/g, '[[UNKNOWN:$1]]');
+
+    // Step 3: Parse BBCode to HTML
+    let html = parseBBCode(processed);
+
+    // Step 4: Convert unknown variable placeholders to highlighted spans
+    html = html.replace(/\[\[UNKNOWN:(\w+)\]\]/g, '<span class="bb-var bb-var-unknown" title="Variable inconnue: $1">&#123;&#123;$1&#125;&#125;</span>');
+
+    preview.innerHTML = html;
+}
+
+function parseBBCode(text) {
+    // Escape HTML first
+    text = escapeHtml(text);
+
+    // Headings
+    text = text.replace(/\[h1\]([\s\S]*?)\[\/h1\]/gi, '<h1 class="bb-h1">$1</h1>');
+    text = text.replace(/\[h2\]([\s\S]*?)\[\/h2\]/gi, '<h2 class="bb-h2">$1</h2>');
+    text = text.replace(/\[h3\]([\s\S]*?)\[\/h3\]/gi, '<h3 class="bb-h3">$1</h3>');
+    text = text.replace(/\[h4\]([\s\S]*?)\[\/h4\]/gi, '<h4 class="bb-h4">$1</h4>');
+
+    // Basic formatting
+    text = text.replace(/\[b\]([\s\S]*?)\[\/b\]/gi, '<span class="bb-bold">$1</span>');
+    text = text.replace(/\[i\]([\s\S]*?)\[\/i\]/gi, '<span class="bb-italic">$1</span>');
+    text = text.replace(/\[u\]([\s\S]*?)\[\/u\]/gi, '<span class="bb-underline">$1</span>');
+    text = text.replace(/\[s\]([\s\S]*?)\[\/s\]/gi, '<span class="bb-strike">$1</span>');
+
+    // Alignment
+    text = text.replace(/\[center\]([\s\S]*?)\[\/center\]/gi, '<div class="bb-center">$1</div>');
+    text = text.replace(/\[left\]([\s\S]*?)\[\/left\]/gi, '<div class="bb-left">$1</div>');
+    text = text.replace(/\[right\]([\s\S]*?)\[\/right\]/gi, '<div class="bb-right">$1</div>');
+
+    // Inline block (for cast cards, etc.)
+    text = text.replace(/\[inline\]([\s\S]*?)\[\/inline\]/gi, '<div class="bb-inline">$1</div>');
+
+    // Color and size
+    text = text.replace(/\[color=([^\]]+)\]([\s\S]*?)\[\/color\]/gi, '<span style="color:$1">$2</span>');
+    text = text.replace(/\[size=([^\]]+)\]([\s\S]*?)\[\/size\]/gi, '<span style="font-size:$1">$2</span>');
+
+    // Quote and code
+    text = text.replace(/\[quote\]([\s\S]*?)\[\/quote\]/gi, '<div class="bb-quote">$1</div>');
+    text = text.replace(/\[quote=([^\]]+)\]([\s\S]*?)\[\/quote\]/gi, '<div class="bb-quote"><strong>$1:</strong><br>$2</div>');
+    text = text.replace(/\[code\]([\s\S]*?)\[\/code\]/gi, '<pre class="bb-code">$1</pre>');
+
+    // Spoiler
+    text = text.replace(/\[spoiler\]([\s\S]*?)\[\/spoiler\]/gi, '<span class="bb-spoiler">$1</span>');
+
+    // URLs
+    text = text.replace(/\[url\]([\s\S]*?)\[\/url\]/gi, '<a href="$1" class="bb-url" target="_blank">$1</a>');
+    text = text.replace(/\[url=([^\]]+)\]([\s\S]*?)\[\/url\]/gi, '<a href="$1" class="bb-url" target="_blank">$2</a>');
+
+    // Images
+    text = text.replace(/\[img\]([\s\S]*?)\[\/img\]/gi, '<img src="$1" class="bb-img" alt="Image">');
+    text = text.replace(/\[img=([^\]]+)\]/gi, '<img src="$1" class="bb-img" alt="Image">');
+
+    // Lists
+    text = text.replace(/\[list\]([\s\S]*?)\[\/list\]/gi, function(match, content) {
+        const items = content.replace(/\[\*\]/g, '</li><li>').replace(/^<\/li>/, '');
+        return '<ul class="bb-list">' + items + '</li></ul>';
+    });
+
+    // Horizontal rule
+    text = text.replace(/\[hr\]/gi, '<hr class="bb-hr">');
+
+    // Line breaks
+    text = text.replace(/\n/g, '<br>');
+
+    return text;
 }
 
 // ============================================================================
@@ -1319,6 +2035,210 @@ function showToast(message, type = 'info') {
 }
 
 // ============================================================================
+// Export/Import Functions
+// ============================================================================
+
+// Store imported data for confirmation
+let pendingImportData = null;
+let pendingImportType = null;
+
+async function exportCurrentTemplate(type) {
+    let id;
+    if (type === 'bbcode') {
+        id = document.getElementById('bbcode-template-id').value;
+    } else if (type === 'naming') {
+        id = document.getElementById('naming-template-id').value;
+    } else if (type === 'nfo') {
+        id = document.getElementById('nfo-template-id').value;
+    }
+
+    if (!id) {
+        showToast('Aucun template selectionne', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/templates/${type}/${id}/export`);
+        if (!response.ok) throw new Error('Export failed');
+
+        const data = await response.json();
+        const name = data.template?.name || type;
+        downloadJSON(data, `${type}_${name}.json`);
+        showToast('Template exporte', 'success');
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+async function exportAllTemplates(type) {
+    try {
+        const response = await fetch(`/api/templates/export-all/${type}`);
+        if (!response.ok) throw new Error('Export failed');
+
+        const data = await response.json();
+        const count = data.templates?.length || 0;
+        downloadJSON(data, `${type}_templates_all.json`);
+        showToast(`${count} template(s) exporte(s)`, 'success');
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+function downloadJSON(data, filename) {
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function openImportModal(type) {
+    pendingImportData = null;
+    pendingImportType = type;
+
+    document.getElementById('import-type').value = type;
+
+    const typeNames = {
+        'bbcode': 'BBCode',
+        'naming': 'Nommage',
+        'nfo': 'NFO'
+    };
+    document.getElementById('import-modal-title').textContent = `Importer des templates ${typeNames[type]}`;
+
+    // Reset modal state
+    document.getElementById('drop-zone').style.display = 'block';
+    document.getElementById('import-file-info').style.display = 'none';
+    document.getElementById('import-file').value = '';
+    document.getElementById('btn-confirm-import').disabled = true;
+
+    document.getElementById('import-modal').classList.add('active');
+}
+
+function closeImportModal() {
+    document.getElementById('import-modal').classList.remove('active');
+    pendingImportData = null;
+    pendingImportType = null;
+}
+
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (file) {
+        processImportFile(file);
+    }
+}
+
+function handleFileDrop(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const dropZone = document.getElementById('drop-zone');
+    dropZone.classList.remove('drag-over');
+
+    const file = event.dataTransfer.files[0];
+    if (file && file.name.endsWith('.json')) {
+        processImportFile(file);
+    } else {
+        showToast('Veuillez deposer un fichier JSON', 'error');
+    }
+}
+
+async function processImportFile(file) {
+    try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+
+        const expectedType = document.getElementById('import-type').value;
+        if (data.type !== expectedType) {
+            showToast(`Type invalide. Attendu: ${expectedType}, recu: ${data.type}`, 'error');
+            return;
+        }
+
+        pendingImportData = { file, data };
+
+        // Show file info
+        document.getElementById('drop-zone').style.display = 'none';
+        document.getElementById('import-file-info').style.display = 'block';
+        document.getElementById('import-file-name').textContent = file.name;
+
+        // Show preview
+        const templates = data.templates || (data.template ? [data.template] : []);
+        const preview = document.getElementById('import-preview');
+        preview.innerHTML = templates.map(t => `
+            <div class="import-preview-item">
+                <svg class="preview-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <span class="preview-name">${escapeHtml(t.name)}</span>
+                ${t.description ? `<span class="preview-desc">${escapeHtml(t.description.substring(0, 30))}...</span>` : ''}
+            </div>
+        `).join('');
+
+        document.getElementById('btn-confirm-import').disabled = false;
+
+    } catch (error) {
+        showToast('Fichier JSON invalide', 'error');
+    }
+}
+
+function clearImportFile() {
+    pendingImportData = null;
+    document.getElementById('drop-zone').style.display = 'block';
+    document.getElementById('import-file-info').style.display = 'none';
+    document.getElementById('import-file').value = '';
+    document.getElementById('btn-confirm-import').disabled = true;
+}
+
+async function confirmImport() {
+    if (!pendingImportData) return;
+
+    const type = document.getElementById('import-type').value;
+    const conflictMode = document.getElementById('conflict-mode').value;
+
+    const formData = new FormData();
+    formData.append('file', pendingImportData.file);
+    formData.append('conflict_mode', conflictMode);
+
+    try {
+        const response = await fetch(`/api/templates/${type}/import`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            const imported = result.imported?.length || 0;
+            const skipped = result.skipped?.length || 0;
+
+            let message = `${imported} template(s) importe(s)`;
+            if (skipped > 0) {
+                message += `, ${skipped} ignore(s)`;
+            }
+
+            showToast(message, 'success');
+            closeImportModal();
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            showToast(result.detail || 'Erreur d\'import', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur: ' + error.message, 'error');
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ============================================================================
 // Initialize
 // ============================================================================
 
@@ -1333,12 +2253,45 @@ document.addEventListener('DOMContentLoaded', () => {
     const firstNFO = document.querySelector('#nfo-templates-list .template-item');
     if (firstNFO) loadNFOTemplate(parseInt(firstNFO.dataset.id));
 
+    // Setup BBCode preview
+    const bbcodeInput = document.getElementById('bbcode-template-content');
+    if (bbcodeInput) {
+        bbcodeInput.addEventListener('input', updateBBCodePreview);
+        updateBBCodePreview();
+    }
+
     // Setup naming preview
     const namingInput = document.getElementById('naming-template-content');
     if (namingInput) {
         namingInput.addEventListener('input', updateNamingPreview);
         updateNamingPreview();
     }
+
+    // Setup drag and drop for import
+    const dropZone = document.getElementById('drop-zone');
+    if (dropZone) {
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', handleFileDrop);
+
+        // Click to browse
+        dropZone.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'INPUT') {
+                document.getElementById('import-file').click();
+            }
+        });
+    }
 });
+{% endraw %}
 </script>
 {% endblock %}

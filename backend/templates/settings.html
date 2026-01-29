@@ -630,12 +630,18 @@
             const result = await response.json();
 
             if (response.ok) {
+                // Store TMDB sample data for template preview if available
+                if (service === 'tmdb' && result.sample_data) {
+                    localStorage.setItem('tmdb_preview_data', JSON.stringify(result.sample_data));
+                    console.log('TMDB preview data stored:', result.sample_data.title);
+                }
+
                 messageContainer.innerHTML = `
                     <div class="alert alert-info">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
-                        <span>${result.message}</span>
+                        <span>${result.message}${result.sample_data ? ' (Donnees de test chargees)' : ''}</span>
                     </div>
                 `;
             } else {
