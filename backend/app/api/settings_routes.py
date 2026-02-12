@@ -83,6 +83,11 @@ class SettingsUpdateRequest(BaseModel):
     )
     qbittorrent_username: Optional[str] = Field(None, description="qBittorrent username")
     qbittorrent_password: Optional[str] = Field(None, description="qBittorrent password")
+    qbittorrent_content_path: Optional[str] = Field(
+        None,
+        description="Base path as seen by qBittorrent (e.g., /data). Maps Seedarr's media path to qBit's mount.",
+        examples=["/data"]
+    )
     tmdb_api_key: Optional[str] = Field(
         None,
         description="TMDB API key or Bearer token",
@@ -131,7 +136,7 @@ class SettingsUpdateRequest(BaseModel):
         """Validate URL fields have proper http/https format."""
         return url_validator(v)
 
-    @field_validator('input_media_path', 'output_dir', mode='before')
+    @field_validator('input_media_path', 'output_dir', 'qbittorrent_content_path', mode='before')
     @classmethod
     def validate_path_fields(cls, v: Optional[str]) -> Optional[str]:
         """Validate and sanitize path fields, blocking path traversal."""
@@ -151,6 +156,7 @@ class SettingsResponse(BaseModel):
     qbittorrent_host: Optional[str]
     qbittorrent_username: Optional[str]
     qbittorrent_password: Optional[str]
+    qbittorrent_content_path: Optional[str]
     tmdb_api_key: Optional[str]
     # Prowlarr integration
     prowlarr_url: Optional[str]
@@ -1030,6 +1036,7 @@ async def save_settings_html(
     qbittorrent_host: Optional[str] = Form(None),
     qbittorrent_username: Optional[str] = Form(None),
     qbittorrent_password: Optional[str] = Form(None),
+    qbittorrent_content_path: Optional[str] = Form(None),
     tmdb_api_key: Optional[str] = Form(None),
     prowlarr_url: Optional[str] = Form(None),
     prowlarr_api_key: Optional[str] = Form(None),
@@ -1058,6 +1065,7 @@ async def save_settings_html(
         # Sanitize path inputs to remove invisible Unicode characters
         input_media_path = sanitize_path(input_media_path)
         output_dir = sanitize_path(output_dir)
+        qbittorrent_content_path = sanitize_path(qbittorrent_content_path)
 
         # Build update data from form fields
         update_data = {}
@@ -1074,6 +1082,8 @@ async def save_settings_html(
             update_data['qbittorrent_username'] = qbittorrent_username
         if qbittorrent_password is not None:
             update_data['qbittorrent_password'] = qbittorrent_password
+        if qbittorrent_content_path is not None:
+            update_data['qbittorrent_content_path'] = qbittorrent_content_path
         if tmdb_api_key is not None:
             update_data['tmdb_api_key'] = tmdb_api_key
         if prowlarr_url is not None:

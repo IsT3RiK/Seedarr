@@ -1622,17 +1622,17 @@ class ProcessingPipeline:
             file_path = Path(file_entry.file_path)
             save_path = str(file_path.parent)
 
-            # CRITICAL: Convert Docker path to qBittorrent-accessible path
-            # If app runs in Docker but qBittorrent runs on Windows, convert paths
-            # Example: /media/Folder -> C:\Users\User\Videos\Folder
-            if save_path.startswith('/media'):
-                # Get the real Windows path from settings (input_media_path)
-                windows_base = settings.input_media_path
-                if windows_base:
-                    # Replace /media with the Windows base path
-                    relative_path = save_path.replace('/media', '', 1).lstrip('/')
-                    save_path = os.path.join(windows_base, relative_path) if relative_path else windows_base
-                    logger.info(f"Converted Docker path to Windows path: {save_path}")
+            # Path mapping: translate Seedarr's internal path to qBittorrent's path
+            # Handles Docker-to-Docker (e.g., Seedarr /media -> qBit /data)
+            # and Docker-to-host (e.g., Seedarr /media -> Windows C:\Media)
+            seedarr_root = (settings.input_media_path or '/media').rstrip('/')
+            qbit_root = (settings.qbittorrent_content_path or '').rstrip('/')
+
+            if qbit_root and save_path.startswith(seedarr_root):
+                relative_path = save_path[len(seedarr_root):].lstrip('/')
+                # Use forward slashes (paths are for Docker/Linux containers)
+                save_path = f"{qbit_root}/{relative_path}" if relative_path else qbit_root
+                logger.info(f"Path mapping ({seedarr_root} -> {qbit_root}): {save_path}")
 
             async with httpx.AsyncClient(timeout=30.0) as client:
                 # Login to qBittorrent

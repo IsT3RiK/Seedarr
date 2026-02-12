@@ -58,11 +58,14 @@ if 'settings' not in tables:
 cur.execute('PRAGMA table_info(settings)')
 columns = [col[1] for col in cur.fetchall()]
 
+has_qbit_content = 'qbittorrent_content_path' in columns
 has_wizard = 'wizard_completed' in columns
 has_extra_config = 'extra_config' in columns
 
 # Determine the real migration level based on schema
-if has_wizard:
+if has_qbit_content:
+    real_rev = '025_add_qbittorrent_content_path'
+elif has_wizard:
     real_rev = '024_migrate_adapter_types'
 elif has_extra_config:
     real_rev = '022_add_naming_and_nfo_templates'

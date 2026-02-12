@@ -89,6 +89,7 @@ class Settings(Base):
     qbittorrent_host = Column(String(500), nullable=True)
     qbittorrent_username = Column(String(255), nullable=True)
     qbittorrent_password = Column(String(500), nullable=True)  # Should be encrypted
+    qbittorrent_content_path = Column(String(1000), nullable=True)  # Base path as seen by qBittorrent (e.g., /data)
     tmdb_api_key = Column(String(500), nullable=True)  # Should be encrypted
 
     # Directory Paths
@@ -188,6 +189,7 @@ class Settings(Base):
             'qbittorrent_host': self.qbittorrent_host,
             'qbittorrent_username': self.qbittorrent_username,
             'qbittorrent_password': mask_value(self.qbittorrent_password),
+            'qbittorrent_content_path': self.qbittorrent_content_path,
             'tmdb_api_key': mask_value(self.tmdb_api_key),
             # Directory paths
             'input_media_path': self.input_media_path,

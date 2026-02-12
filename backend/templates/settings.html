@@ -216,6 +216,22 @@
 
                 <div class="setting-row">
                     <label class="form-label">
+                        <span style="font-weight: 600;">qBittorrent Content Path</span>
+                    </label>
+                    <input
+                        type="text"
+                        name="qbittorrent_content_path"
+                        value="{{ settings.qbittorrent_content_path or '' }}"
+                        placeholder="/data"
+                        class="form-input" style="font-family: 'Monaco', 'Menlo', 'Consolas', monospace;"
+                    />
+                    <label style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-muted);">
+                        <span>Base path as seen by qBittorrent. Maps Seedarr's media path to qBit's mount point (ex: Seedarr <code>/media</code> &rarr; qBit <code>/data</code>).</span>
+                    </label>
+                </div>
+
+                <div class="setting-row">
+                    <label class="form-label">
                         <span style="font-weight: 600;">TMDB API Key</span>
                         <button
                             type="button"
@@ -683,6 +699,7 @@
         'qbittorrent_host': 'qBittorrent Host',
         'qbittorrent_username': 'qBittorrent Username',
         'qbittorrent_password': 'qBittorrent Password',
+        'qbittorrent_content_path': 'qBittorrent Content Path',
         'tmdb_api_key': 'TMDB API Key',
         'prowlarr_url': 'Prowlarr URL',
         'prowlarr_api_key': 'Prowlarr API Key',
