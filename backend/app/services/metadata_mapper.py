@@ -133,15 +133,18 @@ class MetadataMapper:
     }
 
     # Language patterns (French-focused for La Cale)
+    # IMPORTANT: MULTI must be checked BEFORE specific variants (VFF, VOF, etc.)
+    # because filenames like "MULTi VFF" should match MULTI as the language,
+    # with VFF detected separately as language_variant.
     LANGUAGE_PATTERNS = {
+        'MULTI': [r'\bmulti\b', r'\bmulti\-?lang'],
+        'TRUEFRENCH': [r'truefrench'],
         'VFF': [r'\bvff\b'],
         'VOF': [r'\bvof\b'],
         'VFQ': [r'\bvfq\b'],
         'VFI': [r'\bvfi\b'],
         'VF2': [r'\bvf2\b'],
-        'TRUEFRENCH': [r'truefrench'],
         'FRENCH': [r'\bfrench\b', r'\bvf\b'],
-        'MULTI': [r'\bmulti\b', r'\bmulti\-?lang'],
         'VOSTFR': [r'vostfr', r'subfrench'],
         'VO': [r'\bvo\b', r'\beng\b', r'\benglish\b'],
     }

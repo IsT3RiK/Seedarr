@@ -439,8 +439,8 @@ class UniversalRenamer:
         lang = self.normalize_language(language)
         if lang:
             components.append(lang)
-            # Language variant (e.g., MULTI.VFF)
-            if language_variant:
+            # Language variant (e.g., MULTI.VFF) - skip if same as language to avoid VFF.VFF
+            if language_variant and language_variant.upper() != lang.upper():
                 components.append(language_variant.upper())
 
         # 9. Resolution
