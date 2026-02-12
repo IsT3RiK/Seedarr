@@ -27,6 +27,10 @@ COPY --from=builder /usr/local /usr/local
 # Copy application code
 COPY backend/ ./backend/
 
+# Make app files readable by any user (seedarr user needs to read config/code)
+# Only /app/backend/data needs write permissions (handled at runtime by entrypoint)
+RUN chmod -R a+rX /app/backend/
+
 # Copy entrypoint script and fix Windows line endings
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
