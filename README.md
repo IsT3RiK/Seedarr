@@ -17,7 +17,7 @@ Application web pour automatiser la publication de torrents sur trackers prives.
 ## Installation
 
 ```bash
-git clone https://github.com/your-repo/seedarr.git
+git clone https://github.com/IsT3RiK/seedarr.git
 cd seedarr
 cp .env.example .env
 docker-compose up -d
