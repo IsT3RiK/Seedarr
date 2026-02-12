@@ -24,7 +24,7 @@ mkdir -p /app/backend/data
 
 # Fix permissions
 chown -R seedarr:seedarr /app/backend/data
-chown -R seedarr:seedarr /root/.local
+
 
 # Run database migrations as seedarr user
 echo "Running database migrations..."
