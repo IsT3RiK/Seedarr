@@ -579,6 +579,10 @@ class UniversalRenamer:
         # Remove extension
         name = re.sub(r'\.[^.]+$', '', filename)
 
+        # Strip trailing parenthetical content (e.g., "(Beauty and the Beast)")
+        # These are often alternate titles appended after the team tag
+        name = re.sub(r'\s*\([^)]*\)\s*$', '', name)
+
         # Known codec patterns that end with "-something" and look like team tags
         # E-AC-3 -> "-3", DTS-HD -> "-HD", AC-3 -> "-3"
         codec_tail_patterns = [
