@@ -37,7 +37,6 @@ else
     echo "Database stamped at current version."
 fi
 
-# Start the application (must run from /app for 'backend.app.main' import)
-cd /app
+# Start the application (stay in /app/backend for 'app.xxx' imports)
 echo "Starting Seedarr..."
-exec gosu seedarr uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --log-config /app/backend/logging_config.json
+exec gosu seedarr uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-config /app/backend/logging_config.json
