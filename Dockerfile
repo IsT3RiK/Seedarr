@@ -27,9 +27,9 @@ COPY --from=builder /usr/local /usr/local
 # Copy application code
 COPY backend/ ./backend/
 
-# Copy entrypoint script
+# Copy entrypoint script and fix Windows line endings
 COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \

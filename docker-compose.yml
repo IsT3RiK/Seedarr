@@ -17,7 +17,7 @@ services:
     environment:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
-      - DATABASE_URL=${DATABASE_URL:-sqlite:///./backend/data/seedarr.db}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:////app/backend/data/seedarr.db}
       - FLARESOLVERR_URL=${FLARESOLVERR_URL:-http://localhost:8191}
       - PYTHONUNBUFFERED=1
       - TZ=${TZ:-Europe/Paris}
