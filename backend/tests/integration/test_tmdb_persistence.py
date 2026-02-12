@@ -373,7 +373,7 @@ async def test_cache_service_with_mock_api(cache_service, mock_tmdb_api_response
     # Mock TMDB API fetch method
     with patch.object(
         cache_service,
-        '_fetch_from_tmdb_api',
+        '_fetch_from_api',
         new_callable=AsyncMock
     ) as mock_fetch:
         mock_fetch.return_value = {
@@ -433,7 +433,7 @@ async def test_cache_hit_rate_exceeds_90_percent(cache_service):
 
     with patch.object(
         cache_service,
-        '_fetch_from_tmdb_api',
+        '_fetch_from_api',
         side_effect=mock_fetch
     ) as mock_api:
         # Perform all lookups
@@ -542,7 +542,7 @@ async def test_cache_force_refresh(cache_service):
 
     with patch.object(
         cache_service,
-        '_fetch_from_tmdb_api',
+        '_fetch_from_api',
         side_effect=mock_fetch
     ):
         # First call - cache miss, should call API
@@ -665,7 +665,7 @@ async def test_cache_service_api_key_missing(test_db):
     cache_service = TMDBCacheService(test_db)
 
     # Mock API fetch to trigger API key retrieval
-    with patch.object(cache_service, '_fetch_from_tmdb_api', new_callable=AsyncMock):
+    with patch.object(cache_service, '_fetch_from_api', new_callable=AsyncMock):
         with pytest.raises(TrackerAPIError) as exc_info:
             await cache_service.get_metadata("550")
 
@@ -688,7 +688,7 @@ async def test_cache_service_handles_api_errors(cache_service):
     # Test network error
     with patch.object(
         cache_service,
-        '_fetch_from_tmdb_api',
+        '_fetch_from_api',
         side_effect=NetworkRetryableError("Connection timeout")
     ):
         with pytest.raises(NetworkRetryableError) as exc_info:
@@ -698,7 +698,7 @@ async def test_cache_service_handles_api_errors(cache_service):
     # Test API error
     with patch.object(
         cache_service,
-        '_fetch_from_tmdb_api',
+        '_fetch_from_api',
         side_effect=TrackerAPIError("Invalid TMDB ID")
     ):
         with pytest.raises(TrackerAPIError) as exc_info:

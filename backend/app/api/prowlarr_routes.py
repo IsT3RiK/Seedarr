@@ -23,12 +23,14 @@ import logging
 from app.database import get_db
 from app.models.settings import Settings
 from app.models.tracker import Tracker
+from app.models.bbcode_template import BBCodeTemplate
 from app.services.prowlarr_client import (
     ProwlarrClient,
     ProwlarrError,
     get_prowlarr_client,
     reset_prowlarr_client
 )
+from app.adapters.tracker_factory import TrackerFactory
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,64 @@ def _get_prowlarr_client(db: Session) -> Optional[ProwlarrClient]:
         base_url=settings.prowlarr_url,
         api_key=settings.prowlarr_api_key
     )
+
+
+async def _auto_configure_tracker(db: Session, tracker: Tracker) -> None:
+    """
+    Auto-configure a tracker after import from Prowlarr.
+
+    This function:
+    1. Syncs categories from tracker API if credentials are available
+    2. Auto-selects matching BBCode templates
+
+    Args:
+        db: Database session
+        tracker: Newly imported tracker
+    """
+    settings = Settings.get_settings(db)
+    # Auto-sync categories if credentials are available
+    if tracker.api_key or tracker.passkey:
+        try:
+            factory = TrackerFactory(
+                db,
+                flaresolverr_url=settings.flaresolverr_url if settings else None
+            )
+            adapter = factory.get_adapter(tracker)
+            categories = await adapter.get_categories()
+            if categories:
+                # Build category mapping from fetched categories
+                category_mapping = {}
+                for cat in categories:
+                    cat_name = cat.get('name', '').lower()
+                    cat_id = cat.get('category_id', '')
+                    # Map common category names
+                    if 'film' in cat_name or 'movie' in cat_name:
+                        category_mapping['movie_category'] = cat_id
+                    elif 'serie' in cat_name or 'séries' in cat_name or 'tv' in cat_name:
+                        category_mapping['tv_category'] = cat_id
+                    elif 'anime' in cat_name or 'animation' in cat_name:
+                        category_mapping['anime_category'] = cat_id
+                    elif 'doc' in cat_name:
+                        category_mapping['documentary_category'] = cat_id
+
+                if category_mapping:
+                    tracker.category_mapping = {**(tracker.category_mapping or {}), **category_mapping}
+                    db.commit()
+                    logger.info(f"Auto-synced {len(category_mapping)} categories for {tracker.name}")
+        except Exception as e:
+            logger.warning(f"Could not auto-sync categories for {tracker.name}: {e}")
+
+    # Auto-select matching BBCode template
+    try:
+        matching_template = db.query(BBCodeTemplate).filter(
+            BBCodeTemplate.name.ilike(f'%{tracker.slug}%')
+        ).first()
+        if matching_template:
+            tracker.default_template_id = matching_template.id
+            logger.info(f"Auto-selected template '{matching_template.name}' for {tracker.name}")
+            db.commit()
+    except Exception as e:
+        logger.warning(f"Could not auto-select templates for {tracker.name}: {e}")
 
 
 @router.get("/status")
@@ -218,23 +278,28 @@ async def import_indexers(
                 continue
 
             try:
-                # Create new tracker
+                # Create new tracker with enriched data from Prowlarr
                 tracker = Tracker(
                     name=tracker_data['name'],
                     slug=tracker_data['slug'],
                     tracker_url=tracker_data['tracker_url'],
                     adapter_type=tracker_data['adapter_type'],
                     requires_cloudflare=tracker_data['requires_cloudflare'],
+                    source_flag=tracker_data.get('source_flag'),
+                    piece_size_strategy=tracker_data.get('piece_size_strategy', 'auto'),
+                    announce_url_template=tracker_data.get('announce_url_template'),
+                    api_key=tracker_data.get('api_key'),
                     enabled=tracker_data['enabled'],
                     upload_enabled=tracker_data['upload_enabled'],
                     priority=tracker_data['priority']
                 )
 
-                # Store Prowlarr metadata in extra field if available
-                # (We'd need to add an extra_config column to Tracker model)
-
                 db.add(tracker)
                 db.commit()
+                db.refresh(tracker)
+
+                # Auto-configure imported tracker (sync categories, select templates)
+                await _auto_configure_tracker(db, tracker)
 
                 imported.append({
                     'id': idx_id,

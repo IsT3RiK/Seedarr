@@ -53,6 +53,36 @@
 
     {% endif %}
 </div>
+
+<!-- Duplicate Check Modal -->
+<div id="dup-modal" style="display: none; position: fixed; inset: 0; z-index: 50; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);" onclick="if(event.target===this)closeDupModal()">
+    <div style="background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 0.75rem; width: 95%; max-width: 40rem; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+        <!-- Modal Header -->
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-primary);">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <svg style="width: 1.25rem; height: 1.25rem; color: var(--accent-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+                <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 0;">Duplicate Check</h3>
+            </div>
+            <button onclick="closeDupModal()" style="background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 0.25rem;" title="Close">
+                <svg style="width: 1.25rem; height: 1.25rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <!-- Modal subtitle (release name) -->
+        <div style="padding: 0.5rem 1.25rem; border-bottom: 1px solid var(--border-primary); background: var(--bg-tertiary);">
+            <span id="dup-modal-title" style="font-size: 0.8125rem; color: var(--text-muted); font-family: monospace; word-break: break-all;"></span>
+        </div>
+        <!-- Modal Body -->
+        <div id="dup-modal-body" style="padding: 1.25rem; overflow-y: auto; flex: 1;"></div>
+        <!-- Modal Footer -->
+        <div style="display: flex; justify-content: flex-end; padding: 0.75rem 1.25rem; border-top: 1px solid var(--border-primary);">
+            <button onclick="closeDupModal()" class="btn-secondary" style="padding: 0.375rem 1rem; font-size: 0.875rem;">Close</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -332,7 +362,7 @@
         if (item.is_dir) {
             actionsCol = '<div style="display:inline-flex;gap:0.375rem"><button onclick="navigateTo(\'' + escapedPath + '\')" class="btn-secondary" style="padding:0.25rem 0.625rem;font-size:0.75rem;display:inline-flex;align-items:center;gap:0.25rem" title="Open folder"><svg style="width:0.875rem;height:0.875rem" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>Open</button><button onclick="scanFile(\'' + escapedPath + '\')" class="btn-primary" style="padding:0.25rem 0.5rem;font-size:0.75rem" title="Scan folder"><svg style="width:0.875rem;height:0.875rem" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></button></div>';
         } else if (item.type === 'video') {
-            actionsCol = '<button onclick="scanFile(\'' + escapedPath + '\')" class="btn-primary" style="padding:0.25rem 0.625rem;font-size:0.75rem;display:inline-flex;align-items:center;gap:0.25rem" title="Scan this video"><svg style="width:0.875rem;height:0.875rem" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>Scan</button>';
+            actionsCol = '<div style="display:inline-flex;gap:0.375rem"><button onclick="checkDuplicate(\'' + escapedPath + '\')" class="btn-secondary" style="padding:0.25rem 0.625rem;font-size:0.75rem;display:inline-flex;align-items:center;gap:0.25rem" title="Check for duplicates on trackers"><svg style="width:0.875rem;height:0.875rem" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>Dup</button><button onclick="scanFile(\'' + escapedPath + '\')" class="btn-primary" style="padding:0.25rem 0.625rem;font-size:0.75rem;display:inline-flex;align-items:center;gap:0.25rem" title="Scan this video"><svg style="width:0.875rem;height:0.875rem" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>Scan</button></div>';
         } else {
             actionsCol = '<span style="color:var(--text-muted);font-size:0.75rem">-</span>';
         }
@@ -352,6 +382,162 @@
             target: '#filemanager-content',
             swap: 'innerHTML'
         });
+    });
+
+    // --- Duplicate Check ---
+    function formatBytes(bytes) {
+        if (!bytes || isNaN(bytes)) return bytes;
+        var b = Number(bytes);
+        if (b < 1024) return b + ' B';
+        if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+        if (b < 1024 * 1024 * 1024) return (b / (1024 * 1024)).toFixed(1) + ' MB';
+        return (b / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    }
+
+    function checkDuplicate(path) {
+        // Open modal immediately with loading state
+        const modal = document.getElementById('dup-modal');
+        const modalBody = document.getElementById('dup-modal-body');
+        const modalTitle = document.getElementById('dup-modal-title');
+
+        // Extract filename for display
+        const filename = path.split(/[/\\]/).pop();
+        const releaseName = filename.replace(/\.[^.]+$/, '');
+        modalTitle.textContent = releaseName;
+
+        modalBody.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; padding: 2rem; gap: 1rem;">
+                <div class="loading-spinner" style="width: 2rem; height: 2rem; border-width: 3px;"></div>
+                <span style="color: var(--text-muted);">Checking duplicates across trackers...</span>
+            </div>
+        `;
+        modal.style.display = 'flex';
+
+        fetch(`/api/filemanager/check-duplicate?path=${encodeURIComponent(path)}`, {
+            method: 'POST'
+        })
+        .then(response => {
+            if (!response.ok) return response.json().then(d => { throw new Error(d.detail || 'Check failed'); });
+            return response.json();
+        })
+        .then(data => {
+            renderDupResults(data);
+        })
+        .catch(error => {
+            modalBody.innerHTML = `
+                <div class="alert alert-error" style="margin: 1rem 0;">
+                    <svg style="width: 1.25rem; height: 1.25rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>${error.message}</span>
+                </div>
+            `;
+        });
+    }
+
+    function buildTorrentRow(torrent, isExact) {
+        let row = '';
+        const bg = isExact ? 'background: var(--status-error)10; border-left: 3px solid var(--status-error);' : '';
+        row += `<div style="display: flex; justify-content: space-between; align-items: center; padding: 0.375rem 0.5rem; font-size: 0.8125rem; border-bottom: 1px solid var(--border-primary); ${bg}">`;
+        row += `<span style="color: var(--text-primary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${torrent.name || ''}">${torrent.name || 'Unknown'}</span>`;
+        row += `<div style="display: flex; gap: 0.75rem; margin-left: 0.75rem; flex-shrink: 0; color: var(--text-muted); font-size: 0.75rem;">`;
+        if (torrent.size_formatted) row += `<span>${torrent.size_formatted}</span>`;
+        else if (torrent.size) row += `<span>${formatBytes(torrent.size)}</span>`;
+        if (torrent.seeders !== undefined) row += `<span style="color: var(--status-success);">S:${torrent.seeders}</span>`;
+        if (torrent.leechers !== undefined) row += `<span style="color: var(--status-error);">L:${torrent.leechers}</span>`;
+        row += `</div></div>`;
+        return row;
+    }
+
+    function renderDupResults(data) {
+        const modalBody = document.getElementById('dup-modal-body');
+        let html = '';
+
+        // Global status badge
+        if (data.has_duplicates) {
+            html += `<div class="alert alert-error" style="margin-bottom: 1rem; padding: 0.75rem 1rem;">
+                <svg style="width: 1.25rem; height: 1.25rem; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <span><strong>${data.total_duplicates_found} duplicate(s)</strong> found on ${data.trackers_with_duplicates} tracker(s)</span>
+            </div>`;
+        } else {
+            html += `<div class="alert alert-success" style="margin-bottom: 1rem; padding: 0.75rem 1rem;">
+                <svg style="width: 1.25rem; height: 1.25rem; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>No duplicates found across ${data.trackers_checked} tracker(s)</span>
+            </div>`;
+        }
+
+        // File info
+        html += `<div style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem;">
+            Release: <strong style="color: var(--text-primary);">${data.release_name}</strong>
+            &nbsp;&middot;&nbsp; Size: <strong>${data.file_size_formatted}</strong>
+        </div>`;
+
+        // Results per tracker
+        const trackers = data.results_by_tracker || {};
+        const trackerNames = Object.keys(trackers);
+
+        if (trackerNames.length === 0) {
+            html += `<div style="color: var(--text-muted); text-align: center; padding: 1rem;">No enabled trackers found. Configure trackers in Settings.</div>`;
+        }
+
+        for (const name of trackerNames) {
+            const t = trackers[name];
+            const statusColor = t.error ? 'var(--text-muted)' : (t.is_duplicate ? 'var(--status-error)' : 'var(--status-success)');
+            const statusIcon = t.error ? '?' : (t.is_duplicate ? '!!' : '&#10003;');
+            const statusText = t.error ? ('Error: ' + t.error) : (t.is_duplicate ? `${t.existing_torrents.length} duplicate(s)` : 'Clean');
+
+            html += `<div class="dashboard-card" style="padding: 0.75rem 1rem; margin-bottom: 0.75rem;">`;
+            html += `<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: ${t.existing_torrents && t.existing_torrents.length > 0 ? '0.75rem' : '0'};">`;
+            html += `<div style="display: flex; align-items: center; gap: 0.5rem;">`;
+            html += `<span style="display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: ${statusColor}; color: white; font-size: 0.75rem; font-weight: 700;">${statusIcon}</span>`;
+            html += `<strong style="color: var(--text-primary);">${name}</strong>`;
+            html += `</div>`;
+            html += `<span class="status-badge" style="padding: 0.125rem 0.5rem; font-size: 0.75rem; background-color: ${statusColor}20; color: ${statusColor}; border: 1px solid ${statusColor}40;">${statusText}</span>`;
+            html += `</div>`;
+
+            // Split torrents into exact matches and others
+            if (t.existing_torrents && t.existing_torrents.length > 0) {
+                const exactMatches = t.existing_torrents.filter(tr => tr.exact_match);
+                const others = t.existing_torrents.filter(tr => !tr.exact_match);
+
+                // Exact matches section
+                if (exactMatches.length > 0) {
+                    html += `<div style="border-top: 2px solid var(--status-error); padding-top: 0.5rem; margin-top: 0.25rem;">`;
+                    html += `<div style="font-size: 0.75rem; font-weight: 600; color: var(--status-error); margin-bottom: 0.375rem;">MEME TAILLE (${exactMatches.length})</div>`;
+                    for (const torrent of exactMatches) {
+                        html += buildTorrentRow(torrent, true);
+                    }
+                    html += `</div>`;
+                }
+
+                // Other results section
+                if (others.length > 0) {
+                    html += `<div style="border-top: 1px solid var(--border-primary); padding-top: 0.5rem; ${exactMatches.length > 0 ? 'margin-top: 0.5rem;' : ''}">`;
+                    html += `<div style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.375rem;">AUTRES RELEASES (${others.length})</div>`;
+                    for (const torrent of others) {
+                        html += buildTorrentRow(torrent, false);
+                    }
+                    html += `</div>`;
+                }
+            }
+
+            html += `</div>`;
+        }
+
+        modalBody.innerHTML = html;
+    }
+
+    function closeDupModal() {
+        document.getElementById('dup-modal').style.display = 'none';
+    }
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeDupModal();
     });
 </script>
 {% endblock %}

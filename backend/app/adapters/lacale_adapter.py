@@ -470,23 +470,30 @@ class LaCaleAdapter(TrackerAdapter):
         tmdb_id: Optional[str] = None,
         imdb_id: Optional[str] = None,
         release_name: Optional[str] = None,
-        quality: Optional[str] = None
+        quality: Optional[str] = None,
+        file_size: Optional[int] = None,
+        **kwargs
     ) -> Dict[str, Any]:
         """
         Check if a release already exists on La Cale tracker.
 
-        Uses cascade search strategy: TMDB ID -> IMDB ID -> Release name
+        Uses cascade search strategy: TMDB ID -> Release name
+        Note: IMDB search is not directly supported by La Cale External API.
 
         Args:
             tmdb_id: TMDB ID to search for
-            imdb_id: IMDB ID to search for
+            imdb_id: IMDB ID (ignored - not supported by API, kept for interface compatibility)
             release_name: Release name to search for
             quality: Quality to filter results (optional)
+            file_size: File size in bytes for exact match detection (optional)
+            **kwargs: Additional arguments (ignored for compatibility)
 
         Returns:
-            Dictionary with is_duplicate, existing_torrents, search_method, message
+            Dictionary with is_duplicate, exact_match, exact_matches, existing_torrents, search_method, message
         """
-        logger.info(f"Checking for duplicates on La Cale: tmdb={tmdb_id}, imdb={imdb_id}, name={release_name}")
+        logger.info(f"Checking for duplicates on La Cale: tmdb={tmdb_id}, name={release_name}")
+        if imdb_id:
+            logger.debug(f"IMDB ID provided ({imdb_id}) but not supported by La Cale API - using TMDB/name search")
 
         # Ensure we have an authenticated session
         if not self.authenticated_session:
@@ -502,49 +509,43 @@ class LaCaleAdapter(TrackerAdapter):
 
             # Strategy 1: Search by TMDB ID (most reliable)
             if tmdb_id:
-                logger.debug(f"Searching by TMDB ID: {tmdb_id}")
+                logger.info(f"🔍 Duplicate check: Searching by TMDB ID: {tmdb_id}")
                 results = await self.client.search_torrents(
                     self.authenticated_session,
-                    query=tmdb_id,
+                    query=str(tmdb_id),  # Ensure string
                     search_type="tmdb"
                 )
+                logger.info(f"🔍 TMDB search returned {len(results) if results else 0} results")
                 if results:
                     existing_torrents = results
                     search_method = "tmdb"
                     logger.info(f"Found {len(results)} torrents by TMDB ID")
+                    for i, t in enumerate(results[:5]):  # Log first 5 results
+                        logger.debug(f"  Result {i+1}: {t.get('name', 'N/A')} (size={t.get('size', 0)}, hash={t.get('info_hash', 'N/A')[:16] if t.get('info_hash') else 'N/A'})")
 
-            # Strategy 2: Search by IMDB ID (fallback)
-            if not existing_torrents and imdb_id:
-                logger.debug(f"Searching by IMDB ID: {imdb_id}")
-                results = await self.client.search_torrents(
-                    self.authenticated_session,
-                    query=imdb_id,
-                    search_type="imdb"
-                )
-                if results:
-                    existing_torrents = results
-                    search_method = "imdb"
-                    logger.info(f"Found {len(results)} torrents by IMDB ID")
-
-            # Strategy 3: Search by release name (final fallback)
+            # Strategy 2: Search by release name (fallback)
+            # Note: IMDB search is no longer supported by La Cale External API
             if not existing_torrents and release_name:
                 # Extract title from release name (remove year, quality, etc.)
                 import re
                 # Simple extraction: take everything before the year
                 title_match = re.match(r'^(.+?)[\.\s]+(19|20)\d{2}', release_name)
                 search_query = title_match.group(1).replace('.', ' ') if title_match else release_name
-                search_query = search_query[:50]  # Limit query length
+                search_query = search_query[:200]  # API limit is 200 chars
 
-                logger.debug(f"Searching by name: {search_query}")
+                logger.info(f"🔍 Duplicate check: Searching by name: '{search_query}' (from release: {release_name[:50]})")
                 results = await self.client.search_torrents(
                     self.authenticated_session,
                     query=search_query,
                     search_type="name"
                 )
+                logger.info(f"🔍 Name search returned {len(results) if results else 0} results")
                 if results:
                     existing_torrents = results
                     search_method = "name"
                     logger.info(f"Found {len(results)} torrents by name search")
+                    for i, t in enumerate(results[:5]):  # Log first 5 results
+                        logger.debug(f"  Result {i+1}: {t.get('name', 'N/A')} (size={t.get('size', 0)})")
 
             # Filter by quality if specified
             if existing_torrents and quality:
@@ -554,16 +555,34 @@ class LaCaleAdapter(TrackerAdapter):
                     existing_torrents = filtered
                     logger.info(f"Filtered to {len(filtered)} torrents matching quality {quality}")
 
+            # Check for exact matches by file size
+            exact_matches = []
+            if existing_torrents and file_size:
+                # Allow 1% tolerance for size comparison
+                tolerance = file_size * 0.01
+                for t in existing_torrents:
+                    torrent_size = t.get('size', 0)
+                    if abs(torrent_size - file_size) <= tolerance:
+                        exact_matches.append(t)
+                if exact_matches:
+                    logger.info(f"Found {len(exact_matches)} exact size matches")
+
             is_duplicate = len(existing_torrents) > 0
-            if is_duplicate:
+            exact_match = len(exact_matches) > 0
+
+            if exact_match:
+                message = f"EXACT MATCH: Found {len(exact_matches)} torrent(s) with same size"
+            elif is_duplicate:
                 message = f"Found {len(existing_torrents)} existing release(s) via {search_method} search"
             else:
                 message = "No duplicates found - safe to upload"
 
-            logger.info(f"Duplicate check result: is_duplicate={is_duplicate}, method={search_method}")
+            logger.info(f"Duplicate check result: is_duplicate={is_duplicate}, exact_match={exact_match}, method={search_method}")
 
             return {
                 'is_duplicate': is_duplicate,
+                'exact_match': exact_match,
+                'exact_matches': exact_matches,
                 'existing_torrents': existing_torrents,
                 'search_method': search_method,
                 'message': message

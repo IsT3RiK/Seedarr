@@ -23,6 +23,7 @@ import logging
 from app.models.settings import Settings
 from app.models.file_entry import FileEntry
 from app.database import get_db
+from app.services.duplicate_check_service import DuplicateCheckService
 
 logger = logging.getLogger(__name__)
 
@@ -515,4 +516,70 @@ async def scan_path(
         raise
     except Exception as e:
         logger.error(f"Error scanning path {path}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/filemanager/check-duplicate")
+async def check_duplicate(
+    request: Request,
+    path: str = Query(..., description="File path to check for duplicates"),
+    db: Session = Depends(get_db)
+):
+    """
+    Check for duplicate releases across all enabled trackers.
+    Extracts release_name from filename and queries each tracker.
+    """
+    try:
+        settings = Settings.get_settings(db)
+
+        # Security check
+        if not is_path_allowed(path, settings):
+            raise HTTPException(status_code=403, detail="Access denied: Path is outside allowed directories")
+
+        target = Path(path)
+        if not target.exists():
+            raise HTTPException(status_code=404, detail=f"Path not found: {path}")
+
+        if not target.is_file():
+            raise HTTPException(status_code=400, detail="Only files can be checked for duplicates")
+
+        if get_file_type(target.name) != 'video':
+            raise HTTPException(status_code=400, detail="Only video files can be checked for duplicates")
+
+        # Extract release_name (filename without extension)
+        release_name = target.stem
+
+        # Get file size
+        file_size = os.stat(path).st_size
+
+        # Check duplicates across all enabled trackers
+        service = DuplicateCheckService(db)
+        result = await service.check_all_trackers(
+            release_name=release_name,
+        )
+
+        # Format torrent sizes and flag exact size matches server-side
+        result_dict = result.to_dict()
+        tolerance = file_size * 0.01  # 1% tolerance
+        for tracker_name, tracker_result in result_dict.get('results_by_tracker', {}).items():
+            for torrent in tracker_result.get('existing_torrents', []):
+                torrent_size = torrent.get('size', 0)
+                if isinstance(torrent_size, (int, float)) and torrent_size:
+                    torrent['size_formatted'] = format_size(int(torrent_size))
+                    torrent['exact_match'] = abs(torrent_size - file_size) <= tolerance
+                else:
+                    torrent['exact_match'] = False
+
+        return {
+            "status": "success",
+            "release_name": release_name,
+            "file_size": file_size,
+            "file_size_formatted": format_size(file_size),
+            **result_dict
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error checking duplicates for {path}: {e}")
         raise HTTPException(status_code=500, detail=str(e))

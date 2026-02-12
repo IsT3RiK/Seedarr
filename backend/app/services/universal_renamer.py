@@ -145,6 +145,8 @@ class UniversalRenamer:
         "aac": "AAC",
         "ac3": "AC3",
         "ac-3": "AC3",
+        "dd": "AC3",
+        "dd5.1": "AC3",
         "eac3": "EAC3",
         "e-ac-3": "EAC3",
         "dd+": "EAC3",
@@ -362,6 +364,7 @@ class UniversalRenamer:
         imax: bool = False,
         edition: Optional[str] = None,
         language_variant: Optional[str] = None,
+        audio_channels: Optional[str] = None,
     ) -> str:
         """
         Format a complete release name from metadata components.
@@ -466,10 +469,13 @@ class UniversalRenamer:
             hdr_components = self._format_hdr_components(hdr)
             components.extend(hdr_components)
 
-        # 12. Audio codec
+        # 12. Audio codec (with channels if provided, e.g. AC3.5.1)
         audio = self.normalize_audio_codec(audio_codec)
         if audio:
-            components.append(audio)
+            if audio_channels:
+                components.append(f"{audio}.{audio_channels}")
+            else:
+                components.append(audio)
 
         # 13. Video codec
         video = self.normalize_video_codec(video_codec)
@@ -573,13 +579,29 @@ class UniversalRenamer:
         # Remove extension
         name = re.sub(r'\.[^.]+$', '', filename)
 
+        # Known codec patterns that end with "-something" and look like team tags
+        # E-AC-3 -> "-3", DTS-HD -> "-HD", AC-3 -> "-3"
+        codec_tail_patterns = [
+            r'E[\-\.]?AC[\-\.]?3$',           # E-AC-3
+            r'DTS[\-\.]?HD(?:[\-\.]?MA)?$',   # DTS-HD, DTS-HD.MA
+            r'AC[\-\.]?3$',                    # AC-3
+        ]
+
         # Pattern 1: Scene format "-TEAM" (no spaces)
         match = re.search(r'-([A-Za-z0-9]+)$', name)
         if match:
-            return match.group(1)
+            # Check if the matched suffix is actually part of a codec
+            # by looking at the full tail of the name including the match
+            tail = name[max(0, match.start() - 10):]  # Get enough context
+            is_false_positive = any(
+                re.search(pattern, tail, re.IGNORECASE)
+                for pattern in codec_tail_patterns
+            )
+            if not is_false_positive:
+                return match.group(1)
 
         # Pattern 2: Space format " - TEAM" or "- TEAM" or " -TEAM"
-        match = re.search(r'\s*-\s*([A-Za-z0-9]+)$', name)
+        match = re.search(r'\s+-\s*([A-Za-z0-9]+)$', name)
         if match:
             return match.group(1)
 

@@ -380,7 +380,7 @@ static_dir = "static" if os.path.exists("static") else "backend/static"
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Register API routes
-from app.api import settings_routes, dashboard_routes, filemanager_routes, tracker_routes, prowlarr_routes, health_routes, batch_routes, statistics_routes, template_routes, presentation_routes
+from app.api import settings_routes, dashboard_routes, filemanager_routes, tracker_routes, prowlarr_routes, health_routes, batch_routes, statistics_routes, template_routes, presentation_routes, wizard_routes, config_schema_routes
 
 # Register settings routes directly (routes already include /api prefix where needed)
 app.include_router(settings_routes.router, tags=["settings"])
@@ -412,11 +412,47 @@ app.include_router(template_routes.router, tags=["templates"])
 # Register presentation generator routes
 app.include_router(presentation_routes.router, tags=["presentations"])
 
-# Root endpoint
+# Register wizard routes
+app.include_router(wizard_routes.router, tags=["wizard"])
+
+# Register config schema routes (YAML editor)
+app.include_router(config_schema_routes.router, tags=["config-schemas"])
+
+# Root endpoint with wizard redirect
 @app.get("/")
 async def root():
-    """Root endpoint redirecting to dashboard page."""
+    """
+    Root endpoint that checks if wizard should be shown.
+
+    If the application has not been configured yet (no trackers, no TMDB, no Prowlarr)
+    and wizard hasn't been completed, redirects to the setup wizard.
+    Otherwise redirects to the dashboard.
+    """
     from fastapi.responses import RedirectResponse
+    from app.database import get_db
+    from app.models.settings import Settings
+    from app.models.tracker import Tracker
+
+    # Check if wizard is needed
+    db = next(get_db())
+    try:
+        settings = Settings.get_settings(db)
+        trackers = Tracker.get_all(db)
+
+        # Show wizard if nothing is configured and wizard not completed
+        if not settings.wizard_completed:
+            needs_wizard = (
+                not settings.prowlarr_url and
+                not trackers and
+                not settings.tmdb_api_key
+            )
+            if needs_wizard:
+                return RedirectResponse(url="/wizard")
+    except Exception as e:
+        logger.warning(f"Error checking wizard status: {e}")
+    finally:
+        db.close()
+
     return RedirectResponse(url="/dashboard")
 
 # Legacy health check endpoint - redirects to /health/detailed

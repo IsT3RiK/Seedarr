@@ -166,18 +166,11 @@ poetry.lock
 pdm.lock
 
 # ------------------------------------------------------------------------------
-# Claude Code (Project Specific)
+# Auto Claude (Project Specific)
 # ------------------------------------------------------------------------------
-# Claude Code settings and data
-.claude/
+# Auto Claude data directory
 .auto-claude/
 nul
-
-# ------------------------------------------------------------------------------
-# Application Data
-# ------------------------------------------------------------------------------
-# Backend data directory (contains SQLite database)
-backend/data/
 
 # ------------------------------------------------------------------------------
 # Miscellaneous

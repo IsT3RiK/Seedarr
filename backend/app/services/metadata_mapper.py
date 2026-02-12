@@ -63,9 +63,9 @@ class MetadataMapper:
 
     # Resolution patterns
     RESOLUTION_PATTERNS = {
-        '2160p': [r'2160p', r'4k', r'uhd'],
-        '1080p': [r'1080p', r'1080i'],
-        '720p': [r'720p'],
+        '2160p': [r'2160p', r'\b2160\b', r'4k', r'uhd'],
+        '1080p': [r'1080p', r'1080i', r'\b1080\b'],
+        '720p': [r'720p', r'\b720\b'],
         '576p': [r'576p', r'576i'],
         '480p': [r'480p', r'480i'],
     }
@@ -116,8 +116,8 @@ class MetadataMapper:
         'DTS-HD MA': [r'dts[\-\.]?hd[\-\.]?ma', r'dts[\-\.]?hdma'],
         'DTS-HD': [r'dts[\-\.]?hd'],
         'DTS': [r'\bdts\b'],
-        'DD+': [r'dd[\+p]', r'ddp', r'e[\-\.]?ac[\-\.]?3', r'eac3'],
-        'DD5.1': [r'dd5[\.\s]?1', r'ac[\-\.]?3[\-\.]?5[\.\s]?1', r'ac3'],
+        'EAC3': [r'dd[\+p]', r'ddp', r'e[\-\.]?ac[\-\.]?3', r'eac3'],
+        'AC3': [r'dd5[\.\s]?1', r'ac[\-\.]?3[\-\.]?5[\.\s]?1', r'ac3'],
         'AAC': [r'\baac\b'],
         'FLAC': [r'\bflac\b'],
         'MP3': [r'\bmp3\b'],
@@ -331,6 +331,7 @@ class MetadataMapper:
         - "The.Hangover.Part.III.2013.VFF.1080p.BluRay.AC3.x265-HD2.mkv"
         - "Movie Title 2024 1080p WEB-DL"
         - "Show.Name.S01E05.720p.HDTV"
+        - "1917 (2019) VFF BLURAY HDRIP 1080 HEVC E-AC-3.mkv"  (numeric title)
 
         Args:
             filename: Filename to parse
@@ -344,16 +345,53 @@ class MetadataMapper:
         # Replace dots and underscores with spaces for easier parsing
         name_spaced = re.sub(r'[._]', ' ', name)
 
-        # Try to find year (4 digits between 1900-2099)
-        year_match = re.search(r'\b(19\d{2}|20\d{2})\b', name_spaced)
         year = None
         title = None
 
-        if year_match:
-            year = int(year_match.group(1))
-            # Title is everything before the year
-            title = name_spaced[:year_match.start()].strip()
-        else:
+        # Strategy 1: Year in parentheses - most reliable (e.g., "1917 (2019)")
+        paren_match = re.search(r'\((\d{4})\)', name_spaced)
+        if paren_match:
+            candidate_year = int(paren_match.group(1))
+            if 1900 <= candidate_year <= 2099:
+                year = candidate_year
+                # Title is everything before the opening parenthesis
+                title = name_spaced[:paren_match.start()].strip()
+
+        # Strategy 2: Year NOT at position 0 (avoid matching numeric titles like "1917")
+        if not year:
+            for year_match in re.finditer(r'\b(19\d{2}|20\d{2})\b', name_spaced):
+                if year_match.start() > 0:
+                    candidate_title = name_spaced[:year_match.start()].strip()
+                    if candidate_title:
+                        year = int(year_match.group(1))
+                        title = candidate_title
+                        break
+
+        # Strategy 3: Year at position 0, but followed by another year (e.g., "1917 2019 ...")
+        if not year:
+            all_years = list(re.finditer(r'\b(19\d{2}|20\d{2})\b', name_spaced))
+            if len(all_years) >= 2:
+                # First match is likely the title, second is the year
+                year = int(all_years[1].group(1))
+                title = name_spaced[:all_years[1].start()].strip()
+            elif len(all_years) == 1:
+                # Single year-like number - check if it's followed by technical indicators
+                # which would suggest it's a title, not a year
+                after_match = name_spaced[all_years[0].end():].strip()
+                technical_after = re.match(
+                    r'(FRENCH|MULTI|VFF|VFQ|VOSTFR|TRUEFRENCH|'
+                    r'BluRay|WEB|HDTV|HDRip|1080p?|720p?|2160p?|'
+                    r'x264|x265|HEVC|REMUX|REPACK)\b',
+                    after_match, re.IGNORECASE
+                )
+                if technical_after and all_years[0].start() == 0:
+                    # Year-like number at start followed by technical info = numeric title, no year
+                    title = all_years[0].group(1)
+                else:
+                    year = int(all_years[0].group(1))
+                    title = name_spaced[:all_years[0].start()].strip()
+
+        if not year and not title:
             # No year found, try to find first technical indicator
             # Common indicators: resolution, language, source, codec
             indicators = [
@@ -379,6 +417,8 @@ class MetadataMapper:
 
         # Clean up title
         if title:
+            # Remove parentheses left over from year extraction (e.g., "1917 (")
+            title = re.sub(r'[\(\)]+', '', title)
             # Remove trailing dashes, dots, spaces
             title = re.sub(r'[\s.\-]+$', '', title)
             # Remove double spaces
@@ -605,9 +645,9 @@ class MetadataMapper:
             else:
                 parsed['audio'] = 'DTS'
         elif 'e-ac-3' in audio_format or 'eac3' in audio_codec:
-            parsed['audio'] = 'DD+'
+            parsed['audio'] = 'EAC3'
         elif 'ac-3' in audio_format or 'ac3' in audio_codec:
-            parsed['audio'] = 'DD5.1'
+            parsed['audio'] = 'AC3'
         elif 'aac' in audio_format:
             parsed['audio'] = 'AAC'
         elif 'flac' in audio_format:

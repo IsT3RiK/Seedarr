@@ -156,7 +156,13 @@ class DuplicateCheckService:
 
         # Get adapter
         try:
-            adapter = await TrackerFactory.create_adapter(tracker, self.db)
+            from app.models.settings import Settings
+            settings = Settings.get_settings(self.db)
+            factory = TrackerFactory(
+                self.db,
+                flaresolverr_url=settings.flaresolverr_url
+            )
+            adapter = factory.get_adapter(tracker)
         except Exception as e:
             logger.error(f"Failed to create adapter for tracker {tracker.name}: {e}")
             return DuplicateResult(

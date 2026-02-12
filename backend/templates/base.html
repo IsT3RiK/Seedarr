@@ -168,6 +168,59 @@
             margin-right: 0.75rem;
         }
 
+        /* Nav Divider */
+        .nav-divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 0.75rem 1.5rem;
+        }
+
+        /* Nav Sections (Collapsible) */
+        .nav-section {
+            margin: 0.25rem 0;
+        }
+
+        .nav-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: 0.5rem 1.5rem;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .nav-section-header:hover {
+            color: var(--text-primary);
+        }
+
+        .nav-section-arrow {
+            width: 16px;
+            height: 16px;
+            transition: transform 0.2s ease;
+        }
+
+        .nav-section.collapsed .nav-section-arrow {
+            transform: rotate(-90deg);
+        }
+
+        .nav-section-content {
+            max-height: 500px;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .nav-section.collapsed .nav-section-content {
+            max-height: 0;
+        }
+
         .main-container {
             flex: 1;
             display: flex;
@@ -292,6 +345,7 @@
             </div>
 
             <nav class="sidebar-nav">
+                <!-- Main Section -->
                 <a href="/dashboard" class="nav-item {% if request.url.path == '/dashboard' %}active{% endif %}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
@@ -313,55 +367,98 @@
                     File Manager
                 </a>
 
-                <a href="/history" class="nav-item {% if request.url.path == '/history' %}active{% endif %}">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    History
-                </a>
+                <!-- Divider -->
+                <div class="nav-divider"></div>
 
-                <a href="/settings" class="nav-item {% if request.url.path == '/settings' %}active{% endif %}">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    </svg>
-                    Settings
-                </a>
+                <!-- Configuration Section -->
+                <div class="nav-section">
+                    <button class="nav-section-header" onclick="toggleSection('config')">
+                        <span>Configuration</span>
+                        <svg class="nav-section-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="nav-section-content" id="config-section">
+                        <a href="/settings" class="nav-item {% if request.url.path == '/settings' %}active{% endif %}">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                            Settings
+                        </a>
 
-                <a href="/trackers" class="nav-item {% if request.url.path == '/trackers' %}active{% endif %}">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
-                    </svg>
-                    Trackers
-                </a>
+                        <a href="/trackers" class="nav-item {% if request.url.path == '/trackers' %}active{% endif %}">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
+                            </svg>
+                            Trackers
+                        </a>
 
-                <a href="/statistics" class="nav-item {% if request.url.path == '/statistics' %}active{% endif %}">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                    </svg>
-                    Statistics
-                </a>
+                        <a href="/config-schemas" class="nav-item {% if request.url.path == '/config-schemas' %}active{% endif %}">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            Config Schemas
+                        </a>
+                    </div>
+                </div>
 
-                <a href="/templates" class="nav-item {% if request.url.path == '/templates' %}active{% endif %}">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
-                    </svg>
-                    Templates
-                </a>
+                <!-- Content Section -->
+                <div class="nav-section">
+                    <button class="nav-section-header" onclick="toggleSection('content')">
+                        <span>Content</span>
+                        <svg class="nav-section-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="nav-section-content" id="content-section">
+                        <a href="/templates" class="nav-item {% if request.url.path == '/templates' %}active{% endif %}">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                            </svg>
+                            Templates
+                        </a>
 
-                <a href="/presentations" class="nav-item {% if request.url.path == '/presentations' %}active{% endif %}">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
-                    </svg>
-                    Presentations
-                </a>
+                        <a href="/presentations" class="nav-item {% if request.url.path == '/presentations' %}active{% endif %}">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
+                            </svg>
+                            Presentations
+                        </a>
+                    </div>
+                </div>
 
-                <a href="/logs" class="nav-item {% if request.url.path == '/logs' %}active{% endif %}">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    Logs
-                </a>
+                <!-- Monitoring Section -->
+                <div class="nav-section">
+                    <button class="nav-section-header" onclick="toggleSection('monitoring')">
+                        <span>Monitoring</span>
+                        <svg class="nav-section-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="nav-section-content" id="monitoring-section">
+                        <a href="/history" class="nav-item {% if request.url.path == '/history' %}active{% endif %}">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            History
+                        </a>
+
+                        <a href="/statistics" class="nav-item {% if request.url.path == '/statistics' %}active{% endif %}">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            Statistics
+                        </a>
+
+                        <a href="/logs" class="nav-item {% if request.url.path == '/logs' %}active{% endif %}">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            Logs
+                        </a>
+                    </div>
+                </div>
             </nav>
 
             <div class="p-4 border-t border-gray-700">
@@ -456,6 +553,37 @@
                 const newTheme = e.matches ? 'dark' : 'light';
                 document.documentElement.setAttribute('data-theme', newTheme);
             }
+        });
+
+        // Collapsible Sections Management
+        function toggleSection(sectionName) {
+            const section = document.querySelector(`#${sectionName}-section`).parentElement;
+            section.classList.toggle('collapsed');
+
+            // Save state to localStorage
+            const collapsedSections = JSON.parse(localStorage.getItem('collapsedSections') || '[]');
+            if (section.classList.contains('collapsed')) {
+                if (!collapsedSections.includes(sectionName)) {
+                    collapsedSections.push(sectionName);
+                }
+            } else {
+                const index = collapsedSections.indexOf(sectionName);
+                if (index > -1) {
+                    collapsedSections.splice(index, 1);
+                }
+            }
+            localStorage.setItem('collapsedSections', JSON.stringify(collapsedSections));
+        }
+
+        // Restore collapsed state on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const collapsedSections = JSON.parse(localStorage.getItem('collapsedSections') || '[]');
+            collapsedSections.forEach(function(sectionName) {
+                const section = document.querySelector(`#${sectionName}-section`);
+                if (section) {
+                    section.parentElement.classList.add('collapsed');
+                }
+            });
         });
     </script>
 

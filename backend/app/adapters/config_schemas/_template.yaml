@@ -1,6 +1,17 @@
-# Tracker Configuration Template
+# ============================================================================
+# TRACKER CONFIGURATION TEMPLATE - Config-Driven v2.0
+# ============================================================================
+#
 # Copy this file and rename to your_tracker.yaml
 # Fill in your tracker's specific API details
+#
+# This template demonstrates all available features:
+# - Mappings: Value conversion tables (zero Python logic)
+# - Workflow: Multi-step request chains (GET CSRF -> POST upload)
+# - Dynamic Sources: Fetch categories/tags from API
+# - Legacy Support: Backwards compatible with v1.0 configs
+#
+# ============================================================================
 
 # ============================================================================
 # TRACKER IDENTITY (Required)
@@ -18,8 +29,8 @@ tracker:
 # Option 1: Bearer Token (most common for APIs)
 auth:
   type: "bearer"
-  header: "Authorization"
-  prefix: "Bearer "
+  header: "Authorization"      # HTTP header name
+  prefix: "Bearer "            # Prefix before the token
 
 # Option 2: API Key in custom header
 # auth:
@@ -29,39 +40,257 @@ auth:
 # Option 3: Passkey in URL
 # auth:
 #   type: "passkey"
-#   passkey_param: "passkey"
+#   passkey_param: "passkey"   # URL parameter name
+
+# Option 4: No authentication
+# auth:
+#   type: "none"
 
 # ============================================================================
 # CLOUDFLARE BYPASS (Optional)
 # ============================================================================
 cloudflare:
   enabled: false              # Set to true if tracker uses Cloudflare
-  service: "flaresolverr"
-  timeout: 60000
+  service: "flaresolverr"     # FlareSolverr service for bypass
+  timeout: 60000              # Timeout in milliseconds
+  # use_requests_session: true  # Use requests.Session for full Cloudflare bypass
+                              # (avoids cookie transfer issues with httpx)
 
 # ============================================================================
 # API ENDPOINTS (Required)
 # ============================================================================
 endpoints:
   base: "/api"                # Base path for all endpoints
-  upload: "/api/torrents"     # Upload endpoint
+  upload: "/api/torrents"     # Upload endpoint (required)
   categories: "/api/categories"
   tags: "/api/tags"
   search: "/api/torrents/search"
   health: "/api/health"
 
 # ============================================================================
-# UPLOAD CONFIGURATION (Required)
+# MAPPINGS - Value Conversion Tables (New in v2.0)
 # ============================================================================
+# Mappings are pure lookup tables with NO conditional logic.
+# The ConfigAdapter simply looks up input values in the table.
+#
+# Each mapping defines:
+# - input_field: Where to get the source value (from file_entry or kwargs)
+# - output_field: What field name to output
+# - values: The mapping table (input -> output)
+# - default: Value if input is None
+# - fallback: Value if no mapping match found
+# - multi: Set to true if input can be a list (e.g., languages)
+
+mappings:
+  # Resolution mapping example
+  resolution:
+    input_field: "resolution"        # Source field
+    output_field: "resolution_id"    # Output field name
+    default: "2"                     # Default if input is None
+    values:
+      "2160p": "1"
+      "4k": "1"
+      "uhd": "1"
+      "1080p": "2"
+      "1080i": "3"
+      "720p": "5"
+      "480p": "6"
+      "sd": "6"
+    fallback: "10"                   # If no match found
+
+  # Source type mapping
+  source_type:
+    input_field: "source"
+    output_field: "type_id"
+    default: "2"
+    values:
+      "bluray": "1"
+      "remux": "1"
+      "web-dl": "2"
+      "webrip": "5"
+      "hdtv": "4"
+      "dvdrip": "6"
+    fallback: "10"
+
+  # Category based on media type
+  category:
+    input_field: "media_type"
+    output_field: "category"
+    values:
+      "movie": "Films"
+      "tv": "Series"
+      "anime": "Animation"
+    fallback: "Films"
+
+  # Multi-value mapping example (languages)
+  language:
+    input_field: "languages"         # Input is a list
+    output_field: "language_ids"
+    multi: true                      # Supports multiple values
+    values:
+      "french": "1"
+      "english": "2"
+      "multi": "3"
+      "vostfr": "4"
+    fallback: "1"
+
+# ============================================================================
+# WORKFLOW - Request Chain (New in v2.0)
+# ============================================================================
+# Workflow defines a sequence of HTTP requests.
+# Use this for:
+# - Simple uploads (single POST)
+# - CSRF token flows (GET form -> POST upload)
+# - Multi-step uploads
+#
+# Each step can:
+# - Extract values from responses (json, html, cookie, header)
+# - Inject values from previous steps
+# - Build different body types (multipart, json, form)
+
+workflow:
+  # Step 1: Simple upload (single step)
+  - name: "upload"
+    method: "POST"                   # GET, POST, PUT, PATCH, DELETE
+    url: "{tracker_url}/api/torrents/upload"
+    type: "multipart"                # multipart, json, form
+    fields:
+      # File field
+      torrent_file:
+        source: "torrent_data"       # From context
+        type: "file"
+        filename: "{release_name}.torrent"
+        name: "torrent_file"         # API field name
+        required: true
+
+      # Optional NFO file
+      nfo:
+        source: "nfo_data"
+        type: "file"
+        filename: "{release_name}.nfo"
+        name: "nfo"
+        required: false
+
+      # String field
+      title:
+        source: "release_name"
+        type: "string"
+        name: "title"
+        required: true
+        sanitize:                    # Optional sanitization
+          replace_spaces: "."
+          max_length: 255
+
+      # Field from mappings
+      resolution_id:
+        source: "resolution_id"      # Resolved via mappings.resolution
+        type: "string"
+        name: "resolution_id"
+        required: true
+
+      # JSON field
+      options:
+        source: "options"
+        type: "json"
+        name: "options"
+        required: false
+
+      # Boolean field
+      is_anonymous:
+        source: "is_anonymous"
+        type: "boolean"
+        name: "is_anonymous"
+        default: false
+
+      # Repeated field (multiple values with same key)
+      tags:
+        source: "tag_ids"
+        type: "repeated"
+        name: "tags[]"               # Sends: tags[]=1&tags[]=2&tags[]=3
+        required: false
+
+# ============================================================================
+# WORKFLOW WITH CSRF TOKEN (Multi-step example)
+# ============================================================================
+# Uncomment this section for trackers requiring CSRF tokens:
+#
+# workflow:
+#   # Step 1: GET upload form to extract CSRF token
+#   - name: "get_csrf"
+#     method: "GET"
+#     url: "{tracker_url}/upload"
+#     extract:
+#       - name: "csrf_token"
+#         from: "html"               # json, html, cookie, header
+#         selector: "input[name='_token']"
+#         attribute: "value"
+#       - name: "session_cookie"
+#         from: "cookie"
+#         cookie_name: "session"
+#
+#   # Step 2: POST upload with extracted token
+#   - name: "upload"
+#     method: "POST"
+#     url: "{tracker_url}/upload"
+#     type: "multipart"
+#     inject:                        # Inject values from previous steps
+#       - field: "_token"
+#         value: "{csrf_token}"
+#       - field: "Cookie"
+#         header: true               # Inject as header
+#         value: "session={session_cookie}"
+#     fields:
+#       # ... field definitions
+
+# ============================================================================
+# DYNAMIC SOURCES - Fetch from API (New in v2.0)
+# ============================================================================
+# Dynamic sources fetch data from the tracker API with caching.
+# Use this to get categories, tags, resolutions, etc. dynamically.
+
+dynamic_sources:
+  categories:
+    endpoint: "/api/categories"      # API endpoint
+    method: "GET"
+    cache_ttl: 3600                  # Cache for 1 hour (seconds)
+    response:
+      path: "data"                   # JSON path to items array
+      id_field: "id"                 # Field containing ID
+      name_field: "name"             # Field containing name
+
+  tags:
+    endpoint: "/api/tags"
+    method: "GET"
+    cache_ttl: 3600
+    response:
+      path: "data"
+      id_field: "id"
+      name_field: "name"
+      group_field: "category"        # Optional grouping field
+
+  # Resolutions from API
+  # resolutions:
+  #   endpoint: "/api/resolutions"
+  #   method: "GET"
+  #   cache_ttl: 86400               # Cache 24 hours
+  #   response:
+  #     path: "data"
+  #     id_field: "id"
+  #     name_field: "label"
+
+# ============================================================================
+# LEGACY UPLOAD CONFIG (For backwards compatibility)
+# ============================================================================
+# This section is used if no workflow is defined.
+# Keep this for backwards compatibility with existing code.
+
 upload:
   method: "POST"
   content_type: "multipart/form-data"
 
-  # Map internal field names to API field names
-  # Available types: file, string, json, boolean, repeated, number
   fields:
     torrent:
-      name: "torrent"         # API field name
+      name: "torrent"
       type: "file"
       required: true
 
@@ -73,9 +302,9 @@ upload:
     title:
       name: "title"
       type: "string"
-      source: "release_name"  # Where to get the value
+      source: "release_name"
       sanitize:
-        replace_spaces: "."   # Optional: replace spaces
+        replace_spaces: "."
         max_length: 255
 
     category:
@@ -84,21 +313,11 @@ upload:
       source: "category_id"
       required: true
 
-    # Add more fields as needed:
+    # More field examples:
     # subcategory:
     #   name: "subcategoryId"
     #   type: "string"
     #   source: "subcategory_id"
-    #
-    # description:
-    #   name: "description"
-    #   type: "string"
-    #   source: "description"
-    #
-    # tmdb_data:
-    #   name: "tmdbData"
-    #   type: "json"
-    #   source: "tmdb_data"
     #
     # options:
     #   name: "options"
@@ -106,26 +325,28 @@ upload:
     #   source: "options"
     #
     # tags:
-    #   name: "tags[]"        # Use [] for repeated fields
+    #   name: "tags[]"
     #   type: "repeated"
     #   source: "tag_ids"
 
 # ============================================================================
-# OPTIONS MAPPING (Optional - for trackers with options system)
+# LEGACY OPTIONS MAPPING (For backwards compatibility)
 # ============================================================================
+# Use this section for trackers with complex option systems (like C411).
+# The OptionsMapper will be used if this section exists.
+# For simpler trackers, use the mappings section instead.
+
 options:
-  # Language mapping
   language:
-    type: "1"                 # Option type ID used by tracker API
+    type: "1"                        # Option type ID in API
     multi_select: true
-    default: [1]              # Default value(s)
+    default: [1]
     mappings:
       english: 1
       french: 2
       multi: 4
       vostfr: 8
 
-  # Quality mapping
   quality:
     type: "2"
     multi_select: false
@@ -141,7 +362,7 @@ options:
       1080p: 25
       720p: 24
 
-  # Genre mapping (from TMDB genre IDs)
+  # Genre mapping from TMDB IDs
   # genre:
   #   type: "5"
   #   multi_select: true
@@ -149,6 +370,10 @@ options:
   #     28: 39    # Action
   #     35: 49    # Comedy
   #     18: 57    # Drama
+  #   name_mappings:
+  #     action: 39
+  #     comedy: 49
+  #     drama: 57
 
   # Season/Episode for TV shows
   # season:
@@ -163,29 +388,187 @@ options:
   #   max_value: 116
 
 # ============================================================================
-# CATEGORY MAPPING (Optional)
+# CATEGORY CONFIGURATION
 # ============================================================================
 categories:
+  # Main categories
+  movie_category: "1"
+  tv_category: "2"
+  anime_category: "3"
+  documentary_category: "4"
+
+  # Resolution-specific mappings
   movie_4k: "1"
   movie_1080p: "2"
   movie_720p: "3"
   tv_1080p: "4"
   tv_720p: "5"
-  # movie_category: "1"       # Parent category ID
-  # tv_category: "2"
 
 # ============================================================================
-# TORRENT GENERATION (Optional)
+# TORRENT GENERATION
 # ============================================================================
 torrent:
-  piece_size_strategy: "auto"  # auto | c411 | standard
-  source_flag: "MYTRACKER"     # Makes torrent hash unique per tracker
+  piece_size_strategy: "auto"        # auto | c411 | standard
+  source_flag: "MYTRACKER"           # Makes torrent hash unique per tracker
 
 # ============================================================================
-# RESPONSE PARSING (Optional)
+# RESPONSE PARSING
 # ============================================================================
 response:
-  success_field: "success"
-  error_field: "error"
-  torrent_id_field: "data.id"
+  success_field: "success"           # Path to success boolean
+  error_field: "error"               # Path to error message
+  torrent_id_field: "data.id"        # Path to torrent ID (dot notation)
   torrent_url_template: "{tracker_url}/torrent/{torrent_id}"
+  # format: "json"                   # Response format: "json" (default) or "torznab_xml"
+
+  # For nested upload response (e.g., La Cale format):
+  # upload:
+  #   success_field: "data.success"
+  #   error_field: "data.error"
+  #   torrent_id_field: "data.torrent_id"
+
+# ============================================================================
+# SEARCH / DUPLICATE CHECK (New in v2.0)
+# ============================================================================
+# search:
+#   default_query: "FRENCH"          # Default search query for duplicate checks
+#   params:
+#     query_param: "q"              # Query parameter name
+#     imdb_param: "imdbId"          # IMDB ID parameter
+#     tmdb_param: "tmdbId"          # TMDB ID parameter
+#   response:
+#     format: "json"                # "json" or "torznab_xml"
+#     results_path: "data"          # JSON path to results array
+#     title_field: "name"           # Field containing result title
+#     size_field: "size"            # Field containing file size
+
+# ============================================================================
+# SANITIZATION PIPELINE (New in v2.0)
+# ============================================================================
+# Pipeline of operations applied to release_name before upload.
+# Operations run in order.
+#
+# sanitize:
+#   operations:
+#     - type: "replace_spaces"
+#       replacement: "."             # Replace spaces with dots
+#     - type: "remove_pattern"
+#       pattern: "\\(.*?\\)"         # Remove parentheses and content
+#     - type: "remove_pattern"
+#       pattern: "\\[.*?\\]"         # Remove brackets and content
+#     - type: "collapse_dots"        # Replace multiple dots with single dot
+#     - type: "strip_dots"           # Remove leading/trailing dots
+#     - type: "max_length"
+#       max: 255                     # Truncate to max length
+#     - type: "lowercase"            # Convert to lowercase
+#     - type: "uppercase"            # Convert to uppercase
+
+# ============================================================================
+# VALIDATION (New in v2.0)
+# ============================================================================
+# Validates upload data before sending. Prevents bad uploads.
+#
+# validation:
+#   torrent_data:
+#     required: true
+#     min_length: 100                # Minimum file size in bytes
+#   nfo_data:
+#     required: false
+#   release_name:
+#     required: true
+#     min_length: 5
+#     max_length: 255
+#     pattern: "^[\\w\\.\\-\\s]+"    # Regex pattern for valid names
+#   category_id:
+#     required: true
+
+# ============================================================================
+# RATE LIMITING (New in v2.0)
+# ============================================================================
+# Token-bucket rate limiter. Prevents API abuse and bans.
+#
+# rate_limiting:
+#   upload:
+#     max_tokens: 3                  # Max burst requests
+#     refill_rate: 0.05              # Tokens per second (1 every 20s)
+#   search:
+#     max_tokens: 5
+#     refill_rate: 0.2               # 1 every 5s
+#   categories:
+#     max_tokens: 2
+#     refill_rate: 0.1
+
+# ============================================================================
+# TMDB DATA BUILDER (New in v2.0)
+# ============================================================================
+# Defines how to map TMDB API data to tracker-specific fields.
+# ConfigAdapter.build_tmdb_data() reads this to construct the payload.
+#
+# tmdb_data:
+#   movie:
+#     title: "title"                 # TMDB field -> tracker field
+#     original_title: "original_title"
+#     year: "release_date"           # Auto-extracts year from date
+#     overview: "overview"
+#     poster: "poster_path"          # Auto-prepends TMDB image URL
+#     backdrop: "backdrop_path"
+#     genres: "genres"               # Auto-maps genre objects to names
+#     runtime: "runtime"
+#     vote_average: "vote_average"
+#     imdb_id: "imdb_id"
+#     tmdb_id: "id"
+#   tv:
+#     title: "name"
+#     original_title: "original_name"
+#     year: "first_air_date"
+#     overview: "overview"
+#     poster: "poster_path"
+#     backdrop: "backdrop_path"
+#     genres: "genres"
+#     seasons: "number_of_seasons"
+#     episodes: "number_of_episodes"
+#     status: "status"
+#     vote_average: "vote_average"
+#     tmdb_id: "id"
+
+# ============================================================================
+# PROWLARR INTEGRATION (New in v2.0)
+# ============================================================================
+# Allows Prowlarr imports to auto-match this YAML config.
+# When a Prowlarr indexer matches, Seedarr knows how to upload to it.
+#
+# prowlarr:
+#   definitions:                     # Prowlarr definitionName values
+#     - "mytracker"
+#     - "my-tracker"
+#   url_patterns:                    # Patterns found in tracker URL
+#     - "mytracker"
+#     - "my-tracker.org"
+#   auto_config:                     # Config applied on import
+#     source_flag: "MYTRACKER"       # Torrent source flag
+#     piece_size_strategy: "auto"    # Piece size strategy
+#     requires_cloudflare: false     # Whether Cloudflare bypass is needed
+
+# ============================================================================
+# VERIFICATION CHECKLIST
+# ============================================================================
+# Use this checklist to verify your configuration:
+#
+# [ ] Tracker section has name and slug
+# [ ] Auth section matches tracker's authentication method
+# [ ] Endpoints.upload is defined
+# [ ] Either workflow OR upload.fields is defined
+# [ ] Required fields in upload have required: true
+# [ ] Mappings have input_field and values
+# [ ] Dynamic sources have endpoint and response config
+# [ ] Response parsing matches API response format
+# [ ] Prowlarr definitions match Prowlarr indexer names (for auto-import)
+# [ ] Validation section covers required upload fields
+# [ ] Rate limiting is set to avoid API bans
+# [ ] Sanitize operations match tracker naming conventions
+# [ ] Search section configured for duplicate detection
+#
+# Test endpoints (via Seedarr UI):
+#   POST /api/config-schemas/{slug}/test-auth    - Test authentication
+#   POST /api/config-schemas/{slug}/test-search  - Test search/duplicate check
+#   POST /api/config-schemas/{slug}/test-upload   - Dry-run upload (validate only)

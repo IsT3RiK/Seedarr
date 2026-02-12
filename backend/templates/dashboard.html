@@ -5,6 +5,9 @@
 
 {% block content %}
 <div class="dashboard-container">
+    <!-- Configuration Alerts -->
+    <div id="config-alerts" class="mb-4"></div>
+
     <!-- Dashboard Header with Action Button -->
     <div class="dashboard-header">
         <div class="flex justify-between items-center">
@@ -403,5 +406,113 @@
             margin: 0.5rem 0;
         }
     }
+
+    /* Config alerts styling */
+    .config-alert {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+        gap: 1rem;
+    }
+
+    .config-alert-content {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex: 1;
+    }
+
+    .config-alert-icon {
+        flex-shrink: 0;
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    .config-alert-error {
+        background-color: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: #fca5a5;
+    }
+
+    .config-alert-warning {
+        background-color: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        color: #fcd34d;
+    }
+
+    .config-alert-info {
+        background-color: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        color: #93c5fd;
+    }
+
+    .config-alert .btn-fix {
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-decoration: none;
+        white-space: nowrap;
+        background-color: rgba(255, 255, 255, 0.1);
+        color: inherit;
+        border: 1px solid currentColor;
+        transition: all 0.2s ease;
+    }
+
+    .config-alert .btn-fix:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .mb-4 {
+        margin-bottom: 1rem;
+    }
 </style>
+
+<script>
+    // Load configuration alerts on page load
+    async function loadConfigAlerts() {
+        try {
+            const resp = await fetch('/health/config-status');
+            const data = await resp.json();
+
+            if (data.issues_count > 0) {
+                const container = document.getElementById('config-alerts');
+                const html = data.issues.map(issue => {
+                    const alertClass = issue.type === 'error' ? 'config-alert-error' :
+                                       issue.type === 'warning' ? 'config-alert-warning' :
+                                       'config-alert-info';
+
+                    const iconSvg = issue.type === 'error' ?
+                        '<svg class="config-alert-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' :
+                        issue.type === 'warning' ?
+                        '<svg class="config-alert-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>' :
+                        '<svg class="config-alert-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+
+                    const fixButton = issue.fix_url ?
+                        `<a href="${issue.fix_url}" class="btn-fix">Configurer</a>` : '';
+
+                    return `
+                        <div class="config-alert ${alertClass}">
+                            <div class="config-alert-content">
+                                ${iconSvg}
+                                <span><strong>${issue.component}:</strong> ${issue.message}</span>
+                            </div>
+                            ${fixButton}
+                        </div>
+                    `;
+                }).join('');
+
+                container.innerHTML = html;
+            }
+        } catch (error) {
+            console.error('Failed to load config status:', error);
+        }
+    }
+
+    // Load alerts when DOM is ready
+    document.addEventListener('DOMContentLoaded', loadConfigAlerts);
+</script>
 {% endblock %}

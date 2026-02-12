@@ -381,21 +381,35 @@ class ProwlarrClient:
         # Generate slug from definition name or name
         definition = indexer.get('definitionName', '')
         name = indexer.get('name', 'Unknown')
-        slug = definition or name.lower().replace(' ', '-').replace('.', '')
 
-        # Determine adapter type (we'll need to map known trackers)
-        adapter_type = self._determine_adapter_type(definition)
+        # Determine adapter type (check both definition and name)
+        adapter_type = self._determine_adapter_type(definition, name)
+
+        # Generate slug from definition or name
+        slug = self._match_yaml_slug(definition, name)
+        if not slug:
+            slug = definition.lower().replace(' ', '-') if definition else name.lower().replace(' ', '-').replace('.', '')
+
+        # Get tracker-specific config from matching YAML
+        tracker_config = self._get_tracker_config(adapter_type, definition, name)
 
         # Extract capabilities
         capabilities = indexer.get('capabilities', {})
         categories_caps = capabilities.get('categories', [])
+
+        # Extract API key from Prowlarr fields
+        api_key = self._extract_api_key(indexer)
 
         return {
             'name': name,
             'slug': slug,
             'tracker_url': base_url,
             'adapter_type': adapter_type,
-            'requires_cloudflare': indexer.get('privacy') == 'private',
+            'requires_cloudflare': tracker_config.get('requires_cloudflare', False),
+            'source_flag': tracker_config.get('source_flag'),
+            'piece_size_strategy': tracker_config.get('piece_size_strategy', 'auto'),
+            'announce_url_template': tracker_config.get('announce_url_template'),
+            'api_key': api_key,
             'enabled': indexer.get('enable', False),
             'upload_enabled': False,  # Default to false, user must enable
             'priority': 100,  # Default priority
@@ -410,33 +424,186 @@ class ProwlarrClient:
             }
         }
 
-    def _determine_adapter_type(self, definition_name: str) -> str:
+    def _determine_adapter_type(self, definition_name: str, indexer_name: str = '') -> str:
         """
-        Determine adapter type from Prowlarr definition name.
+        Determine adapter type from Prowlarr definition name or indexer name.
 
-        Maps known Prowlarr definitions to our adapter types.
+        Scans YAML config files for prowlarr.definitions and prowlarr.url_patterns
+        to match Prowlarr indexers to tracker configs.
 
         Args:
             definition_name: Prowlarr definition identifier
+            indexer_name: Prowlarr indexer name (fallback)
 
         Returns:
-            Adapter type string ('lacale', 'c411', 'generic')
+            Adapter type string ('config' or 'generic')
         """
-        # Map known definitions to adapter types
-        ADAPTER_MAP = {
-            'lacale': 'lacale',
-            'cinema411': 'c411',
-            'c411': 'c411',
-            # Add more mappings as needed
-        }
+        # Scan YAML configs for prowlarr matching
+        try:
+            from ..adapters.tracker_config_loader import get_config_loader
+            config_loader = get_config_loader()
+            available_configs = config_loader.get_available_configs()
 
-        definition_lower = definition_name.lower()
+            for slug in available_configs:
+                try:
+                    config = config_loader.load(slug, use_cache=True)
+                    prowlarr_config = config.get("prowlarr", {})
+                    definitions = prowlarr_config.get("definitions", [])
+                    url_patterns = prowlarr_config.get("url_patterns", [])
 
-        for key, adapter in ADAPTER_MAP.items():
-            if key in definition_lower:
-                return adapter
+                    # Check definition match
+                    for check_value in [definition_name, indexer_name]:
+                        if not check_value:
+                            continue
+                        check_lower = check_value.lower()
+
+                        for defn in definitions:
+                            if defn.lower() in check_lower:
+                                logger.info(f"Prowlarr match: '{check_value}' -> config '{slug}' (definition)")
+                                return 'config'
+
+                        for pattern in url_patterns:
+                            if pattern.lower() in check_lower:
+                                logger.info(f"Prowlarr match: '{check_value}' -> config '{slug}' (url_pattern)")
+                                return 'config'
+
+                except Exception:
+                    continue
+
+        except Exception as e:
+            logger.warning(f"Error scanning YAML configs for Prowlarr matching: {e}")
 
         return 'generic'
+
+    def _match_yaml_slug(self, definition_name: str = "", indexer_name: str = "") -> Optional[str]:
+        """
+        Find the YAML config slug that matches a Prowlarr indexer.
+
+        Args:
+            definition_name: Prowlarr definition identifier
+            indexer_name: Prowlarr indexer name
+
+        Returns:
+            Config slug if matched, None otherwise
+        """
+        try:
+            from ..adapters.tracker_config_loader import get_config_loader
+            config_loader = get_config_loader()
+            available_configs = config_loader.get_available_configs()
+
+            for slug in available_configs:
+                try:
+                    config = config_loader.load(slug, use_cache=True)
+                    prowlarr_config = config.get("prowlarr", {})
+                    definitions = prowlarr_config.get("definitions", [])
+                    url_patterns = prowlarr_config.get("url_patterns", [])
+
+                    for check_value in [definition_name, indexer_name]:
+                        if not check_value:
+                            continue
+                        check_lower = check_value.lower()
+                        for defn in definitions:
+                            if defn.lower() in check_lower:
+                                return slug
+                        for pattern in url_patterns:
+                            if pattern.lower() in check_lower:
+                                return slug
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        return None
+
+    def _get_tracker_config(self, adapter_type: str, definition_name: str = "", indexer_name: str = "") -> Dict[str, Any]:
+        """
+        Get tracker config from matching YAML config file.
+
+        Scans YAML configs for prowlarr.auto_config section to get
+        source_flag, piece_size_strategy, and cloudflare requirements.
+
+        Args:
+            adapter_type: Adapter type string
+            definition_name: Prowlarr definition identifier
+            indexer_name: Prowlarr indexer name
+
+        Returns:
+            Dict with tracker-specific configuration
+        """
+        # Scan YAML configs for matching prowlarr config
+        try:
+            from ..adapters.tracker_config_loader import get_config_loader
+            config_loader = get_config_loader()
+            available_configs = config_loader.get_available_configs()
+
+            for slug in available_configs:
+                try:
+                    config = config_loader.load(slug, use_cache=True)
+                    prowlarr_config = config.get("prowlarr", {})
+                    definitions = prowlarr_config.get("definitions", [])
+                    url_patterns = prowlarr_config.get("url_patterns", [])
+
+                    # Check if this config matches
+                    matched = False
+                    for check_value in [definition_name, indexer_name]:
+                        if not check_value:
+                            continue
+                        check_lower = check_value.lower()
+                        for defn in definitions:
+                            if defn.lower() in check_lower:
+                                matched = True
+                                break
+                        if not matched:
+                            for pattern in url_patterns:
+                                if pattern.lower() in check_lower:
+                                    matched = True
+                                    break
+                        if matched:
+                            break
+
+                    if matched:
+                        auto_config = prowlarr_config.get("auto_config", {})
+                        torrent_config = config.get("torrent", {})
+                        cloudflare_config = config.get("cloudflare", {})
+
+                        return {
+                            'source_flag': auto_config.get('source_flag') or torrent_config.get('source_flag', ''),
+                            'piece_size_strategy': auto_config.get('piece_size_strategy') or torrent_config.get('piece_size_strategy', 'auto'),
+                            'requires_cloudflare': auto_config.get('requires_cloudflare', cloudflare_config.get('enabled', False)),
+                            'announce_url_template': '{url}/announce?passkey={passkey}',
+                        }
+
+                except Exception:
+                    continue
+
+        except Exception as e:
+            logger.warning(f"Error loading tracker config: {e}")
+
+        return {}
+
+    def _extract_api_key(self, indexer: Dict[str, Any]) -> Optional[str]:
+        """
+        Extract API key from Prowlarr indexer fields.
+
+        Prowlarr stores credentials in the 'fields' array. This method
+        looks for common API key field names.
+
+        Args:
+            indexer: Prowlarr indexer dict
+
+        Returns:
+            API key string if found, None otherwise
+        """
+        fields = indexer.get('fields', [])
+        # Common field names for API keys in Prowlarr
+        api_key_names = ('apiKey', 'apikey', 'api_key', 'passkey', 'apitoken', 'token')
+
+        for field in fields:
+            field_name = field.get('name', '').lower()
+            if field_name in [name.lower() for name in api_key_names]:
+                value = field.get('value')
+                if value:
+                    return str(value)
+        return None
 
     async def check_duplicate_on_indexer(
         self,

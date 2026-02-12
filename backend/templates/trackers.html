@@ -359,16 +359,29 @@
                     <input type="url" id="tracker-url" name="tracker_url" class="input input-bordered" required placeholder="https://lacale.example.com">
                 </div>
 
-                <!-- Passkey -->
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Passkey</span></label>
-                    <input type="password" id="tracker-passkey" name="passkey" class="input input-bordered" placeholder="Your passkey">
+                <!-- Passkey (for announce URL) -->
+                <div class="form-control full-width">
+                    <label class="label">
+                        <span class="label-text">Passkey (pour announce URL)</span>
+                    </label>
+                    <input type="password" id="tracker-passkey" name="passkey" class="input input-bordered" placeholder="Passkey pour l'URL d'announce">
+                    <label class="label">
+                        <span class="label-text-alt">Trouvez votre passkey dans votre profil sur le tracker</span>
+                    </label>
                 </div>
 
-                <!-- API Key -->
-                <div class="form-control">
-                    <label class="label"><span class="label-text">API Key</span></label>
-                    <input type="password" id="tracker-apikey" name="api_key" class="input input-bordered" placeholder="Bearer token (C411)">
+                <!-- API Key (for API authentication) -->
+                <div class="form-control full-width">
+                    <label class="label">
+                        <span class="label-text">Clé API (pour l'authentification API)</span>
+                        <span class="label-text-alt" style="font-size: 0.7rem; color: var(--status-warning);">Requis pour La Cale</span>
+                    </label>
+                    <input type="password" id="tracker-apikey" name="api_key" class="input input-bordered" placeholder="Clé API pour les requêtes API">
+                    <label class="label">
+                        <span class="label-text-alt">
+                            <strong>La Cale:</strong> Paramètres > Compte > Clé API externe
+                        </span>
+                    </label>
                 </div>
 
                 <!-- Adapter Type -->
@@ -671,8 +684,8 @@
             document.getElementById('tracker-name').value = tracker.name || '';
             document.getElementById('tracker-slug').value = tracker.slug || '';
             document.getElementById('tracker-url').value = tracker.tracker_url || '';
-            document.getElementById('tracker-passkey').value = '';  // Don't show masked value
-            document.getElementById('tracker-apikey').value = '';
+            document.getElementById('tracker-passkey').value = '';  // Don't show masked passkey
+            document.getElementById('tracker-apikey').value = '';  // Don't show masked API key
             document.getElementById('tracker-adapter').value = tracker.adapter_type || 'generic';
             document.getElementById('tracker-piecesize').value = tracker.piece_size_strategy || 'auto';
             document.getElementById('tracker-source').value = tracker.source_flag || '';
@@ -717,9 +730,11 @@
 
         // Only include credentials if provided (for updates)
         const passkey = formData.get('passkey');
-        const api_key = formData.get('api_key');
         if (passkey) data.passkey = passkey;
-        if (api_key) data.api_key = api_key;
+
+        // API key for trackers using API authentication (e.g., La Cale)
+        const apiKey = formData.get('api_key');
+        if (apiKey) data.api_key = apiKey;
 
         const trackerId = formData.get('tracker_id');
         const isEdit = trackerId && trackerId !== '';

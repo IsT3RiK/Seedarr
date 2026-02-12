@@ -7,9 +7,8 @@ and instantiates the appropriate adapter for each tracker.
 
 Architecture:
     TrackerFactory
-        ├── LaCaleAdapter (adapter_type: "lacale")
-        ├── C411Adapter (adapter_type: "c411")
-        └── GenericTrackerAdapter (adapter_type: "generic")
+        ├── ConfigAdapter (adapter_type: "config") - YAML-driven, handles ALL trackers
+        └── GenericTrackerAdapter (adapter_type: "generic") - fallback for search-only
 
 Usage:
     factory = TrackerFactory(db, flaresolverr_url)
@@ -28,7 +27,6 @@ import logging
 from typing import Dict, List, Optional, Tuple, Type, TYPE_CHECKING
 
 from .tracker_adapter import TrackerAdapter
-from .lacale_adapter import LaCaleAdapter
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -45,9 +43,10 @@ class TrackerFactory:
     appropriate adapter instances based on tracker configuration.
 
     Adapter Registry:
-        - "lacale": LaCaleAdapter (requires FlareSolverr, Cloudflare bypass)
-        - "c411": C411Adapter (API key auth, no Cloudflare)
-        - "generic": GenericTrackerAdapter (basic implementation)
+        - "config": ConfigAdapter (config-driven, handles all trackers with YAML)
+        - "generic": GenericTrackerAdapter (basic fallback for search-only)
+        - "lacale": Legacy alias -> redirects to ConfigAdapter
+        - "c411": Legacy alias -> redirects to ConfigAdapter
 
     Example:
         >>> factory = TrackerFactory(db, flaresolverr_url="http://localhost:8191")
@@ -79,7 +78,7 @@ class TrackerFactory:
 
         Args:
             db: SQLAlchemy database session
-            flaresolverr_url: FlareSolverr service URL (required for La Cale)
+            flaresolverr_url: FlareSolverr service URL (for Cloudflare bypass)
             flaresolverr_timeout: FlareSolverr request timeout in ms
         """
         self.db = db
@@ -98,20 +97,13 @@ class TrackerFactory:
         if cls._registry_initialized:
             return
 
-        # Register built-in adapters
-        cls._REGISTRY['lacale'] = LaCaleAdapter
-
-        # Import and register C411 adapter if available
-        try:
-            from .c411_adapter import C411Adapter
-            cls._REGISTRY['c411'] = C411Adapter
-        except ImportError:
-            logger.warning("C411Adapter not available")
-
         # Import and register ConfigAdapter (config-driven generic adapter)
         try:
             from .config_adapter import ConfigAdapter
             cls._REGISTRY['config'] = ConfigAdapter
+            # Legacy aliases - redirect to ConfigAdapter
+            cls._REGISTRY['lacale'] = ConfigAdapter
+            cls._REGISTRY['c411'] = ConfigAdapter
         except ImportError:
             logger.warning("ConfigAdapter not available")
 
@@ -131,7 +123,7 @@ class TrackerFactory:
         Register a new adapter type.
 
         Args:
-            adapter_type: Adapter type identifier (e.g., "lacale", "c411")
+            adapter_type: Adapter type identifier (e.g., "mytracker")
             adapter_class: Adapter class implementing TrackerAdapter
 
         Example:
@@ -147,6 +139,11 @@ class TrackerFactory:
         Creates a new adapter instance if not cached, or returns
         the cached instance for the tracker.
 
+        Adapter selection logic:
+        1. If a YAML config file exists for tracker.slug -> use ConfigAdapter
+        2. If tracker.adapter_type is a legacy type (lacale, c411) -> use ConfigAdapter
+        3. Fallback to "generic" if no adapter_type set
+
         Args:
             tracker: Tracker model instance
 
@@ -160,7 +157,8 @@ class TrackerFactory:
         if tracker.id in self._adapter_cache:
             return self._adapter_cache[tracker.id]
 
-        adapter_type = tracker.adapter_type or "generic"
+        # Determine adapter type (always prefer ConfigAdapter if YAML exists)
+        adapter_type = self._determine_adapter_type(tracker)
 
         if adapter_type not in self._REGISTRY:
             raise ValueError(
@@ -183,6 +181,50 @@ class TrackerFactory:
 
         return adapter
 
+    def _determine_adapter_type(self, tracker: 'Tracker') -> str:
+        """
+        Determine which adapter type to use for a tracker.
+
+        Priority:
+        1. If tracker.slug has a YAML config file -> "config"
+        2. If tracker.adapter_type is a known type (lacale, c411) -> "config" (legacy redirect)
+        3. tracker.adapter_type if set
+        4. "generic" as fallback
+
+        Args:
+            tracker: Tracker model instance
+
+        Returns:
+            Adapter type string
+        """
+        # Check if YAML config exists for this tracker
+        if tracker.slug:
+            from .tracker_config_loader import get_config_loader
+            try:
+                config_loader = get_config_loader()
+                config = config_loader.load(tracker.slug, use_cache=True)
+                if config:
+                    logger.info(
+                        f"Found YAML config for tracker '{tracker.slug}', "
+                        f"using ConfigAdapter"
+                    )
+                    return "config"
+            except FileNotFoundError:
+                pass  # No config file, continue to next check
+            except Exception as e:
+                logger.warning(f"Error loading config for {tracker.slug}: {e}")
+
+        # Legacy adapter types -> redirect to config
+        adapter_type = tracker.adapter_type or "generic"
+        if adapter_type in ("lacale", "c411"):
+            logger.info(
+                f"Legacy adapter_type '{adapter_type}' for {tracker.name}, "
+                f"redirecting to ConfigAdapter"
+            )
+            return "config"
+
+        return adapter_type
+
     def _create_adapter(
         self,
         adapter_class: Type[TrackerAdapter],
@@ -198,33 +240,6 @@ class TrackerFactory:
         Returns:
             Configured adapter instance
         """
-        # LaCaleAdapter requires FlareSolverr
-        if adapter_class == LaCaleAdapter:
-            if not self.flaresolverr_url and tracker.requires_cloudflare:
-                raise ValueError(
-                    f"FlareSolverr URL required for {tracker.name} "
-                    f"(requires_cloudflare=True)"
-                )
-
-            return LaCaleAdapter(
-                flaresolverr_url=self.flaresolverr_url or "",
-                tracker_url=tracker.tracker_url,
-                passkey=tracker.passkey or "",
-                flaresolverr_timeout=self.flaresolverr_timeout
-            )
-
-        # C411Adapter uses API key
-        if hasattr(adapter_class, '__name__') and 'C411' in adapter_class.__name__:
-            # Import here to avoid circular dependency
-            from .c411_adapter import C411Adapter
-            return C411Adapter(
-                tracker_url=tracker.tracker_url,
-                api_key=tracker.api_key or "",
-                passkey=tracker.passkey or "",
-                default_category_id=tracker.default_category_id,
-                default_subcategory_id=tracker.default_subcategory_id
-            )
-
         # ConfigAdapter - config-driven generic adapter
         if hasattr(adapter_class, '__name__') and 'ConfigAdapter' in adapter_class.__name__:
             from .config_adapter import ConfigAdapter
@@ -264,15 +279,8 @@ class TrackerFactory:
                 api_key=tracker.api_key
             )
         except ImportError:
-            # Fallback to LaCaleAdapter if generic not available
-            logger.warning(
-                f"GenericTrackerAdapter not available, using LaCaleAdapter for {tracker.name}"
-            )
-            return LaCaleAdapter(
-                flaresolverr_url=self.flaresolverr_url or "",
-                tracker_url=tracker.tracker_url,
-                passkey=tracker.passkey or "",
-                flaresolverr_timeout=self.flaresolverr_timeout
+            raise ValueError(
+                f"GenericTrackerAdapter not available for {tracker.name}"
             )
 
     def get_all_enabled_adapters(self) -> List[Tuple['Tracker', TrackerAdapter]]:

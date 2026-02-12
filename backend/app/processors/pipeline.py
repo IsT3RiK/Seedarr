@@ -40,7 +40,7 @@ from ..services.nfo_validator import NFOValidator
 from ..services.nfo_generator import get_nfo_generator
 from ..services.metadata_mapper import MetadataMapper
 from ..services.options_mapper import OptionsMapper, get_options_mapper
-from ..services.c411_options_mapper import C411OptionsMapper  # Legacy, for backward compatibility
+# C411OptionsMapper removed - all options mapping now via ConfigAdapter + OptionsMapper
 from ..adapters.tracker_adapter import TrackerAdapter
 from ..adapters.tracker_config_loader import get_config_loader
 from ..services.statistics_service import get_statistics_service
@@ -636,7 +636,11 @@ class ProcessingPipeline:
         # Get components for release name from the correct sources
         # Title/Year: prefer TMDB data, then parsed title, then fallback to filename stem
         # Important: Never use file_path.stem directly as it includes metadata (resolution, codec, etc.)
-        title = tmdb.get('title') or parsed.get('title') or file_path.stem
+        # Apply .title() to parsed fallback to ensure proper capitalization (filename titles are often lowercase)
+        parsed_title = parsed.get('title')
+        if parsed_title:
+            parsed_title = parsed_title.title()
+        title = tmdb.get('title') or parsed_title or file_path.stem
         year = tmdb.get('year') or parsed.get('year')
 
         # Technical metadata: from parsed filename, with MediaInfo fallback
@@ -803,6 +807,23 @@ class ProcessingPipeline:
                 if s_match:
                     season = int(s_match.group(1))
 
+        # Extract audio channels from first audio track
+        audio_channels = None
+        if audio_tracks and audio_tracks[0].get('channels'):
+            channels = audio_tracks[0].get('channels', '')
+            channel_map = {'2': '2.0', '6': '5.1', '8': '7.1', '1': '1.0'}
+            audio_channels = channel_map.get(str(channels), str(channels))
+            if audio_tracks[0].get('channel_layout'):
+                layout = audio_tracks[0].get('channel_layout', '')
+                if '5.1' in layout:
+                    audio_channels = '5.1'
+                elif '7.1' in layout:
+                    audio_channels = '7.1'
+                elif '2.0' in layout or 'stereo' in layout.lower():
+                    audio_channels = '2.0'
+            if audio_channels:
+                logger.info(f"Audio channels from MediaInfo: {audio_channels}")
+
         # Generate universal release name
         try:
             release_name = renamer.format_release_name(
@@ -822,6 +843,7 @@ class ProcessingPipeline:
                 imax=imax,
                 edition=edition,
                 language_variant=language_variant,
+                audio_channels=audio_channels,
             )
 
             logger.info(f"Generated release name: {release_name}")
@@ -933,10 +955,16 @@ class ProcessingPipeline:
                         quality = 'HDLight'
 
                 # Build template metadata
-                # Use parsed title as fallback instead of full filename
-                base_title = tmdb.get('title') or parsed.get('title') or file_path.stem
-                # For title_fr, fallback to base_title if no French title from TMDB
-                title_fr = tmdb.get('title_fr') or base_title
+                # TMDB 'title' is the French title (API called with language=fr-FR)
+                # TMDB 'original_title' is the original (usually English) title
+                # Apply .title() to parsed fallback for proper capitalization
+                parsed_title = parsed.get('title')
+                if parsed_title:
+                    parsed_title = parsed_title.title()
+                title_fr = tmdb.get('title') or parsed_title or file_path.stem
+                title_en = tmdb.get('original_title') or parsed_title or file_path.stem
+                # base_title uses French title if available
+                base_title = title_fr
 
                 template_metadata = renamer.build_template_metadata(
                     title=base_title,
@@ -951,7 +979,7 @@ class ProcessingPipeline:
                     episode=parsed.get('episode'),
                     hdr=parsed.get('hdr') or (video_tracks[0].get('hdr_format') if video_tracks else None),
                     title_fr=title_fr,
-                    title_en=tmdb.get('title_en') or tmdb.get('original_title') or base_title,
+                    title_en=title_en,
                     audio_channels=audio_channels,
                     quality=quality,
                 )
@@ -1027,13 +1055,13 @@ class ProcessingPipeline:
                     file_path=str(file_path),
                     announce_url=settings.announce_url,
                     release_name=release_name,
-                    source_flag="lacale",
+                    source_flag="seedarr",
                     piece_size_strategy="auto",
                     output_dir=str(output_dir)
                 )
 
                 file_entry.torrent_path = torrent_path
-                file_entry.set_torrent_path_for_tracker("lacale", torrent_path)
+                file_entry.set_torrent_path_for_tracker("default", torrent_path)
                 logger.info(f"✓ Torrent file generated: {torrent_path}")
 
             except Exception as e:
@@ -1162,6 +1190,35 @@ class ProcessingPipeline:
         logger.info(f"  - category_id: {category_id}")
         logger.info(f"  - tag_ids: {tag_ids if tag_ids else '(none)'}")
 
+        # Extract resolution from parsed metadata (shared across all trackers)
+        resolution = None
+        if file_entry.mediainfo_data:
+            parsed_meta = file_entry.mediainfo_data.get('parsed_from_filename', {})
+            resolution = parsed_meta.get('resolution')
+        logger.info(f"  - resolution: {resolution}")
+
+        # Extract genres from TMDB data (shared across all trackers)
+        tmdb_genres = []
+        if file_entry.mediainfo_data and 'tmdb' in file_entry.mediainfo_data:
+            tmdb_genres = file_entry.mediainfo_data['tmdb'].get('genres', [])
+        # Fallback: get from TMDB cache
+        if not tmdb_genres and tmdb_id:
+            try:
+                from app.models.tmdb_cache import TMDBCache
+                cache_entry = TMDBCache.get_cached(self.db, tmdb_id)
+                if cache_entry and cache_entry.extra_data:
+                    genres_raw = cache_entry.extra_data.get('genres', [])
+                    for g in genres_raw:
+                        if isinstance(g, dict):
+                            tmdb_genres.append(g)
+                        else:
+                            tmdb_genres.append({"name": g})
+            except Exception as e:
+                logger.warning(f"Failed to get genres from cache: {e}")
+
+        if tmdb_genres:
+            logger.info(f"  - genres: {[g.get('name', g) for g in tmdb_genres[:5]]}")
+
         # Initialize tracker statuses as PENDING
         qbittorrent_injected = False
 
@@ -1177,6 +1234,10 @@ class ProcessingPipeline:
             logger.info(f"\n{'='*50}")
             logger.info(f"Uploading to tracker: {tracker.name}")
             logger.info(f"{'='*50}")
+
+            # Get tracker-specific release name (from naming_template) or default
+            tracker_release_name = file_entry.get_effective_release_name_for_tracker(tracker.slug)
+            logger.info(f"  - tracker release_name: {tracker_release_name}")
 
             try:
                 # Get adapter for this tracker
@@ -1215,8 +1276,8 @@ class ProcessingPipeline:
                     duplicate_result = await adapter.check_duplicate(
                         tmdb_id=tmdb_id,
                         imdb_id=file_entry.imdb_id if hasattr(file_entry, 'imdb_id') else None,
-                        release_name=release_name,
-                        quality=file_entry.resolution if hasattr(file_entry, 'resolution') else None,
+                        release_name=tracker_release_name,
+                        quality=resolution,
                         file_size=file_entry.file_size  # Pass file size for exact match detection
                     )
 
@@ -1267,12 +1328,12 @@ class ProcessingPipeline:
                 logger.info(f"Uploading to {tracker.name}...")
 
                 # Resolve category and subcategory using config-driven approach
-                resolution = file_entry.resolution if hasattr(file_entry, 'resolution') else None
                 effective_category_id, subcategory_id = self._resolve_category_for_tracker(
                     tracker=tracker,
                     tmdb_type=tmdb_type,
                     resolution=resolution,
-                    category_id=category_id
+                    category_id=category_id,
+                    genres=tmdb_genres
                 )
 
                 if not effective_category_id:
@@ -1283,7 +1344,7 @@ class ProcessingPipeline:
 
                 upload_kwargs = {
                     'torrent_data': torrent_data,
-                    'release_name': release_name,
+                    'release_name': tracker_release_name,
                     'category_id': effective_category_id,
                     'tag_ids': tag_ids,
                     'nfo_data': nfo_data,
@@ -1299,15 +1360,17 @@ class ProcessingPipeline:
                     logger.info(f"categoryId={effective_category_id}, subcategoryId={subcategory_id} (tmdb_type={tmdb_type})")
 
                 # Add tracker-specific data (options, tmdbData, BBCode description)
-                # This now uses config-driven approach with legacy fallback
-                tracker_tmdb_data = await self._build_c411_tmdb_data(file_entry, tmdb_id, tmdb_type)
+                # Build TMDB data via ConfigAdapter if adapter supports it
+                tracker_tmdb_data = None
+                if hasattr(adapter, 'build_tmdb_data') and tmdb_id:
+                    tracker_tmdb_data = await adapter.build_tmdb_data(tmdb_id, tmdb_type or 'movie', self.db)
                 if tracker_tmdb_data:
                     upload_kwargs['tmdb_data'] = tracker_tmdb_data
                     logger.info(f"TMDB data prepared for TMDB ID: {tmdb_id}")
 
-                # Build options using config-driven mapper (with legacy C411 fallback)
+                # Build options using config-driven mapper
                 genres = tracker_tmdb_data.get('genres', []) if tracker_tmdb_data else []
-                tracker_options = self._build_tracker_options(tracker, file_entry, release_name, tmdb_type, genres)
+                tracker_options = self._build_tracker_options(tracker, file_entry, tracker_release_name, tmdb_type, genres)
                 if tracker_options:
                     upload_kwargs['options'] = tracker_options
                     logger.info(f"Tracker options: {tracker_options}")
@@ -1561,7 +1624,7 @@ class ProcessingPipeline:
 
             # CRITICAL: Convert Docker path to qBittorrent-accessible path
             # If app runs in Docker but qBittorrent runs on Windows, convert paths
-            # Example: /media/Folder -> C:\Users\IsT3RiK\Videos\Folder
+            # Example: /media/Folder -> C:\Users\User\Videos\Folder
             if save_path.startswith('/media'):
                 # Get the real Windows path from settings (input_media_path)
                 windows_base = settings.input_media_path
@@ -1757,7 +1820,8 @@ class ProcessingPipeline:
         tracker,
         tmdb_type: Optional[str],
         resolution: Optional[str],
-        category_id: Optional[str]
+        category_id: Optional[str],
+        genres: Optional[list] = None
     ) -> tuple:
         """
         Resolve category and subcategory for a tracker.
@@ -1770,6 +1834,7 @@ class ProcessingPipeline:
             tmdb_type: "movie" or "tv"
             resolution: Resolution string (e.g., "1080p", "2160p")
             category_id: Default category from file_entry
+            genres: List of TMDB genre dicts [{"id": 16, "name": "Animation"}, ...]
 
         Returns:
             Tuple of (category_id, subcategory_id)
@@ -1777,13 +1842,32 @@ class ProcessingPipeline:
         effective_category_id = None
         subcategory_id = None
 
+        # Detect content type from TMDB genres
+        # Animation genre ID = 16, Documentary genre ID = 99
+        is_animation = False
+        is_documentary = False
+        if genres:
+            genre_ids = [g.get('id') for g in genres if isinstance(g, dict)]
+            is_animation = 16 in genre_ids
+            is_documentary = 99 in genre_ids
+
         # Try config-driven category mapping first
         try:
             config_loader = get_config_loader()
             tracker_config = config_loader.load_from_tracker(tracker)
 
             if tracker_config and tracker_config.get("categories"):
-                categories = tracker_config["categories"]
+                categories = dict(tracker_config["categories"])  # Copy to avoid mutation
+
+                # Merge synced category_mapping (from API sync) - these take precedence
+                # This adds keys like anime_movie, anime_series from C411 sync
+                if tracker.category_mapping:
+                    categories.update(tracker.category_mapping)
+                    logger.info(f"[DEBUG] Merged category_mapping keys: {list(tracker.category_mapping.keys())}")
+                    if 'anime_movie' in tracker.category_mapping:
+                        logger.info(f"[DEBUG] anime_movie = {tracker.category_mapping['anime_movie']}")
+                    else:
+                        logger.warning("[DEBUG] anime_movie NOT FOUND in category_mapping - need to re-sync C411 categories!")
 
                 # Build lookup keys based on media type and resolution
                 res_suffix = None
@@ -1796,20 +1880,58 @@ class ProcessingPipeline:
                     elif '720' in res_lower:
                         res_suffix = '720p'
 
-                media_type = tmdb_type or 'movie'
+                # Determine base media type
+                base_media_type = tmdb_type or 'movie'
 
-                # Try resolution-specific mapping first
-                if res_suffix:
-                    key = f"{media_type}_{res_suffix}"
-                    if key in categories:
-                        subcategory_id = categories[key]
+                # Log the category detection for debugging
+                logger.info(
+                    f"Category detection for {tracker.name}: "
+                    f"is_animation={is_animation}, is_documentary={is_documentary}, "
+                    f"tmdb_type={base_media_type}, resolution={resolution}, res_suffix={res_suffix}, "
+                    f"available_keys={list(categories.keys())}"
+                )
 
-                # Fallback to general mapping
-                if not subcategory_id:
-                    subcategory_id = categories.get(media_type)
+                # For Animation, use anime_movie/anime_series (from C411 sync) or anime_* (from YAML)
+                if is_animation:
+                    # Try C411-style keys first (from synced mapping)
+                    if base_media_type == 'tv':
+                        subcategory_id = categories.get('anime_series')
+                    else:
+                        subcategory_id = categories.get('anime_movie')
 
-                # Get main category from config
-                effective_category_id = categories.get(f"{media_type}_category")
+                    # Fallback to YAML-style keys (anime_1080p, anime, etc.)
+                    if not subcategory_id and res_suffix:
+                        subcategory_id = categories.get(f'anime_{res_suffix}')
+                    if not subcategory_id:
+                        subcategory_id = categories.get('anime')
+
+                    if subcategory_id:
+                        logger.info(f"Animation subcategory resolved: {subcategory_id}")
+
+                    # Main category for animation
+                    effective_category_id = categories.get('anime_category') or categories.get('movie_category')
+
+                elif is_documentary:
+                    if res_suffix:
+                        subcategory_id = categories.get(f'documentary_{res_suffix}')
+                    if not subcategory_id:
+                        subcategory_id = categories.get('documentary')
+                    effective_category_id = categories.get('documentary_category') or categories.get('movie_category')
+
+                else:
+                    # Regular movie/tv
+                    if res_suffix:
+                        key = f"{base_media_type}_{res_suffix}"
+                        if key in categories:
+                            subcategory_id = categories[key]
+                            logger.info(f"Found category mapping: {key} -> {subcategory_id}")
+
+                    if not subcategory_id:
+                        subcategory_id = categories.get(base_media_type)
+                        if subcategory_id:
+                            logger.info(f"Using fallback category: {base_media_type} -> {subcategory_id}")
+
+                    effective_category_id = categories.get(f"{base_media_type}_category")
 
         except Exception:
             pass  # Fall back to legacy approach
@@ -1817,40 +1939,54 @@ class ProcessingPipeline:
         # Legacy fallback: use tracker model's category_mapping
         if not effective_category_id and tracker.category_mapping:
             mapping = tracker.category_mapping
-            media_type = tmdb_type or 'movie'
 
-            # For C411-style trackers with separate category/subcategory
-            if tracker.adapter_type == 'c411':
-                if tmdb_type == 'tv':
-                    effective_category_id = mapping.get('tv_category') or mapping.get('movie_category')
-                else:
-                    effective_category_id = mapping.get('movie_category')
-
-                # Resolve subcategory
-                if resolution:
-                    res_lower = resolution.lower()
-                    if '2160' in res_lower or '4k' in res_lower:
-                        res_suffix = '4k'
-                    elif '1080' in res_lower:
-                        res_suffix = '1080p'
-                    elif '720' in res_lower:
-                        res_suffix = '720p'
-                    else:
-                        res_suffix = None
-
-                    if res_suffix:
-                        if tmdb_type == 'tv':
-                            subcategory_id = mapping.get(f'series_{res_suffix}') or mapping.get(f'tv_{res_suffix}')
-                        else:
-                            subcategory_id = mapping.get(f'movie_{res_suffix}')
-
-                if not subcategory_id:
-                    if tmdb_type == 'tv':
-                        subcategory_id = mapping.get('tv') or mapping.get('series')
-                    else:
-                        subcategory_id = mapping.get('movie')
+            # Determine media type - prioritize Animation/Documentary
+            if is_animation:
+                media_type = 'anime'
+            elif is_documentary:
+                media_type = 'documentary'
             else:
-                # Other trackers: use get_category_id method
+                media_type = tmdb_type or 'movie'
+
+            # Resolve category from mapping (works for all trackers)
+            if is_animation:
+                effective_category_id = mapping.get('anime_category') or mapping.get('movie_category')
+            elif tmdb_type == 'tv':
+                effective_category_id = mapping.get('tv_category') or mapping.get('movie_category')
+            else:
+                effective_category_id = mapping.get('movie_category')
+
+            # Resolve subcategory based on resolution
+            res_suffix = None
+            if resolution:
+                res_lower = resolution.lower()
+                if '2160' in res_lower or '4k' in res_lower:
+                    res_suffix = '4k'
+                elif '1080' in res_lower:
+                    res_suffix = '1080p'
+                elif '720' in res_lower:
+                    res_suffix = '720p'
+
+            if is_animation:
+                if tmdb_type == 'tv':
+                    subcategory_id = mapping.get('anime_series')
+                else:
+                    subcategory_id = mapping.get('anime_movie')
+                logger.info(f"Animation detected for {tracker.name}, subcategory: {subcategory_id}")
+            elif res_suffix:
+                if tmdb_type == 'tv':
+                    subcategory_id = mapping.get(f'series_{res_suffix}') or mapping.get(f'tv_{res_suffix}')
+                else:
+                    subcategory_id = mapping.get(f'movie_{res_suffix}')
+
+            if not subcategory_id:
+                if tmdb_type == 'tv':
+                    subcategory_id = mapping.get('tv') or mapping.get('series')
+                else:
+                    subcategory_id = mapping.get('movie')
+
+            # Fallback: use get_category_id if mapping didn't resolve
+            if not effective_category_id:
                 effective_category_id = tracker.get_category_id(
                     media_type=media_type,
                     resolution=resolution
@@ -1859,10 +1995,16 @@ class ProcessingPipeline:
         # Final fallbacks
         if not effective_category_id:
             effective_category_id = tracker.default_category_id or category_id
+            logger.warning(
+                f"Category fallback for {tracker.name}: "
+                f"default_category_id={tracker.default_category_id}, "
+                f"file_entry_category_id={category_id} -> using {effective_category_id}"
+            )
 
         if not subcategory_id:
             subcategory_id = getattr(tracker, 'default_subcategory_id', None)
 
+        logger.info(f"Final category for {tracker.name}: category_id={effective_category_id}, subcategory_id={subcategory_id}")
         return (effective_category_id, subcategory_id)
 
     def _build_tracker_options(
@@ -1876,8 +2018,7 @@ class ProcessingPipeline:
         """
         Build tracker-specific options dict from file metadata.
 
-        Uses config-driven OptionsMapper when available, falls back to
-        hardcoded C411OptionsMapper for legacy support.
+        Uses config-driven OptionsMapper to build options from YAML config.
 
         Args:
             tracker: Tracker model instance
@@ -1890,29 +2031,24 @@ class ProcessingPipeline:
             Options dict for tracker API
         """
         try:
-            # Try to load config-driven options mapper
+            # Load config-driven options mapper
             config_loader = get_config_loader()
             tracker_config = None
 
             try:
                 tracker_config = config_loader.load_from_tracker(tracker)
             except Exception:
-                pass  # Fall back to legacy mapper
+                pass
 
             if tracker_config and tracker_config.get("options"):
                 # Use generic config-driven options mapper
                 mapper = get_options_mapper(tracker_config.get("options", {}))
-                is_tv_show = tmdb_type == 'tv' if tmdb_type else False
 
                 return mapper.build_options_from_file_entry(
                     file_entry=file_entry,
                     release_name=release_name,
                     genres=genres
                 )
-
-            # Fallback: Legacy C411 mapper for backward compatibility
-            if tracker.adapter_type == 'c411':
-                return self._build_c411_options(file_entry, release_name, tmdb_type, genres)
 
             # No options mapping for this tracker
             return {}
@@ -1921,212 +2057,10 @@ class ProcessingPipeline:
             logger.warning(f"Failed to build options for {tracker.name}: {e}")
             return {}
 
-    def _build_c411_options(
-        self,
-        file_entry: FileEntry,
-        release_name: str,
-        tmdb_type: Optional[str],
-        genres: Optional[list] = None
-    ) -> dict:
-        """
-        Build C411 options dict from file metadata (legacy method).
-
-        Uses C411OptionsMapper to convert resolution, source, language,
-        genres, and season/episode info to C411 API option format.
-
-        Args:
-            file_entry: FileEntry with metadata
-            release_name: Release name for detection
-            tmdb_type: "movie" or "tv"
-            genres: List of TMDB genre dicts [{"id": 28, "name": "Action"}, ...]
-
-        Returns:
-            C411 options dict, e.g., {"1": [4], "2": 25, "5": [39, 44], "7": 121, "6": 96}
-        """
-        try:
-            mapper = C411OptionsMapper()
-            is_tv_show = tmdb_type == 'tv' if tmdb_type else False
-
-            return mapper.build_options_from_file_entry(
-                file_entry=file_entry,
-                release_name=release_name,
-                genres=genres
-            )
-        except Exception as e:
-            logger.warning(f"Failed to build C411 options: {e}")
-            # Return minimal default options
-            return {"1": [4], "2": 25}  # Multi language, WEB-DL 1080p
-
-    async def _build_c411_tmdb_data(
-        self,
-        file_entry: FileEntry,
-        tmdb_id: Optional[str],
-        tmdb_type: Optional[str]
-    ) -> Optional[dict]:
-        """
-        Build C411 tmdbData JSON object from TMDB cache.
-
-        Retrieves TMDB metadata from cache and formats it according
-        to C411 API requirements.
-
-        Args:
-            file_entry: FileEntry with metadata
-            tmdb_id: TMDB ID
-            tmdb_type: "movie" or "tv"
-
-        Returns:
-            C411 tmdbData dict or None if not available
-
-        C411 Expected Format (movie):
-            {
-                "id": 27205,
-                "title": "Inception",
-                "originalTitle": "Inception",
-                "overview": "Dom Cobb est un voleur...",
-                "releaseDate": "2010-07-15",
-                "runtime": 148,
-                "voteAverage": 8.4,
-                "voteCount": 35000,
-                "popularity": 98.5,
-                "posterPath": "/qmDpIHrmpJINaRKAfWQfftjCdyi.jpg",
-                "backdropPath": "/s3TBrRGB1iav7gFOCNx3H31MoES.jpg",
-                "genres": [{"id": 878, "name": "Science-Fiction"}],
-                "productionCountries": [{"iso_3166_1": "US", "name": "United States"}],
-                "credits": {
-                    "cast": [{"id": 6193, "name": "Leonardo DiCaprio", "character": "Cobb"}],
-                    "crew": [{"id": 525, "name": "Christopher Nolan", "job": "Director"}]
-                }
-            }
-        """
-        if not tmdb_id:
-            return None
-
-        try:
-            from app.models.tmdb_cache import TMDBCache
-            from app.services.tmdb_cache_service import TMDBCacheService
-
-            # Get cached TMDB data
-            cache_entry = TMDBCache.get_cached(self.db, tmdb_id)
-            if not cache_entry:
-                logger.warning(f"No cached TMDB data for ID: {tmdb_id}")
-                return None
-
-            # Check if cached data is incomplete (old cache missing new fields)
-            extra_data_check = cache_entry.extra_data or {}
-            needs_refresh = False
-
-            # Check for missing critical fields
-            if not extra_data_check.get('release_date'):
-                logger.info(f"Cache missing release_date, needs refresh for tmdb_id={tmdb_id}")
-                needs_refresh = True
-            if not extra_data_check.get('production_countries'):
-                logger.info(f"Cache missing production_countries, needs refresh for tmdb_id={tmdb_id}")
-                needs_refresh = True
-            if not extra_data_check.get('imdb_id'):
-                logger.info(f"Cache missing imdb_id, needs refresh for tmdb_id={tmdb_id}")
-                needs_refresh = True
-
-            # Check if cast data has profile_path
-            if not needs_refresh and cache_entry.cast and len(cache_entry.cast) > 0:
-                first_cast = cache_entry.cast[0]
-                if isinstance(first_cast, dict) and not first_cast.get('profile_path'):
-                    logger.info(f"Cast data missing profile_path, needs refresh for tmdb_id={tmdb_id}")
-                    needs_refresh = True
-
-            if needs_refresh:
-                try:
-                    tmdb_service = TMDBCacheService(self.db)
-                    await tmdb_service.get_metadata(tmdb_id, force_refresh=True)
-                    cache_entry = TMDBCache.get_cached(self.db, tmdb_id)
-                    if not cache_entry:
-                        logger.warning(f"Failed to reload cache after refresh for ID: {tmdb_id}")
-                        return None
-                    logger.info(f"Successfully refreshed TMDB cache for tmdb_id={tmdb_id}")
-                except Exception as e:
-                    logger.warning(f"Failed to refresh TMDB cache for {tmdb_id}: {e}")
-
-            # Build C411 format
-            extra_data = cache_entry.extra_data or {}
-            ratings = cache_entry.ratings or {}
-
-            c411_tmdb_data = {
-                "id": int(tmdb_id),
-                "title": cache_entry.title,
-                "originalTitle": extra_data.get('original_title', cache_entry.title),
-                "overview": cache_entry.plot or "",
-                "voteAverage": ratings.get('vote_average', 0),
-                "voteCount": ratings.get('vote_count', 0),
-            }
-
-            # Add release date (use real date from extra_data, fallback to year)
-            if extra_data.get('release_date'):
-                c411_tmdb_data["releaseDate"] = extra_data['release_date']
-            elif cache_entry.year:
-                c411_tmdb_data["releaseDate"] = f"{cache_entry.year}-01-01"
-
-            # Add production countries
-            if extra_data.get('production_countries'):
-                c411_tmdb_data["productionCountries"] = extra_data['production_countries']
-
-            # Add IMDB ID
-            if extra_data.get('imdb_id'):
-                c411_tmdb_data["imdbId"] = extra_data['imdb_id']
-
-            # Add runtime if available
-            if extra_data.get('runtime'):
-                c411_tmdb_data["runtime"] = extra_data['runtime']
-
-            # Add poster/backdrop paths
-            if extra_data.get('poster_path'):
-                c411_tmdb_data["posterPath"] = extra_data['poster_path']
-            if extra_data.get('backdrop_path'):
-                c411_tmdb_data["backdropPath"] = extra_data['backdrop_path']
-
-            # Add genres (handle both old format with strings and new format with {id, name} objects)
-            if extra_data.get('genres'):
-                genres_raw = extra_data['genres']
-                c411_genres = []
-                for i, g in enumerate(genres_raw, start=1):
-                    if isinstance(g, dict):
-                        # New format: {"id": 28, "name": "Action"}
-                        c411_genres.append({"id": g.get('id', i), "name": g.get('name', '')})
-                    else:
-                        # Old format: just a string like "Action"
-                        c411_genres.append({"id": i, "name": g})
-                c411_tmdb_data["genres"] = c411_genres
-
-            # Add credits (cast) - include profile_path for actor photos
-            if cache_entry.cast:
-                c411_tmdb_data["credits"] = {
-                    "cast": [
-                        {
-                            "id": actor.get('id', i),
-                            "name": actor.get('name', 'Unknown'),
-                            "character": actor.get('character', ''),
-                            "profile_path": actor.get('profile_path', '')
-                        }
-                        for i, actor in enumerate(cache_entry.cast[:10], start=1)
-                    ],
-                    "crew": []
-                }
-
-            # For TV shows, add additional fields
-            if tmdb_type == 'tv':
-                c411_tmdb_data["name"] = c411_tmdb_data.pop("title", "")
-                c411_tmdb_data["originalName"] = c411_tmdb_data.pop("originalTitle", "")
-                c411_tmdb_data["firstAirDate"] = c411_tmdb_data.pop("releaseDate", "")
-
-            logger.debug(f"Built C411 tmdbData for {tmdb_id}: {cache_entry.title}")
-            return c411_tmdb_data
-
-        except Exception as e:
-            logger.warning(f"Failed to build C411 tmdbData: {e}")
-            return None
-
     async def _generate_bbcode_description(
         self,
         file_entry: FileEntry,
-        c411_tmdb_data: Optional[dict],
+        tmdb_data: Optional[dict],
         template_id: Optional[int] = None
     ) -> Optional[str]:
         """
@@ -2137,7 +2071,7 @@ class ProcessingPipeline:
 
         Args:
             file_entry: FileEntry with metadata
-            c411_tmdb_data: TMDB data dict (from _build_c411_tmdb_data)
+            tmdb_data: TMDB data dict (from ConfigAdapter.build_tmdb_data)
             template_id: Optional specific template ID to use (from tracker settings)
                         If None, uses global default template
 
@@ -2161,12 +2095,12 @@ class ProcessingPipeline:
 
             media_data = await nfo_gen.extract_mediainfo(file_path)
 
-            # Convert c411_tmdb_data to TMDBData
-            tmdb_data = None
-            if c411_tmdb_data:
-                # Extract cast from c411_tmdb_data
+            # Convert tmdb_data dict to TMDBData dataclass
+            tmdb_data_obj = None
+            if tmdb_data:
+                # Extract cast from tmdb_data
                 cast_list = []
-                credits = c411_tmdb_data.get('credits', {})
+                credits = tmdb_data.get('credits', {})
                 for actor in credits.get('cast', [])[:6]:
                     cast_list.append(CastMember(
                         name=actor.get('name', ''),
@@ -2175,16 +2109,15 @@ class ProcessingPipeline:
                     ))
 
                 # Extract genres
-                genres = [g.get('name', '') for g in c411_tmdb_data.get('genres', [])]
+                genres = [g.get('name', '') for g in tmdb_data.get('genres', [])]
 
                 # Format release date in French
                 formatted_release_date = ""
-                raw_date = c411_tmdb_data.get('releaseDate', '')
+                raw_date = tmdb_data.get('releaseDate', '') or tmdb_data.get('firstAirDate', '')
                 if raw_date and len(raw_date) >= 10:
                     try:
                         from datetime import datetime
                         dt = datetime.strptime(raw_date[:10], "%Y-%m-%d")
-                        # French day/month names
                         fr_days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
                         fr_months = ["", "janvier", "février", "mars", "avril", "mai", "juin",
                                      "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
@@ -2194,24 +2127,24 @@ class ProcessingPipeline:
 
                 # Extract country from production countries
                 country = ""
-                prod_countries = c411_tmdb_data.get('productionCountries', [])
+                prod_countries = tmdb_data.get('productionCountries', [])
                 if prod_countries:
                     country = ", ".join(c.get('name', '') for c in prod_countries if c.get('name'))
 
-                tmdb_data = TMDBData(
-                    title=c411_tmdb_data.get('title') or c411_tmdb_data.get('name', ''),
-                    original_title=c411_tmdb_data.get('originalTitle') or c411_tmdb_data.get('originalName', ''),
-                    year=int(c411_tmdb_data.get('releaseDate', '0000')[:4]) if c411_tmdb_data.get('releaseDate') else 0,
+                tmdb_data_obj = TMDBData(
+                    title=tmdb_data.get('title') or tmdb_data.get('name', ''),
+                    original_title=tmdb_data.get('originalTitle') or tmdb_data.get('originalName', ''),
+                    year=int(raw_date[:4]) if raw_date and len(raw_date) >= 4 else 0,
                     release_date=formatted_release_date,
                     country=country,
-                    poster_url=c411_tmdb_data.get('posterPath', ''),
-                    backdrop_url=c411_tmdb_data.get('backdropPath', ''),
-                    vote_average=c411_tmdb_data.get('voteAverage', 0),
+                    poster_url=tmdb_data.get('posterPath', ''),
+                    backdrop_url=tmdb_data.get('backdropPath', ''),
+                    vote_average=tmdb_data.get('voteAverage', 0),
                     genres=genres,
-                    overview=c411_tmdb_data.get('overview', ''),
-                    runtime=c411_tmdb_data.get('runtime', 0),
-                    tmdb_id=str(c411_tmdb_data.get('id', '')),
-                    imdb_id=c411_tmdb_data.get('imdbId', ''),
+                    overview=tmdb_data.get('overview', ''),
+                    runtime=tmdb_data.get('runtime', 0),
+                    tmdb_id=str(tmdb_data.get('id', '')),
+                    imdb_id=tmdb_data.get('imdbId', ''),
                     cast=cast_list
                 )
 
@@ -2245,13 +2178,13 @@ class ProcessingPipeline:
                 bbcode = bbcode_gen.render_template(
                     template.content,
                     media_data,
-                    tmdb_data,
+                    tmdb_data_obj,
                     extra_variables=extra_vars if extra_vars else None
                 )
             else:
                 # Use built-in default generator
                 logger.debug("Using built-in BBCode generator (no template configured)")
-                bbcode = bbcode_gen.generate_bbcode(media_data, tmdb_data)
+                bbcode = bbcode_gen.generate_bbcode(media_data, tmdb_data_obj)
 
             return bbcode
 
@@ -2277,7 +2210,6 @@ async def process_file_by_id(file_entry_id: int, skip_approval: bool = False) ->
     """
     from app.database import SessionLocal
     from app.models.settings import Settings
-    from app.adapters.lacale_adapter import LaCaleAdapter
 
     db = SessionLocal()
     try:
@@ -2289,14 +2221,8 @@ async def process_file_by_id(file_entry_id: int, skip_approval: bool = False) ->
         # Get settings
         settings = Settings.get_settings(db)
 
-        # Initialize tracker adapter
+        # tracker_adapter is no longer needed here - the pipeline uses TrackerFactory
         tracker_adapter = None
-        if settings and settings.flaresolverr_url and settings.tracker_url and settings.tracker_passkey:
-            tracker_adapter = LaCaleAdapter(
-                flaresolverr_url=settings.flaresolverr_url,
-                tracker_url=settings.tracker_url,
-                passkey=settings.tracker_passkey
-            )
 
         # Create pipeline and process
         pipeline = ProcessingPipeline(db, tracker_adapter=tracker_adapter)

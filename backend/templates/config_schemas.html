@@ -1,0 +1,721 @@
+{% extends "base.html" %}
+
+{% block title %}Config Schemas - Seedarr v2.0{% endblock %}
+
+{% block page_title %}Tracker Config Schemas{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Config editor styles */
+    .config-list {
+        max-height: calc(100vh - 300px);
+        overflow-y: auto;
+    }
+
+    .config-item {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: background-color 0.15s;
+    }
+
+    .config-item:hover {
+        background: var(--nav-hover);
+    }
+
+    .config-item.active {
+        background: var(--nav-active-bg);
+        border-left: 3px solid var(--accent-color, #3b82f6);
+    }
+
+    .config-item-name {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+
+    .config-item-slug {
+        font-family: monospace;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+
+    .config-item-badges {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .config-badge {
+        font-size: 0.65rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 9999px;
+        background: var(--border-color);
+        color: var(--text-secondary);
+    }
+
+    .config-badge.workflow { background: #22c55e33; color: #22c55e; }
+    .config-badge.mappings { background: #3b82f633; color: #3b82f6; }
+    .config-badge.cloudflare { background: #f9731633; color: #f97316; }
+
+    /* Editor container */
+    .editor-container {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 200px);
+        background: var(--bg-sidebar);
+        border-radius: 0.5rem;
+        border: 1px solid var(--border-color);
+    }
+
+    .editor-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+        background: var(--bg-base);
+        border-radius: 0.5rem 0.5rem 0 0;
+    }
+
+    .editor-title {
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .editor-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    /* Code editor textarea */
+    .yaml-editor {
+        flex: 1;
+        width: 100%;
+        padding: 1rem;
+        font-family: 'Monaco', 'Menlo', 'Consolas', 'Liberation Mono', monospace;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        background: #1a1a2e;
+        color: #e4e4e7;
+        border: none;
+        resize: none;
+        outline: none;
+        tab-size: 2;
+    }
+
+    .yaml-editor:focus {
+        outline: none;
+    }
+
+    /* Validation panel */
+    .validation-panel {
+        padding: 0.75rem 1rem;
+        border-top: 1px solid var(--border-color);
+        background: var(--bg-base);
+        border-radius: 0 0 0.5rem 0.5rem;
+        max-height: 150px;
+        overflow-y: auto;
+    }
+
+    .validation-success {
+        color: #22c55e;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .validation-error {
+        color: #ef4444;
+        font-size: 0.875rem;
+        margin: 0.25rem 0;
+    }
+
+    .validation-warning {
+        color: #f59e0b;
+        font-size: 0.875rem;
+        margin: 0.25rem 0;
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(4px);
+    }
+
+    .modal-content {
+        background: var(--bg-sidebar);
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        max-width: 500px;
+        width: 90%;
+        border: 1px solid var(--border-color);
+    }
+
+    .modal-header {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+
+    /* Empty state */
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: var(--text-secondary);
+        padding: 2rem;
+        text-align: center;
+    }
+
+    .empty-state svg {
+        width: 4rem;
+        height: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+        .config-layout {
+            flex-direction: column;
+        }
+        .config-sidebar {
+            width: 100% !important;
+            max-height: 300px;
+        }
+        .editor-container {
+            height: 500px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div>
+            <h1 class="dashboard-title">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                </svg>
+                Tracker Config Schemas
+            </h1>
+            <p class="dashboard-subtitle">Edit YAML configuration files for trackers</p>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="showNewConfigModal()" class="btn btn-primary btn-sm">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                New Config
+            </button>
+        </div>
+    </div>
+
+    <!-- Messages -->
+    <div id="message-container" class="mb-4"></div>
+
+    <!-- Main Layout -->
+    <div class="config-layout flex gap-4" style="min-height: calc(100vh - 250px);">
+        <!-- Sidebar: Config List -->
+        <div class="config-sidebar bg-base-200 rounded-lg border border-base-300" style="width: 300px; flex-shrink: 0;">
+            <div class="p-3 border-b border-base-300">
+                <input type="text" id="config-search" placeholder="Search configs..."
+                       class="input input-sm input-bordered w-full"
+                       oninput="filterConfigs(this.value)">
+            </div>
+            <div class="config-list" id="config-list">
+                {% for config in configs %}
+                <div class="config-item" data-slug="{{ config.slug }}" onclick="loadConfig('{{ config.slug }}')">
+                    <div class="config-item-name">{{ config.name }}</div>
+                    <div class="config-item-slug">{{ config.slug }}.yaml</div>
+                    <div class="config-item-badges">
+                        <span class="config-badge">{{ config.auth_type }}</span>
+                        {% if config.has_workflow %}
+                        <span class="config-badge workflow">workflow</span>
+                        {% endif %}
+                        {% if config.has_mappings %}
+                        <span class="config-badge mappings">mappings</span>
+                        {% endif %}
+                        {% if config.cloudflare_enabled %}
+                        <span class="config-badge cloudflare">cloudflare</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-base-content/50">
+                    No config files found
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Editor Panel -->
+        <div class="flex-1">
+            <div class="editor-container" id="editor-container">
+                <!-- Empty state -->
+                <div class="empty-state" id="empty-state">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <p class="text-lg font-medium">Select a config to edit</p>
+                    <p class="text-sm mt-2">Choose a tracker configuration from the list on the left</p>
+                </div>
+
+                <!-- Editor (hidden initially) -->
+                <div id="editor-wrapper" style="display: none; height: 100%; display: flex; flex-direction: column;">
+                    <div class="editor-header">
+                        <div class="editor-title">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <span id="editor-filename">config.yaml</span>
+                            <span id="editor-modified" class="text-warning text-sm" style="display: none;">*</span>
+                        </div>
+                        <div class="editor-actions">
+                            <button onclick="validateConfig()" class="btn btn-ghost btn-sm" title="Validate">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </button>
+                            <button onclick="duplicateConfig()" class="btn btn-ghost btn-sm" title="Duplicate">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                            </button>
+                            <button onclick="deleteConfig()" class="btn btn-ghost btn-sm text-error" title="Delete">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                            <button onclick="saveConfig()" class="btn btn-primary btn-sm">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                                </svg>
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                    <textarea class="yaml-editor" id="yaml-editor" spellcheck="false"
+                              oninput="markModified()"></textarea>
+                    <div class="validation-panel" id="validation-panel">
+                        <div class="validation-success">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Configuration valid</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Config Modal -->
+<div id="new-config-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">Create New Config</div>
+        <form onsubmit="createConfig(event)">
+            <div class="form-control mb-4">
+                <label class="label">
+                    <span class="label-text">Config Slug</span>
+                </label>
+                <input type="text" id="new-config-slug" class="input input-bordered w-full"
+                       placeholder="mytracker" pattern="[a-z0-9_-]+" required>
+                <label class="label">
+                    <span class="label-text-alt">Lowercase letters, numbers, hyphens, underscores only</span>
+                </label>
+            </div>
+            <div class="form-control mb-4">
+                <label class="label">
+                    <span class="label-text">Start From</span>
+                </label>
+                <select id="new-config-template" class="select select-bordered w-full">
+                    <option value="template">Template (recommended)</option>
+                    <option value="empty">Empty</option>
+                    {% for config in configs %}
+                    <option value="{{ config.slug }}">Copy from: {{ config.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex justify-end gap-2 mt-6">
+                <button type="button" onclick="hideNewConfigModal()" class="btn btn-ghost">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Duplicate Config Modal -->
+<div id="duplicate-config-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">Duplicate Config</div>
+        <form onsubmit="doDuplicateConfig(event)">
+            <div class="form-control mb-4">
+                <label class="label">
+                    <span class="label-text">New Config Slug</span>
+                </label>
+                <input type="text" id="duplicate-config-slug" class="input input-bordered w-full"
+                       placeholder="mytracker_copy" pattern="[a-z0-9_-]+" required>
+            </div>
+            <div class="flex justify-end gap-2 mt-6">
+                <button type="button" onclick="hideDuplicateModal()" class="btn btn-ghost">Cancel</button>
+                <button type="submit" class="btn btn-primary">Duplicate</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    let currentSlug = null;
+    let originalContent = '';
+    let isModified = false;
+
+    // Load config into editor
+    async function loadConfig(slug) {
+        if (isModified && !confirm('You have unsaved changes. Discard them?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/config-schemas/${slug}`);
+            if (!response.ok) throw new Error('Failed to load config');
+
+            const data = await response.json();
+
+            // Update UI
+            currentSlug = slug;
+            originalContent = data.content;
+            isModified = false;
+
+            document.getElementById('yaml-editor').value = data.content;
+            document.getElementById('editor-filename').textContent = `${slug}.yaml`;
+            document.getElementById('editor-modified').style.display = 'none';
+
+            // Show editor
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('editor-wrapper').style.display = 'flex';
+
+            // Update active state in list
+            document.querySelectorAll('.config-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.slug === slug) {
+                    item.classList.add('active');
+                }
+            });
+
+            // Show validation errors if any
+            if (data.validation_errors && data.validation_errors.length > 0) {
+                showValidationErrors(data.validation_errors, []);
+            } else {
+                showValidationSuccess();
+            }
+
+        } catch (error) {
+            showMessage('error', error.message);
+        }
+    }
+
+    // Mark as modified
+    function markModified() {
+        const current = document.getElementById('yaml-editor').value;
+        isModified = current !== originalContent;
+        document.getElementById('editor-modified').style.display = isModified ? 'inline' : 'none';
+    }
+
+    // Save config
+    async function saveConfig() {
+        if (!currentSlug) return;
+
+        const content = document.getElementById('yaml-editor').value;
+
+        try {
+            const response = await fetch(`/api/config-schemas/${currentSlug}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({content})
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to save');
+            }
+
+            originalContent = content;
+            isModified = false;
+            document.getElementById('editor-modified').style.display = 'none';
+
+            showMessage('success', 'Configuration saved successfully');
+            showValidationSuccess();
+
+        } catch (error) {
+            showMessage('error', error.message);
+        }
+    }
+
+    // Validate config
+    async function validateConfig() {
+        const content = document.getElementById('yaml-editor').value;
+
+        try {
+            const response = await fetch('/api/config-schemas/validate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({content})
+            });
+
+            const data = await response.json();
+
+            if (data.valid) {
+                showValidationSuccess();
+                if (data.warnings && data.warnings.length > 0) {
+                    showValidationErrors([], data.warnings);
+                }
+                showMessage('success', 'Configuration is valid');
+            } else {
+                showValidationErrors(data.errors, data.warnings || []);
+            }
+
+        } catch (error) {
+            showMessage('error', error.message);
+        }
+    }
+
+    // Show validation success
+    function showValidationSuccess() {
+        document.getElementById('validation-panel').innerHTML = `
+            <div class="validation-success">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                <span>Configuration valid</span>
+            </div>
+        `;
+    }
+
+    // Show validation errors
+    function showValidationErrors(errors, warnings) {
+        let html = '';
+
+        errors.forEach(err => {
+            html += `<div class="validation-error">Error: ${err}</div>`;
+        });
+
+        warnings.forEach(warn => {
+            html += `<div class="validation-warning">Warning: ${warn}</div>`;
+        });
+
+        if (html === '') {
+            showValidationSuccess();
+        } else {
+            document.getElementById('validation-panel').innerHTML = html;
+        }
+    }
+
+    // Delete config
+    async function deleteConfig() {
+        if (!currentSlug) return;
+        if (!confirm(`Are you sure you want to delete "${currentSlug}.yaml"?`)) return;
+
+        try {
+            const response = await fetch(`/api/config-schemas/${currentSlug}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.detail || 'Failed to delete');
+            }
+
+            showMessage('success', 'Configuration deleted');
+
+            // Remove from list and reset editor
+            const item = document.querySelector(`.config-item[data-slug="${currentSlug}"]`);
+            if (item) item.remove();
+
+            currentSlug = null;
+            document.getElementById('empty-state').style.display = 'flex';
+            document.getElementById('editor-wrapper').style.display = 'none';
+
+        } catch (error) {
+            showMessage('error', error.message);
+        }
+    }
+
+    // Show new config modal
+    function showNewConfigModal() {
+        document.getElementById('new-config-modal').style.display = 'flex';
+        document.getElementById('new-config-slug').focus();
+    }
+
+    function hideNewConfigModal() {
+        document.getElementById('new-config-modal').style.display = 'none';
+    }
+
+    // Create new config
+    async function createConfig(event) {
+        event.preventDefault();
+
+        const slug = document.getElementById('new-config-slug').value.toLowerCase();
+        const template = document.getElementById('new-config-template').value;
+
+        try {
+            let content;
+
+            if (template === 'template') {
+                // Get template content
+                const tplResponse = await fetch('/api/config-schemas/template');
+                const tplData = await tplResponse.json();
+                content = tplData.content.replace(/mytracker/g, slug).replace(/My Tracker/g, slug);
+            } else if (template === 'empty') {
+                content = `# ${slug} Tracker Configuration\n\ntracker:\n  name: "${slug}"\n  slug: "${slug}"\n`;
+            } else {
+                // Copy from existing
+                const srcResponse = await fetch(`/api/config-schemas/${template}`);
+                const srcData = await srcResponse.json();
+                content = srcData.content;
+            }
+
+            const response = await fetch('/api/config-schemas', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({slug, content})
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to create');
+            }
+
+            hideNewConfigModal();
+            showMessage('success', `Created ${slug}.yaml`);
+
+            // Reload page to show new config
+            window.location.reload();
+
+        } catch (error) {
+            showMessage('error', error.message);
+        }
+    }
+
+    // Duplicate config
+    function duplicateConfig() {
+        if (!currentSlug) return;
+        document.getElementById('duplicate-config-slug').value = currentSlug + '_copy';
+        document.getElementById('duplicate-config-modal').style.display = 'flex';
+    }
+
+    function hideDuplicateModal() {
+        document.getElementById('duplicate-config-modal').style.display = 'none';
+    }
+
+    async function doDuplicateConfig(event) {
+        event.preventDefault();
+
+        const newSlug = document.getElementById('duplicate-config-slug').value.toLowerCase();
+
+        try {
+            const response = await fetch(`/api/config-schemas/${currentSlug}/duplicate?new_slug=${encodeURIComponent(newSlug)}`, {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to duplicate');
+            }
+
+            hideDuplicateModal();
+            showMessage('success', `Created ${newSlug}.yaml`);
+
+            // Reload page
+            window.location.reload();
+
+        } catch (error) {
+            showMessage('error', error.message);
+        }
+    }
+
+    // Filter configs
+    function filterConfigs(query) {
+        const lowerQuery = query.toLowerCase();
+        document.querySelectorAll('.config-item').forEach(item => {
+            const name = item.querySelector('.config-item-name').textContent.toLowerCase();
+            const slug = item.dataset.slug.toLowerCase();
+            const visible = name.includes(lowerQuery) || slug.includes(lowerQuery);
+            item.style.display = visible ? '' : 'none';
+        });
+    }
+
+    // Show message
+    function showMessage(type, message) {
+        const container = document.getElementById('message-container');
+        const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
+
+        container.innerHTML = `
+            <div class="alert ${alertClass} shadow-lg">
+                <span>${message}</span>
+                <button onclick="this.parentElement.remove()" class="btn btn-ghost btn-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        `;
+
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            const alert = container.querySelector('.alert');
+            if (alert) alert.remove();
+        }, 5000);
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        // Ctrl+S to save
+        if (e.ctrlKey && e.key === 's') {
+            e.preventDefault();
+            if (currentSlug) saveConfig();
+        }
+    });
+
+    // Tab key in textarea
+    document.getElementById('yaml-editor').addEventListener('keydown', (e) => {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const textarea = e.target;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            textarea.value = textarea.value.substring(0, start) + '  ' + textarea.value.substring(end);
+            textarea.selectionStart = textarea.selectionEnd = start + 2;
+            markModified();
+        }
+    });
+
+    // Warn before leaving with unsaved changes
+    window.addEventListener('beforeunload', (e) => {
+        if (isModified) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+</script>
+{% endblock %}

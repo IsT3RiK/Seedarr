@@ -17,36 +17,25 @@ Application web pour automatiser la publication de torrents sur trackers prives.
 ## Installation
 
 ```bash
-git clone https://github.com/IsT3RiK/Seedarr.git
-cd Seedarr
+git clone https://github.com/your-repo/seedarr.git
+cd seedarr
 cp .env.example .env
-docker compose up -d
+docker-compose up -d
 ```
 
 Accessible sur http://localhost:8000
 
 ## Configuration
 
-Apres le premier lancement, configurez l'application via l'interface web:
-
-1. **Settings** (`/settings`)
-   - TMDB API Key (obligatoire) - https://www.themoviedb.org/settings/api
-   - qBittorrent (host, username, password)
-   - FlareSolverr URL (si tracker avec Cloudflare)
-
-2. **Trackers** (`/trackers`)
-   - Ajouter vos trackers (URL, passkey, adapter type)
-   - Tester la connexion
-   - Activer le tracker
-
-3. **Templates** (`/bbcode-templates`) - Optionnel
-   - Personnaliser les presentations BBCode
+1. **Settings** (`/settings`) - TMDB API key, qBittorrent, FlareSolverr, chemins
+2. **Trackers** (`/trackers`) - Ajouter vos trackers (URL, passkey, adapter)
+3. **Templates** (`/bbcode-templates`) - Personnaliser les presentations
 
 ## Utilisation
 
 1. **File Manager** - Selectionner un fichier media
 2. **Add to Queue** - Ajouter a la file d'attente
-3. **Process** - Le pipeline s'execute automatiquement
+3. **Process** - Le pipeline s'execute automatiquement (scan → analyze → rename → metadata → upload)
 4. **Dashboard** - Suivre la progression en temps reel
 
 ## Pages
@@ -70,40 +59,46 @@ Apres le premier lancement, configurez l'application via l'interface web:
 | C411 | c411 | API Key | Non |
 | Generic | generic | Passkey | Non |
 
-## Variables d'environnement (.env)
+## Services requis
 
-| Variable | Description | Defaut |
-|----------|-------------|--------|
-| `APP_PORT` | Port de l'application | 8000 |
-| `MEDIA_PATH` | Chemin vers vos fichiers media | ./media |
-| `TZ` | Timezone | Europe/Paris |
+- **TMDB API Key** - https://www.themoviedb.org/settings/api
+- **qBittorrent** - Pour le seeding
+- **FlareSolverr** - Si tracker avec Cloudflare
 
 ## API
 
 Documentation Swagger: http://localhost:8000/docs
 
 ---
-<img width="2251" height="1301" alt="Screenshot_61" src="https://github.com/user-attachments/assets/f4dd0d30-6a89-47f4-b32b-00e43e25b41f" />
-
-<img width="2267" height="1308" alt="Screenshot_2" src="https://github.com/user-attachments/assets/f33129f0-5037-4e8f-bdf6-4cf5b6333da9" />
-
-<img width="2262" height="1307" alt="Screenshot_4" src="https://github.com/user-attachments/assets/8eca60df-f13b-4238-bd9d-4375f761f286" />
-
-<img width="2263" height="1314" alt="Screenshot_5" src="https://github.com/user-attachments/assets/00f7b655-7980-4cce-932b-beccadfe39eb" />
 
 ## Developpement
 
-```bash
-git clone https://github.com/IsT3RiK/Seedarr.git
-cd Seedarr
+Pour contribuer ou modifier le code:
 
+```bash
+# Cloner et setup
+git clone https://github.com/your-repo/seedarr.git
+cd seedarr
+
+# Environnement virtuel
 python -m venv venv
 venv\Scripts\activate  # Windows
 source venv/bin/activate  # Linux/Mac
 
+# Dependances
 pip install -r backend/requirements.txt
+
+# Base de donnees
 cd backend && alembic upgrade head
+
+# Lancer en mode dev (hot reload)
 python dev.py
+```
+
+### Tests
+
+```bash
+pytest backend/tests -v
 ```
 
 ## License

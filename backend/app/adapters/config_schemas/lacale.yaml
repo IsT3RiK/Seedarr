@@ -1,115 +1,291 @@
 # La Cale Tracker Configuration
-# This file defines how to interact with the La Cale tracker API
+# French private tracker - Config-Driven v2.0
+# Updated for La Cale External API (2026)
 
 tracker:
   name: "La Cale"
   slug: "lacale"
   description: "La Cale French private tracker"
+  url: "https://la-cale.space"
 
-# Authentication configuration
+# ============================================================================
+# AUTHENTICATION
+# ============================================================================
+# La Cale uses API Key authentication (X-Api-Key header)
+# The API key is the same as what was previously called "passkey"
 auth:
-  type: "passkey"             # bearer | passkey | cookie | api_key
-  passkey_param: "passkey"    # URL parameter name for passkey
+  type: "api_key"
+  header_name: "X-Api-Key"
+  query_param: "apikey"  # Also send as query param for search compatibility
 
-# Cloudflare bypass configuration
+# ============================================================================
+# CLOUDFLARE BYPASS CONFIGURATION
+# ============================================================================
 cloudflare:
-  enabled: true               # La Cale uses Cloudflare protection
-  service: "flaresolverr"     # FlareSolverr service for bypass
-  timeout: 60000              # Timeout in milliseconds
+  enabled: true
+  service: "flaresolverr"
+  timeout: 60000
+  use_requests_session: true  # Use requests.Session to avoid cookie transfer issues
 
-# API endpoints
+# ============================================================================
+# API ENDPOINTS (La Cale External API)
+# Documentation: https://la-cale.space/api/external/docs
+# ============================================================================
 endpoints:
-  base: "/ajax"
-  upload: "/ajax/upload.php"
-  tags: "/ajax/tags.php"
-  categories: "/ajax/categories.php"
-  search: "/ajax/search.php"
-  health: "/ajax/ping.php"
+  base: "/api/external"
+  upload: "/api/external/upload"
+  meta: "/api/external/meta"
+  search: "/api/external"
+  download: "/api/torrents/download/{infoHash}"
 
-# Upload form configuration
+# ============================================================================
+# SEARCH CONFIGURATION
+# ============================================================================
+search:
+  method: "GET"
+  endpoint: "/api/external"
+  auth_header: true
+  default_query: "FRENCH"  # Default query appended to TMDB searches
+  params:
+    query: "q"           # Text search (max 200 chars)
+    tmdb_id: "tmdbId"    # TMDB ID for exact matching
+    category: "cat"      # Category slug (repeatable)
+  response:
+    format: "json_array"
+    fields:
+      id: "guid"
+      title: "title"
+      size: "size"
+      pub_date: "pubDate"
+      download_link: "link"
+      category: "category"
+      seeders: "seeders"
+      leechers: "leechers"
+      info_hash: "infoHash"
+  limits:
+    max_results: 50
+    query_max_length: 200
+    category_max_length: 64
+  cache:
+    ttl_seconds: 30
+
+# ============================================================================
+# METADATA ENDPOINT
+# ============================================================================
+metadata:
+  method: "GET"
+  endpoint: "/api/external/meta"
+  auth_header: true
+  response:
+    categories: "categories"
+    tag_groups: "tagGroups"
+    ungrouped_tags: "ungroupedTags"
+  cache:
+    ttl_seconds: 3600
+
+# ============================================================================
+# MAPPINGS - Pure Value Conversion Tables (Zero Logic)
+# ============================================================================
+mappings:
+  # Category based on media type
+  category:
+    input_field: "media_type"
+    output_field: "category"
+    values:
+      "movie": "films"
+      "tv": "series"
+      "anime": "anime"
+      "documentary": "documentaires"
+      "music": "musique"
+    fallback: "films"
+
+  # Resolution tag mapping
+  resolution:
+    input_field: "resolution"
+    output_field: "resolution_tag"
+    values:
+      "2160p": "4K"
+      "4k": "4K"
+      "uhd": "4K"
+      "1080p": "1080p"
+      "1080i": "1080p"
+      "720p": "720p"
+      "480p": "SD"
+      "sd": "SD"
+    fallback: "1080p"
+
+  # Source tag mapping
+  source:
+    input_field: "source"
+    output_field: "source_tag"
+    values:
+      "bluray": "BluRay"
+      "blu-ray": "BluRay"
+      "remux": "BluRay"
+      "web-dl": "WEB-DL"
+      "webdl": "WEB-DL"
+      "web": "WEB-DL"
+      "webrip": "WEBRip"
+      "hdtv": "HDTV"
+      "dvdrip": "DVDRip"
+      "dvd": "DVDRip"
+    fallback: "WEB-DL"
+
+  # Language tag mapping
+  language:
+    input_field: "languages"
+    output_field: "language_tags"
+    multi: true
+    values:
+      "french": "French"
+      "english": "English"
+      "multi": "Multi"
+      "vostfr": "VOSTFR"
+      "vff": "French"
+      "vfq": "French"
+    fallback: "Multi"
+
+  # TMDB type mapping (must be uppercase for La Cale API)
+  tmdb_type:
+    input_field: "media_type"
+    output_field: "tmdb_type"
+    values:
+      "movie": "MOVIE"
+      "tv": "TV"
+    fallback: "MOVIE"
+
+# ============================================================================
+# UPLOAD CONFIGURATION (La Cale External API)
+# POST /api/external/upload - multipart/form-data
+# ============================================================================
 upload:
   method: "POST"
+  endpoint: "/api/external/upload"
   content_type: "multipart/form-data"
+  auth_header: true  # Uses X-Api-Key header
 
   # CRITICAL: La Cale requires tags as REPEATED form fields
-  # Example: tags[]=10&tags[]=15&tags[]=20 (NOT tags=["10","15","20"])
+  # Example: tags=ID1&tags=ID2 (NOT tags=["ID1","ID2"])
   tags_as_repeated_fields: true
 
-  # Field mappings
   fields:
-    torrent:
-      name: "torrent"
-      type: "file"
-      required: true
-
-    nfo:
-      name: "nfo"
-      type: "file"
-      required: true          # La Cale requires NFO
-
+    # Required fields
     title:
-      name: "name"
+      name: "title"
       type: "string"
       source: "release_name"
       required: true
 
     category:
-      name: "category"
+      name: "categoryId"
       type: "string"
       source: "category_id"
       required: true
 
+    torrent:
+      name: "file"
+      type: "file"
+      source: "torrent_data"
+      filename: "{release_name}.torrent"
+      content_type: "application/x-bittorrent"
+      required: true
+
+    nfo:
+      name: "nfoFile"
+      type: "file"
+      source: "nfo_data"
+      filename: "{release_name}.nfo"
+      content_type: "text/plain"
+      required: true
+      min_length: 50
+
+    # Optional fields
     tags:
-      name: "tags[]"          # Repeated field notation
+      name: "tags"
       type: "repeated"
       source: "tag_ids"
       required: false
 
     description:
-      name: "descr"
+      name: "description"
       type: "string"
       source: "description"
       required: false
 
     tmdb_id:
-      name: "tmdb"
+      name: "tmdbId"
       type: "string"
       source: "tmdb_id"
       required: false
 
     tmdb_type:
-      name: "tmdb_type"
+      name: "tmdbType"
       type: "string"
       source: "tmdb_type"
       required: false
+      # Must be "MOVIE" or "TV" (uppercase)
 
     cover_url:
-      name: "cover"
+      name: "coverUrl"
       type: "string"
       source: "cover_url"
       required: false
 
-# La Cale doesn't use the same options system as C411
-# Tags are used instead for resolution, language, etc.
-options: {}
+# ============================================================================
+# RESPONSE PARSING
+# ============================================================================
+response:
+  # Upload response format
+  upload:
+    success_field: "success"
+    id_field: "id"
+    slug_field: "slug"
+    url_field: "link"
+    error_field: "message"
 
-# Category configuration
+  # Error codes
+  errors:
+    400: "Bad request - check parameters"
+    401: "Missing API key"
+    403: "Invalid API key"
+    409: "Torrent already exists (duplicate infoHash)"
+    429: "Rate limit exceeded"
+    500: "Server error"
+
+# ============================================================================
+# RATE LIMITING
+# ============================================================================
+rate_limiting:
+  upload:
+    requests_per_minute: 30
+  search:
+    requests_per_minute: 60
+
+# ============================================================================
+# TORRENT GENERATION
+# ============================================================================
+torrent:
+  piece_size_strategy: "standard"
+  source_flag: "lacale"
+  # Important: Torrent must contain source flag "lacale"
+  # Otherwise client will need to re-download from site
+
+# ============================================================================
+# CATEGORY CONFIGURATION (IDs from /api/external/meta)
+# ============================================================================
 categories:
-  movie_4k: "1"
-  movie_2160p: "1"
-  movie_1080p: "1"
-  movie_720p: "1"
-  tv_1080p: "2"
-  tv_720p: "2"
-  tv_4k: "2"
-  anime: "3"
-  documentary: "4"
-  music: "5"
-  games: "6"
-  software: "7"
-  ebook: "8"
+  # Use category slugs from API, not hardcoded IDs
+  # IDs should be fetched from metadata endpoint
+  movie_category: "films"
+  tv_category: "series"
+  anime_category: "anime"
+  documentary_category: "documentaires"
+  music_category: "musique"
 
-# Tag groups (for reference - actual IDs come from API)
+# ============================================================================
+# TAG GROUPS (Reference - actual IDs come from API)
+# Fetch from /api/external/meta endpoint
+# ============================================================================
 tag_groups:
   resolution:
     - "4K"
@@ -134,14 +310,49 @@ tag_groups:
     - "HDR"
     - "DV"
 
-# Piece size strategy
-torrent:
-  piece_size_strategy: "standard"
-  source_flag: "lacale"       # Makes torrent hash unique per tracker
+# ============================================================================
+# VALIDATION
+# ============================================================================
+validation:
+  torrent_data:
+    required: true
+  nfo_data:
+    required: true
+    min_length: 50
+  release_name:
+    required: true
+    min_length: 5
+    max_length: 255
 
-# Response parsing
-response:
-  success_field: "success"
-  error_field: "error"
-  torrent_id_field: "torrent_id"
-  torrent_url_template: "{tracker_url}/torrent/{torrent_id}"
+# ============================================================================
+# PROWLARR INTEGRATION
+# ============================================================================
+prowlarr:
+  definitions: ["lacale", "la-cale"]
+  url_patterns: ["la-cale", "lacale"]
+  auto_config:
+    source_flag: "lacale"
+    piece_size_strategy: "standard"
+    requires_cloudflare: true
+
+# ============================================================================
+# DYNAMIC SOURCES (Fetch from API)
+# Uses ConfigAdapter._fetch_dynamic_source() with _get_nested_value() wildcard support
+# ============================================================================
+dynamic_sources:
+  categories:
+    endpoint: "/api/external/meta"
+    method: "GET"
+    cache_ttl: 3600
+    response:
+      path: "categories"
+      id_field: "id"
+      name_field: "name"
+  tags:
+    endpoint: "/api/external/meta"
+    method: "GET"
+    cache_ttl: 3600
+    response:
+      path: "tagGroups[*].tags"
+      id_field: "id"
+      name_field: "name"

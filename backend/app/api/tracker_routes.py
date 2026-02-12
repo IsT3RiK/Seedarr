@@ -179,10 +179,10 @@ async def trackers_page(request: Request, db: Session = Depends(get_db)):
 
     # Available adapter types
     adapter_types = [
-        {"value": "lacale", "label": "La Cale (legacy)"},
-        {"value": "c411", "label": "C411 (legacy)"},
         {"value": "config", "label": "Config-driven (YAML)"},
         {"value": "generic", "label": "Generic (fallback)"},
+        {"value": "lacale", "label": "La Cale (legacy -> config)"},
+        {"value": "c411", "label": "C411 (legacy -> config)"},
     ]
 
     # Piece size strategies
@@ -209,6 +209,222 @@ async def trackers_page(request: Request, db: Session = Depends(get_db)):
             "naming_templates": naming_templates,
         }
     )
+
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+async def _auto_configure_tracker(db: Session, tracker: Tracker) -> None:
+    """
+    Auto-configure a tracker after creation.
+
+    This function:
+    1. Syncs categories from tracker API if credentials are available
+    2. Auto-selects matching BBCode templates
+
+    Args:
+        db: Database session
+        tracker: Newly created tracker
+    """
+    settings = Settings.get_settings(db)
+
+    # Auto-sync categories if credentials are available
+    if tracker.api_key or tracker.passkey:
+        try:
+            factory = TrackerFactory(
+                db,
+                flaresolverr_url=settings.flaresolverr_url if settings else None
+            )
+            adapter = factory.get_adapter(tracker)
+            categories = await adapter.get_categories()
+            if categories:
+                count = _sync_categories_generic(db, tracker, categories)
+                logger.info(f"Auto-synced {count} categories for tracker {tracker.name}")
+        except Exception as e:
+            logger.warning(f"Could not auto-sync categories for {tracker.name}: {e}")
+
+    # Auto-select matching BBCode template
+    try:
+        matching_template = db.query(BBCodeTemplate).filter(
+            BBCodeTemplate.name.ilike(f'%{tracker.slug}%')
+        ).first()
+        if matching_template:
+            tracker.default_template_id = matching_template.id
+            logger.info(f"Auto-selected template '{matching_template.name}' for {tracker.name}")
+
+        # Set announce URL template if not already set
+        if not tracker.announce_url_template:
+            tracker.announce_url_template = "{url}/announce?passkey={passkey}"
+
+        db.commit()
+    except Exception as e:
+        logger.warning(f"Could not auto-select templates for {tracker.name}: {e}")
+
+
+def _sync_categories_generic(db: Session, tracker: Tracker, categories: list) -> int:
+    """
+    Sync categories to tracker's category_mapping.
+
+    Works for any tracker - stores categories as mapping dict.
+    Supports hierarchical categories (with subcategories) for trackers like C411.
+
+    Args:
+        db: Database session
+        tracker: Tracker model
+        categories: List of category dicts from API
+
+    Returns:
+        Number of categories synced
+    """
+    category_mapping = tracker.category_mapping or {}
+    has_subcategories = any(cat.get('subcategories') for cat in categories)
+
+    if has_subcategories:
+        # Hierarchical categories (e.g., C411: category + subcategory system)
+        logger.info(f"Detected hierarchical categories for {tracker.name}")
+
+        # Also sync to C411Category table if available
+        try:
+            from app.models.c411_category import C411Category
+            # Convert to raw format expected by C411Category.sync_from_api
+            raw_cats = []
+            for cat in categories:
+                raw_cat = {
+                    'id': cat.get('category_id', ''),
+                    'name': cat.get('name', ''),
+                    'subcategories': cat.get('subcategories', [])
+                }
+                raw_cats.append(raw_cat)
+            C411Category.sync_from_api(db, tracker.id, raw_cats)
+        except Exception as e:
+            logger.debug(f"C411Category sync skipped: {e}")
+
+        default_category_id = None
+        subcategory_mapping = {}
+
+        for cat in categories:
+            cat_id = cat.get('category_id', '')
+            cat_name = cat.get('name', '')
+            subcats = cat.get('subcategories') or []
+
+            # "Films & Vidéos" is the main media category
+            if _matches_pattern(cat_name, 'film') and (_matches_pattern(cat_name, 'video') or subcats):
+                # Check if subcategories contain media types (Film, Série, etc.)
+                has_media_subcats = any(
+                    _matches_pattern(s.get('name', ''), 'film', 'serie', 'anim', 'doc')
+                    for s in subcats
+                )
+                if has_media_subcats or _matches_pattern(cat_name, 'video'):
+                    default_category_id = cat_id
+
+                    for sub in subcats:
+                        sub_id = str(sub.get('id', ''))
+                        sub_name = sub.get('name') or ''
+
+                        # Film/Movie (not animation or série)
+                        if _matches_pattern(sub_name, 'film', 'movie') and not _matches_pattern(sub_name, 'anim', 'serie', 'series'):
+                            subcategory_mapping['movie'] = sub_id
+                            subcategory_mapping['movie_4k'] = sub_id
+                            subcategory_mapping['movie_2160p'] = sub_id
+                            subcategory_mapping['movie_1080p'] = sub_id
+                            subcategory_mapping['movie_720p'] = sub_id
+
+                        # Série TV / TV Series
+                        elif _matches_pattern(sub_name, 'serie', 'series') and not _matches_pattern(sub_name, 'anim'):
+                            subcategory_mapping['tv'] = sub_id
+                            subcategory_mapping['series'] = sub_id
+                            subcategory_mapping['tv_4k'] = sub_id
+                            subcategory_mapping['tv_2160p'] = sub_id
+                            subcategory_mapping['tv_1080p'] = sub_id
+                            subcategory_mapping['tv_720p'] = sub_id
+                            subcategory_mapping['series_4k'] = sub_id
+                            subcategory_mapping['series_1080p'] = sub_id
+                            subcategory_mapping['series_720p'] = sub_id
+
+                        # Animation Série (anime series)
+                        elif _matches_pattern(sub_name, 'anim') and _matches_pattern(sub_name, 'serie', 'series'):
+                            subcategory_mapping['anime_series'] = sub_id
+
+                        # Animation (anime movie)
+                        elif _matches_pattern(sub_name, 'anim') and not _matches_pattern(sub_name, 'serie', 'series'):
+                            subcategory_mapping['anime_movie'] = sub_id
+
+                        # Documentaire / Documentary
+                        elif _matches_pattern(sub_name, 'doc', 'documentaire', 'documentary'):
+                            subcategory_mapping['documentary'] = sub_id
+                            subcategory_mapping['documentary_4k'] = sub_id
+                            subcategory_mapping['documentary_1080p'] = sub_id
+                            subcategory_mapping['documentary_720p'] = sub_id
+
+                        # Concert / Spectacle
+                        elif _matches_pattern(sub_name, 'concert', 'spectacle', 'show', 'live'):
+                            subcategory_mapping['concert'] = sub_id
+
+                        # Émission TV / TV Show
+                        elif _matches_pattern(sub_name, 'emission', 'tvshow'):
+                            subcategory_mapping['tv_show'] = sub_id
+
+            # Audio category
+            elif _matches_pattern(cat_name, 'audio', 'musique', 'music'):
+                subcats = cat.get('subcategories') or []
+                for sub in subcats:
+                    sub_id = str(sub.get('id', ''))
+                    sub_name = sub.get('name') or ''
+                    if _matches_pattern(sub_name, 'musique', 'music'):
+                        subcategory_mapping['music'] = sub_id
+                        category_mapping['music_category'] = cat_id
+
+            # Ebook category
+            elif _matches_pattern(cat_name, 'ebook', 'book', 'livre'):
+                category_mapping['book_category'] = cat_id
+
+            # Games category
+            elif _matches_pattern(cat_name, 'jeux', 'game', 'jeu'):
+                category_mapping['game_category'] = cat_id
+
+        # Set main category (parent) for movie/tv/anime/documentary
+        if default_category_id:
+            category_mapping['default'] = default_category_id
+            category_mapping['movie_category'] = default_category_id
+            category_mapping['tv_category'] = default_category_id
+            category_mapping['anime_category'] = default_category_id
+            category_mapping['documentary_category'] = default_category_id
+
+        # Merge subcategory mappings
+        category_mapping.update(subcategory_mapping)
+
+        # Set default IDs on tracker model
+        if default_category_id and not tracker.default_category_id:
+            tracker.default_category_id = default_category_id
+        if subcategory_mapping.get('movie') and not getattr(tracker, 'default_subcategory_id', None):
+            tracker.default_subcategory_id = subcategory_mapping['movie']
+
+        logger.info(f"Hierarchical category_mapping for {tracker.name}: {category_mapping}")
+
+    else:
+        # Flat categories (simple tracker)
+        for cat in categories:
+            cat_name = cat.get('name', '').lower()
+            cat_id = cat.get('category_id', '')
+
+            # Map common category names to standard keys
+            if 'film' in cat_name or 'movie' in cat_name:
+                category_mapping['movie_category'] = cat_id
+            elif 'serie' in cat_name or 'séries' in cat_name or 'tv' in cat_name:
+                category_mapping['tv_category'] = cat_id
+            elif 'anime' in cat_name or 'animation' in cat_name:
+                category_mapping['anime_category'] = cat_id
+            elif 'doc' in cat_name:
+                category_mapping['documentary_category'] = cat_id
+
+            # Also store by name for subcategory resolution
+            category_mapping[cat_name] = cat_id
+
+    tracker.category_mapping = category_mapping
+    db.commit()
+
+    return len(categories)
 
 
 # ============================================================================
@@ -280,6 +496,9 @@ async def create_tracker(
     tracker = Tracker.create(db, **tracker_data.model_dump())
 
     logger.info(f"Created tracker: {tracker.name} (id={tracker.id})")
+
+    # Auto-configure tracker (sync categories, select templates)
+    await _auto_configure_tracker(db, tracker)
 
     return TrackerResponse(**tracker.to_dict(mask_secrets=True))
 
@@ -563,6 +782,49 @@ async def check_duplicate(
         )
 
 
+import re
+import unicodedata
+
+
+def _normalize_category_name(name: str) -> str:
+    """
+    Normalize category name for flexible matching.
+
+    Removes accents, special characters, and converts to lowercase
+    for case-insensitive and accent-insensitive comparisons.
+
+    Args:
+        name: Category name to normalize
+
+    Returns:
+        Normalized string with only lowercase alphanumeric characters
+    """
+    # Normalize unicode characters (NFD decomposes accents)
+    normalized = unicodedata.normalize('NFD', name)
+    # Remove diacritics (accents)
+    without_accents = ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
+    # Remove non-alphanumeric and lowercase
+    return re.sub(r'[^a-z0-9]', '', without_accents.lower())
+
+
+def _matches_pattern(name: str, *patterns: str) -> bool:
+    """
+    Check if name matches any of the given patterns.
+
+    Uses normalized comparison for flexible matching that's insensitive
+    to accents, case, spaces, and special characters.
+
+    Args:
+        name: Category name to check
+        *patterns: Pattern strings to match against
+
+    Returns:
+        True if normalized name contains any of the patterns
+    """
+    normalized = _normalize_category_name(name)
+    return any(p in normalized for p in patterns)
+
+
 async def _sync_c411_categories(
     db: Session,
     tracker: Tracker,
@@ -574,6 +836,11 @@ async def _sync_c411_categories(
     C411 uses a category + subcategory system:
     - categoryId: Main category (e.g., 1 = "Films & Vidéos")
     - subcategoryId: Specific type (e.g., 6 = "Film", 7 = "Série TV")
+
+    Uses flexible pattern matching for category detection that is:
+    - Case insensitive (Film, film, FILM all match)
+    - Accent insensitive (série, serie both match)
+    - Space/punctuation insensitive (Série TV, SerieTV both match)
 
     Args:
         db: Database session
@@ -598,59 +865,73 @@ async def _sync_c411_categories(
 
         for cat in categories:
             cat_id = str(cat.get('id', ''))
-            cat_name = (cat.get('name') or cat.get('label', '')).lower()
+            cat_name = cat.get('name') or cat.get('label', '')
 
             # "Films & Vidéos" is the main media category
-            if 'film' in cat_name and 'vidéo' in cat_name:
+            # Flexible match: film + (video or vidéo)
+            if _matches_pattern(cat_name, 'film') and _matches_pattern(cat_name, 'video'):
                 default_category_id = cat_id
 
                 # Process subcategories
                 subcats = cat.get('subcategories') or []
                 for sub in subcats:
                     sub_id = str(sub.get('id', ''))
-                    sub_name = (sub.get('name') or '').lower()
+                    sub_name = sub.get('name') or ''
 
-                    # Map subcategories to media types
-                    if sub_name == 'film':
+                    # Map subcategories to media types using flexible matching
+                    # Film/Movie (but not animation or série)
+                    if _matches_pattern(sub_name, 'film', 'movie') and not _matches_pattern(sub_name, 'anim', 'serie', 'series'):
                         subcategory_mapping['movie'] = sub_id
                         subcategory_mapping['movie_4k'] = sub_id
                         subcategory_mapping['movie_1080p'] = sub_id
                         subcategory_mapping['movie_720p'] = sub_id
                         if not default_subcategory_id:
                             default_subcategory_id = sub_id
-                    elif 'série tv' in sub_name or sub_name == 'série tv':
+
+                    # Série TV / TV Series
+                    elif _matches_pattern(sub_name, 'serie', 'series') and not _matches_pattern(sub_name, 'anim'):
                         subcategory_mapping['tv'] = sub_id
                         subcategory_mapping['series'] = sub_id
                         subcategory_mapping['series_4k'] = sub_id
                         subcategory_mapping['series_1080p'] = sub_id
                         subcategory_mapping['series_720p'] = sub_id
-                    elif sub_name == 'animation':
-                        subcategory_mapping['anime_movie'] = sub_id
-                    elif 'animation série' in sub_name:
+
+                    # Animation Série (anime series)
+                    elif _matches_pattern(sub_name, 'anim') and _matches_pattern(sub_name, 'serie', 'series'):
                         subcategory_mapping['anime_series'] = sub_id
-                    elif 'documentaire' in sub_name:
+
+                    # Animation (anime movie) - animation but not série
+                    elif _matches_pattern(sub_name, 'anim') and not _matches_pattern(sub_name, 'serie', 'series'):
+                        subcategory_mapping['anime_movie'] = sub_id
+
+                    # Documentaire / Documentary
+                    elif _matches_pattern(sub_name, 'doc', 'documentaire', 'documentary'):
                         subcategory_mapping['documentary'] = sub_id
-                    elif 'concert' in sub_name or 'spectacle' in sub_name:
+
+                    # Concert / Spectacle
+                    elif _matches_pattern(sub_name, 'concert', 'spectacle', 'show', 'live'):
                         subcategory_mapping['concert'] = sub_id
-                    elif 'emission' in sub_name:
+
+                    # Émission TV / TV Show
+                    elif _matches_pattern(sub_name, 'emission', 'tvshow'):
                         subcategory_mapping['tv_show'] = sub_id
 
             # Audio category
-            elif 'audio' in cat_name:
+            elif _matches_pattern(cat_name, 'audio', 'musique', 'music'):
                 subcats = cat.get('subcategories') or []
                 for sub in subcats:
                     sub_id = str(sub.get('id', ''))
-                    sub_name = (sub.get('name') or '').lower()
-                    if 'musique' in sub_name:
+                    sub_name = sub.get('name') or ''
+                    if _matches_pattern(sub_name, 'musique', 'music'):
                         subcategory_mapping['music'] = sub_id
                         category_mapping['music_category'] = cat_id
 
             # Ebook category
-            elif 'ebook' in cat_name:
+            elif _matches_pattern(cat_name, 'ebook', 'book', 'livre'):
                 category_mapping['book_category'] = cat_id
 
             # Games category
-            elif 'jeux' in cat_name:
+            elif _matches_pattern(cat_name, 'jeux', 'game', 'jeu'):
                 category_mapping['game_category'] = cat_id
 
         # Store the main category ID (for "Films & Vidéos")
@@ -725,16 +1006,15 @@ async def test_tracker_connection(
             # Perform health check
             health = await adapter.health_check()
 
-            # Sync categories for C411
+            # Sync categories for all trackers
             categories_synced = 0
-            if tracker.adapter_type == "c411":
-                try:
-                    categories = await adapter.get_categories()
-                    if categories:
-                        categories_synced = await _sync_c411_categories(db, tracker, categories)
-                        logger.info(f"Synced {categories_synced} categories for {tracker.name}")
-                except Exception as e:
-                    logger.warning(f"Could not sync categories for {tracker.name}: {e}")
+            try:
+                categories = await adapter.get_categories()
+                if categories:
+                    categories_synced = _sync_categories_generic(db, tracker, categories)
+                    logger.info(f"Synced {categories_synced} categories for {tracker.name}")
+            except Exception as e:
+                logger.warning(f"Could not sync categories for {tracker.name}: {e}")
 
             message = f"Successfully connected to {tracker.name}"
             if categories_synced > 0:
@@ -809,12 +1089,6 @@ async def sync_tracker_categories(
     if not tracker:
         raise HTTPException(status_code=404, detail="Tracker not found")
 
-    if tracker.adapter_type != "c411":
-        return {
-            "success": False,
-            "message": f"Category sync only supported for C411 trackers, not {tracker.adapter_type}"
-        }
-
     try:
         # Get FlareSolverr URL from settings
         settings = Settings.get_settings(db)
@@ -827,7 +1101,7 @@ async def sync_tracker_categories(
         # Fetch and sync categories
         categories = await adapter.get_categories()
         if categories:
-            count = await _sync_c411_categories(db, tracker, categories)
+            count = _sync_categories_generic(db, tracker, categories)
             return {
                 "success": True,
                 "message": f"Synced {count} categories",

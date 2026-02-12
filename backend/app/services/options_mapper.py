@@ -210,6 +210,15 @@ class OptionsMapper:
                 if "720p_light" in mappings:
                     return mappings["720p_light"]
 
+        # BluRay encodes (x265/x264) → Light/HDRip, not Full BluRay
+        if source_lower and "blu" in source_lower and ("x265" in release_lower or "x264" in release_lower):
+            if "2160" in resolution_norm or "4k" in resolution_norm:
+                return mappings.get("4klight") or mappings.get("2160p_light") or mappings.get("2160p_bluray")
+            elif "1080" in resolution_norm:
+                return mappings.get("hdlight_1080") or mappings.get("1080p_light") or mappings.get("1080p_bluray")
+            elif "720" in resolution_norm:
+                return mappings.get("hdlight_720") or mappings.get("720p_light") or mappings.get("720p_bluray")
+
         # Normalize source
         if "remux" in source_lower or "remux" in release_lower:
             source_norm = "remux"

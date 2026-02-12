@@ -15,10 +15,12 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.settings import Settings
+from app.models.tracker import Tracker
 from app.services.health_check_service import (
     get_health_service,
     HealthStatus
 )
+from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -155,3 +157,111 @@ async def clear_health_cache():
 
     logger.info("Health check cache cleared")
     return {"status": "success", "message": "Health check cache cleared"}
+
+
+@router.get("/config-status")
+async def get_config_status(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """
+    Check configuration status and return missing or incomplete settings.
+
+    This endpoint helps users identify what needs to be configured
+    for the application to function properly.
+
+    Returns:
+        JSON with status and list of configuration issues
+    """
+    settings = Settings.get_settings(db)
+    trackers = Tracker.get_all(db)
+    enabled_trackers = Tracker.get_enabled(db)
+
+    issues: List[Dict[str, Any]] = []
+
+    # Check TMDB API key
+    if not settings.tmdb_api_key:
+        issues.append({
+            "type": "warning",
+            "component": "TMDB",
+            "message": "Clé API TMDB non configurée - les métadonnées ne seront pas disponibles",
+            "fix_url": "/settings#tmdb"
+        })
+
+    # Check qBittorrent
+    if not settings.qbittorrent_host:
+        issues.append({
+            "type": "warning",
+            "component": "qBittorrent",
+            "message": "qBittorrent non configuré - le seeding automatique ne fonctionnera pas",
+            "fix_url": "/settings#qbittorrent"
+        })
+
+    # Check trackers
+    if not trackers:
+        issues.append({
+            "type": "error",
+            "component": "Trackers",
+            "message": "Aucun tracker configuré - vous ne pouvez pas publier de torrents",
+            "fix_url": "/trackers"
+        })
+    elif not enabled_trackers:
+        issues.append({
+            "type": "warning",
+            "component": "Trackers",
+            "message": "Aucun tracker activé - activez au moins un tracker pour publier",
+            "fix_url": "/trackers"
+        })
+
+    # Check all trackers for API key and categories
+    for tracker in trackers:
+        if tracker.is_enabled:
+            # Check API key for trackers that need it
+            if not tracker.api_key and not tracker.passkey:
+                issues.append({
+                    "type": "warning",
+                    "component": f"Tracker {tracker.name}",
+                    "message": "Clé API/passkey manquante - les uploads ne fonctionneront pas",
+                    "fix_url": f"/trackers?edit={tracker.id}"
+                })
+            # Check categories
+            elif not tracker.category_mapping:
+                issues.append({
+                    "type": "warning",
+                    "component": f"Tracker {tracker.name}",
+                    "message": "Catégories non synchronisées - testez la connexion pour synchroniser",
+                    "fix_action": f"test_tracker_{tracker.id}",
+                    "fix_url": f"/trackers?test={tracker.id}"
+                })
+
+    # Check Prowlarr (optional but useful)
+    if not settings.prowlarr_url:
+        issues.append({
+            "type": "info",
+            "component": "Prowlarr",
+            "message": "Prowlarr non configuré - l'import automatique des trackers n'est pas disponible",
+            "fix_url": "/settings#prowlarr"
+        })
+
+    # Determine overall status
+    has_errors = any(i["type"] == "error" for i in issues)
+    has_warnings = any(i["type"] == "warning" for i in issues)
+
+    if has_errors:
+        status = "error"
+    elif has_warnings:
+        status = "warning"
+    elif issues:
+        status = "info"
+    else:
+        status = "ok"
+
+    return {
+        "status": status,
+        "issues": issues,
+        "issues_count": len(issues),
+        "summary": {
+            "trackers_configured": len(trackers),
+            "trackers_enabled": len(enabled_trackers),
+            "tmdb_configured": bool(settings.tmdb_api_key),
+            "qbittorrent_configured": bool(settings.qbittorrent_host),
+            "prowlarr_configured": bool(settings.prowlarr_url)
+        }
+    }

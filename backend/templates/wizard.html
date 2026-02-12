@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Wizard - Seedarr</title>
+
+    <!-- TailwindCSS + DaisyUI -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@3.9.4/dist/full.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --text-muted: #64748b;
+            --accent-primary: #3b82f6;
+            --accent-success: #10b981;
+            --accent-warning: #f59e0b;
+            --accent-error: #ef4444;
+            --border-primary: #475569;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .wizard-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .wizard-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .wizard-logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            background: linear-gradient(135deg, var(--accent-primary), #8b5cf6);
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .wizard-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .wizard-subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        /* Steps indicator */
+        .steps-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .step-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--bg-tertiary);
+            transition: all 0.3s ease;
+        }
+
+        .step-dot.active {
+            background-color: var(--accent-primary);
+            transform: scale(1.2);
+        }
+
+        .step-dot.completed {
+            background-color: var(--accent-success);
+        }
+
+        /* Wizard card */
+        .wizard-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 1rem;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .wizard-card-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .wizard-card-description {
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+        }
+
+        /* Form styles */
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: 0.5rem;
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .form-hint {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-primary);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--border-primary);
+        }
+
+        .btn-success {
+            background-color: var(--accent-success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #059669;
+        }
+
+        .btn-skip {
+            background: transparent;
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+        }
+
+        .btn-skip:hover {
+            color: var(--text-primary);
+        }
+
+        /* Actions */
+        .wizard-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 2rem;
+        }
+
+        /* Status messages */
+        .status-message {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .status-message.show {
+            display: block;
+        }
+
+        .status-success {
+            background-color: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #6ee7b7;
+        }
+
+        .status-error {
+            background-color: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+
+        .status-loading {
+            background-color: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: #93c5fd;
+        }
+
+        /* Step content */
+        .step-content {
+            display: none;
+        }
+
+        .step-content.active {
+            display: block;
+        }
+
+        /* Indexer list */
+        .indexer-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 1rem 0;
+        }
+
+        .indexer-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background-color: var(--bg-tertiary);
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .indexer-item input[type="checkbox"] {
+            margin-right: 0.75rem;
+        }
+
+        .indexer-name {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .indexer-type {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            background-color: var(--bg-secondary);
+            border-radius: 0.25rem;
+            color: var(--text-muted);
+        }
+
+        /* Completion screen */
+        .completion-icon {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 1.5rem;
+            background-color: rgba(16, 185, 129, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .completion-icon svg {
+            width: 50px;
+            height: 50px;
+            color: var(--accent-success);
+        }
+
+        .completion-text {
+            text-align: center;
+        }
+
+        .completion-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .completion-subtitle {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        /* Animated spinner */
+        .spinner {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="wizard-container">
+        <!-- Header -->
+        <div class="wizard-header">
+            <div class="wizard-logo">
+                <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+            </div>
+            <h1 class="wizard-title">Bienvenue sur Seedarr</h1>
+            <p class="wizard-subtitle">Configurons votre environnement en quelques etapes</p>
+        </div>
+
+        <!-- Steps indicator -->
+        <div class="steps-indicator">
+            <div class="step-dot" id="dot-1"></div>
+            <div class="step-dot" id="dot-2"></div>
+            <div class="step-dot" id="dot-3"></div>
+            <div class="step-dot" id="dot-4"></div>
+            <div class="step-dot" id="dot-5"></div>
+            <div class="step-dot" id="dot-6"></div>
+        </div>
+
+        <!-- Step 1: Welcome -->
+        <div class="step-content" id="step-1">
+            <div class="wizard-card">
+                <h2 class="wizard-card-title">
+                    <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                    </svg>
+                    Bienvenue !
+                </h2>
+                <p class="wizard-card-description">
+                    Seedarr automatise la publication de torrents sur vos trackers prives.
+                    Ce wizard va vous guider pour configurer les elements essentiels.
+                </p>
+
+                <div style="background-color: var(--bg-tertiary); border-radius: 0.5rem; padding: 1rem; margin-top: 1rem;">
+                    <h3 style="font-weight: 600; margin-bottom: 0.75rem;">Ce que nous allons configurer :</h3>
+                    <ul style="list-style: none; padding: 0; margin: 0;">
+                        <li style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            <span>Prowlarr - Import automatique de vos trackers</span>
+                        </li>
+                        <li style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            <span>TMDB - Recuperation des metadonnees</span>
+                        </li>
+                        <li style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            <span>qBittorrent - Seeding automatique</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="wizard-actions">
+                    <button class="btn btn-skip" onclick="skipWizard()">Passer le wizard</button>
+                    <button class="btn btn-primary" onclick="nextStep()">
+                        Commencer
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Prowlarr -->
+        <div class="step-content" id="step-2">
+            <div class="wizard-card">
+                <h2 class="wizard-card-title">
+                    <svg class="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    Configuration Prowlarr
+                </h2>
+                <p class="wizard-card-description">
+                    Prowlarr permet d'importer automatiquement vos trackers configures.
+                    Entrez l'URL et la cle API de votre instance Prowlarr.
+                </p>
+
+                <div class="form-group">
+                    <label class="form-label">URL Prowlarr</label>
+                    <input type="text" class="form-input" id="prowlarr-url" placeholder="http://localhost:9696" value="{{ settings.prowlarr_url or '' }}">
+                    <p class="form-hint">L'adresse de votre instance Prowlarr</p>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Cle API</label>
+                    <input type="text" class="form-input" id="prowlarr-api-key" placeholder="Votre cle API Prowlarr">
+                    <p class="form-hint">Disponible dans Prowlarr > Settings > General > Security</p>
+                </div>
+
+                <button class="btn btn-secondary" onclick="testProwlarr()">
+                    <span id="prowlarr-test-text">Tester la connexion</span>
+                    <span id="prowlarr-test-spinner" class="spinner" style="display: none;"></span>
+                </button>
+
+                <div id="prowlarr-status" class="status-message"></div>
+
+                <div class="wizard-actions">
+                    <button class="btn btn-secondary" onclick="prevStep()">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                        Retour
+                    </button>
+                    <div>
+                        <button class="btn btn-skip" onclick="nextStep()">Passer</button>
+                        <button class="btn btn-primary" onclick="saveProwlarrAndNext()" id="prowlarr-save-btn">
+                            Continuer
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Import Trackers -->
+        <div class="step-content" id="step-3">
+            <div class="wizard-card">
+                <h2 class="wizard-card-title">
+                    <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                    Importer les Trackers
+                </h2>
+                <p class="wizard-card-description">
+                    Selectionnez les trackers a importer depuis Prowlarr.
+                    Les trackers C411 seront automatiquement configures.
+                </p>
+
+                <button class="btn btn-secondary" onclick="loadIndexers()" id="load-indexers-btn">
+                    <span id="indexers-load-text">Charger les indexers</span>
+                    <span id="indexers-load-spinner" class="spinner" style="display: none;"></span>
+                </button>
+
+                <div id="indexers-list" class="indexer-list"></div>
+
+                <button class="btn btn-success" onclick="importSelectedIndexers()" id="import-btn" style="display: none;">
+                    <span id="import-text">Importer la selection</span>
+                    <span id="import-spinner" class="spinner" style="display: none;"></span>
+                </button>
+
+                <div id="import-status" class="status-message"></div>
+
+                <div class="wizard-actions">
+                    <button class="btn btn-secondary" onclick="prevStep()">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                        Retour
+                    </button>
+                    <div>
+                        <button class="btn btn-skip" onclick="nextStep()">Passer</button>
+                        <button class="btn btn-primary" onclick="nextStep()">
+                            Continuer
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4: TMDB -->
+        <div class="step-content" id="step-4">
+            <div class="wizard-card">
+                <h2 class="wizard-card-title">
+                    <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
+                    </svg>
+                    Configuration TMDB
+                </h2>
+                <p class="wizard-card-description">
+                    TMDB est utilise pour recuperer les informations sur vos films et series
+                    (titre, annee, synopsis, poster, etc.).
+                </p>
+
+                <div class="form-group">
+                    <label class="form-label">Cle API TMDB</label>
+                    <input type="text" class="form-input" id="tmdb-api-key" placeholder="Votre cle API TMDB">
+                    <p class="form-hint">
+                        Obtenez une cle gratuite sur
+                        <a href="https://www.themoviedb.org/settings/api" target="_blank" style="color: var(--accent-primary);">themoviedb.org</a>
+                    </p>
+                </div>
+
+                <button class="btn btn-secondary" onclick="testTmdb()">
+                    <span id="tmdb-test-text">Tester la connexion</span>
+                    <span id="tmdb-test-spinner" class="spinner" style="display: none;"></span>
+                </button>
+
+                <div id="tmdb-status" class="status-message"></div>
+
+                <div class="wizard-actions">
+                    <button class="btn btn-secondary" onclick="prevStep()">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                        Retour
+                    </button>
+                    <div>
+                        <button class="btn btn-skip" onclick="nextStep()">Passer</button>
+                        <button class="btn btn-primary" onclick="saveTmdbAndNext()">
+                            Continuer
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 5: qBittorrent -->
+        <div class="step-content" id="step-5">
+            <div class="wizard-card">
+                <h2 class="wizard-card-title">
+                    <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                    </svg>
+                    Configuration qBittorrent
+                </h2>
+                <p class="wizard-card-description">
+                    qBittorrent est utilise pour ajouter automatiquement les torrents
+                    apres upload pour le seeding.
+                </p>
+
+                <div class="form-group">
+                    <label class="form-label">URL qBittorrent</label>
+                    <input type="text" class="form-input" id="qbit-host" placeholder="http://localhost:8080" value="{{ settings.qbittorrent_host or '' }}">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Nom d'utilisateur</label>
+                    <input type="text" class="form-input" id="qbit-username" placeholder="admin" value="{{ settings.qbittorrent_username or '' }}">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Mot de passe</label>
+                    <input type="password" class="form-input" id="qbit-password" placeholder="Mot de passe">
+                </div>
+
+                <button class="btn btn-secondary" onclick="testQbittorrent()">
+                    <span id="qbit-test-text">Tester la connexion</span>
+                    <span id="qbit-test-spinner" class="spinner" style="display: none;"></span>
+                </button>
+
+                <div id="qbit-status" class="status-message"></div>
+
+                <div class="wizard-actions">
+                    <button class="btn btn-secondary" onclick="prevStep()">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                        Retour
+                    </button>
+                    <div>
+                        <button class="btn btn-skip" onclick="nextStep()">Passer</button>
+                        <button class="btn btn-primary" onclick="saveQbitAndNext()">
+                            Continuer
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 6: Complete -->
+        <div class="step-content" id="step-6">
+            <div class="wizard-card">
+                <div class="completion-icon">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+
+                <div class="completion-text">
+                    <h2 class="completion-title">Configuration terminee !</h2>
+                    <p class="completion-subtitle">
+                        Seedarr est pret a etre utilise. Vous pouvez maintenant
+                        commencer a publier vos torrents.
+                    </p>
+                </div>
+
+                <div style="background-color: var(--bg-tertiary); border-radius: 0.5rem; padding: 1rem; margin-bottom: 2rem;">
+                    <h3 style="font-weight: 600; margin-bottom: 0.75rem;">Prochaines etapes :</h3>
+                    <ul style="list-style: none; padding: 0; margin: 0;">
+                        <li style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            <span>Configurez votre dossier d'entree dans les parametres</span>
+                        </li>
+                        <li style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            <span>Activez les uploads pour vos trackers</span>
+                        </li>
+                        <li style="display: flex; align-items: center; gap: 0.5rem;">
+                            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            <span>Lancez un scan depuis le dashboard</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div style="text-align: center;">
+                    <button class="btn btn-success" onclick="completeWizard()" style="font-size: 1.1rem; padding: 1rem 2rem;">
+                        Acceder au Dashboard
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = {{ current_step }};
+        const totalSteps = 6;
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            showStep(currentStep);
+        });
+
+        function showStep(step) {
+            // Hide all steps
+            for (let i = 1; i <= totalSteps; i++) {
+                document.getElementById(`step-${i}`).classList.remove('active');
+                document.getElementById(`dot-${i}`).classList.remove('active', 'completed');
+            }
+
+            // Show current step
+            document.getElementById(`step-${step}`).classList.add('active');
+
+            // Update dots
+            for (let i = 1; i <= totalSteps; i++) {
+                if (i < step) {
+                    document.getElementById(`dot-${i}`).classList.add('completed');
+                } else if (i === step) {
+                    document.getElementById(`dot-${i}`).classList.add('active');
+                }
+            }
+
+            currentStep = step;
+        }
+
+        function nextStep() {
+            if (currentStep < totalSteps) {
+                showStep(currentStep + 1);
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 1) {
+                showStep(currentStep - 1);
+            }
+        }
+
+        function showStatus(elementId, message, type) {
+            const elem = document.getElementById(elementId);
+            elem.textContent = message;
+            elem.className = `status-message show status-${type}`;
+        }
+
+        function hideStatus(elementId) {
+            document.getElementById(elementId).classList.remove('show');
+        }
+
+        // Prowlarr functions
+        async function testProwlarr() {
+            const url = document.getElementById('prowlarr-url').value;
+            const apiKey = document.getElementById('prowlarr-api-key').value;
+
+            if (!url || !apiKey) {
+                showStatus('prowlarr-status', 'Veuillez remplir tous les champs', 'error');
+                return;
+            }
+
+            document.getElementById('prowlarr-test-text').style.display = 'none';
+            document.getElementById('prowlarr-test-spinner').style.display = 'inline-block';
+            showStatus('prowlarr-status', 'Test en cours...', 'loading');
+
+            try {
+                // First save the settings
+                await fetch('/api/settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prowlarr_url: url,
+                        prowlarr_api_key: apiKey
+                    })
+                });
+
+                // Then test connection
+                const resp = await fetch('/api/prowlarr/status');
+                const data = await resp.json();
+
+                if (data.status === 'connected') {
+                    showStatus('prowlarr-status', `Connexion reussie ! Version: ${data.version || 'N/A'}`, 'success');
+                } else {
+                    showStatus('prowlarr-status', data.message || 'Echec de connexion', 'error');
+                }
+            } catch (error) {
+                showStatus('prowlarr-status', 'Erreur de connexion: ' + error.message, 'error');
+            } finally {
+                document.getElementById('prowlarr-test-text').style.display = 'inline';
+                document.getElementById('prowlarr-test-spinner').style.display = 'none';
+            }
+        }
+
+        async function saveProwlarrAndNext() {
+            const url = document.getElementById('prowlarr-url').value;
+            const apiKey = document.getElementById('prowlarr-api-key').value;
+
+            if (url && apiKey) {
+                await fetch('/api/settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prowlarr_url: url,
+                        prowlarr_api_key: apiKey
+                    })
+                });
+            }
+            nextStep();
+        }
+
+        // Indexers functions
+        async function loadIndexers() {
+            document.getElementById('indexers-load-text').style.display = 'none';
+            document.getElementById('indexers-load-spinner').style.display = 'inline-block';
+
+            try {
+                const resp = await fetch('/api/prowlarr/indexers');
+                const data = await resp.json();
+
+                if (data.status === 'error') {
+                    showStatus('import-status', data.message || 'Erreur lors du chargement', 'error');
+                    return;
+                }
+
+                const indexers = data.indexers || [];
+                const container = document.getElementById('indexers-list');
+
+                if (indexers.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">Aucun indexer trouve dans Prowlarr</p>';
+                    return;
+                }
+
+                container.innerHTML = indexers.map(idx => `
+                    <div class="indexer-item">
+                        <input type="checkbox" id="indexer-${idx.id}" value="${idx.id}" ${idx.already_imported ? 'disabled checked' : ''}>
+                        <label for="indexer-${idx.id}" class="indexer-name">${idx.name}</label>
+                        <span class="indexer-type">${idx.adapter_type || 'generic'}</span>
+                        ${idx.already_imported ? '<span style="font-size: 0.75rem; color: var(--accent-success);">Importe</span>' : ''}
+                    </div>
+                `).join('');
+
+                document.getElementById('import-btn').style.display = 'block';
+            } catch (error) {
+                showStatus('import-status', 'Erreur: ' + error.message, 'error');
+            } finally {
+                document.getElementById('indexers-load-text').style.display = 'inline';
+                document.getElementById('indexers-load-spinner').style.display = 'none';
+            }
+        }
+
+        async function importSelectedIndexers() {
+            const checkboxes = document.querySelectorAll('#indexers-list input[type="checkbox"]:checked:not(:disabled)');
+            const ids = Array.from(checkboxes).map(cb => parseInt(cb.value));
+
+            if (ids.length === 0) {
+                showStatus('import-status', 'Selectionnez au moins un indexer', 'error');
+                return;
+            }
+
+            document.getElementById('import-text').style.display = 'none';
+            document.getElementById('import-spinner').style.display = 'inline-block';
+            showStatus('import-status', 'Import en cours...', 'loading');
+
+            try {
+                const resp = await fetch('/api/prowlarr/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ indexer_ids: ids })
+                });
+
+                const data = await resp.json();
+
+                if (data.status === 'success') {
+                    const imported = data.summary?.imported_count || 0;
+                    showStatus('import-status', `${imported} tracker(s) importe(s) avec succes !`, 'success');
+                    // Reload list to show imported status
+                    setTimeout(loadIndexers, 1000);
+                } else {
+                    showStatus('import-status', data.message || 'Erreur lors de l\'import', 'error');
+                }
+            } catch (error) {
+                showStatus('import-status', 'Erreur: ' + error.message, 'error');
+            } finally {
+                document.getElementById('import-text').style.display = 'inline';
+                document.getElementById('import-spinner').style.display = 'none';
+            }
+        }
+
+        // TMDB functions
+        async function testTmdb() {
+            const apiKey = document.getElementById('tmdb-api-key').value;
+
+            if (!apiKey) {
+                showStatus('tmdb-status', 'Veuillez entrer une cle API', 'error');
+                return;
+            }
+
+            document.getElementById('tmdb-test-text').style.display = 'none';
+            document.getElementById('tmdb-test-spinner').style.display = 'inline-block';
+            showStatus('tmdb-status', 'Test en cours...', 'loading');
+
+            try {
+                // Save first
+                await fetch('/api/settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tmdb_api_key: apiKey })
+                });
+
+                // Test connection
+                const resp = await fetch('/health/services/tmdb');
+                const data = await resp.json();
+
+                if (data.status === 'healthy') {
+                    showStatus('tmdb-status', 'Connexion TMDB reussie !', 'success');
+                } else {
+                    showStatus('tmdb-status', data.message || 'Echec de connexion', 'error');
+                }
+            } catch (error) {
+                showStatus('tmdb-status', 'Erreur: ' + error.message, 'error');
+            } finally {
+                document.getElementById('tmdb-test-text').style.display = 'inline';
+                document.getElementById('tmdb-test-spinner').style.display = 'none';
+            }
+        }
+
+        async function saveTmdbAndNext() {
+            const apiKey = document.getElementById('tmdb-api-key').value;
+
+            if (apiKey) {
+                await fetch('/api/settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tmdb_api_key: apiKey })
+                });
+            }
+            nextStep();
+        }
+
+        // qBittorrent functions
+        async function testQbittorrent() {
+            const host = document.getElementById('qbit-host').value;
+            const username = document.getElementById('qbit-username').value;
+            const password = document.getElementById('qbit-password').value;
+
+            if (!host) {
+                showStatus('qbit-status', 'Veuillez entrer l\'URL qBittorrent', 'error');
+                return;
+            }
+
+            document.getElementById('qbit-test-text').style.display = 'none';
+            document.getElementById('qbit-test-spinner').style.display = 'inline-block';
+            showStatus('qbit-status', 'Test en cours...', 'loading');
+
+            try {
+                // Save first
+                await fetch('/api/settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        qbittorrent_host: host,
+                        qbittorrent_username: username,
+                        qbittorrent_password: password
+                    })
+                });
+
+                // Test connection
+                const resp = await fetch('/health/services/qbittorrent');
+                const data = await resp.json();
+
+                if (data.status === 'healthy') {
+                    showStatus('qbit-status', 'Connexion qBittorrent reussie !', 'success');
+                } else {
+                    showStatus('qbit-status', data.message || 'Echec de connexion', 'error');
+                }
+            } catch (error) {
+                showStatus('qbit-status', 'Erreur: ' + error.message, 'error');
+            } finally {
+                document.getElementById('qbit-test-text').style.display = 'inline';
+                document.getElementById('qbit-test-spinner').style.display = 'none';
+            }
+        }
+
+        async function saveQbitAndNext() {
+            const host = document.getElementById('qbit-host').value;
+            const username = document.getElementById('qbit-username').value;
+            const password = document.getElementById('qbit-password').value;
+
+            if (host) {
+                await fetch('/api/settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        qbittorrent_host: host,
+                        qbittorrent_username: username,
+                        qbittorrent_password: password
+                    })
+                });
+            }
+            nextStep();
+        }
+
+        // Completion
+        async function completeWizard() {
+            await fetch('/api/wizard/complete', { method: 'POST' });
+            window.location.href = '/dashboard';
+        }
+
+        async function skipWizard() {
+            await fetch('/api/wizard/skip', { method: 'POST' });
+            window.location.href = '/dashboard';
+        }
+    </script>
+</body>
+</html>

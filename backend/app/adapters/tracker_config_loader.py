@@ -49,16 +49,18 @@ class TrackerConfigLoader:
     Supports both YAML and JSON formats. Configurations define:
     - Authentication method (bearer, passkey, cookie)
     - API endpoints
-    - Upload field mappings
-    - Options/metadata mappings
+    - Upload field mappings (legacy) or Workflow (new)
+    - Mappings (new) - value conversion tables
+    - Options/metadata mappings (legacy)
+    - Dynamic sources (new) - fetch from API
     - Category mappings
     """
 
     # Default config directory (relative to this file)
     DEFAULT_CONFIG_DIR = Path(__file__).parent / "config_schemas"
 
-    # Required config sections
-    REQUIRED_SECTIONS = ["tracker", "auth", "endpoints", "upload"]
+    # Required config sections (upload OR workflow required)
+    REQUIRED_SECTIONS = ["tracker", "auth", "endpoints"]
 
     # Required tracker fields
     REQUIRED_TRACKER_FIELDS = ["name", "slug"]
@@ -68,6 +70,15 @@ class TrackerConfigLoader:
 
     # Valid upload field types
     VALID_FIELD_TYPES = ["file", "string", "json", "boolean", "repeated", "number"]
+
+    # Valid workflow step methods
+    VALID_WORKFLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+
+    # Valid workflow body types
+    VALID_WORKFLOW_TYPES = ["multipart", "json", "form"]
+
+    # Valid extraction sources
+    VALID_EXTRACT_SOURCES = ["json", "html", "cookie", "header"]
 
     def __init__(self, config_dir: Optional[Path] = None):
         """
@@ -216,6 +227,8 @@ class TrackerConfigLoader:
         """
         Validate a tracker configuration.
 
+        Supports both legacy (upload.fields) and new (workflow + mappings) formats.
+
         Args:
             config: Configuration dictionary to validate
 
@@ -249,25 +262,48 @@ class TrackerConfigLoader:
         if not endpoints.get("upload"):
             errors.append("Missing required endpoint: 'upload'")
 
-        # Validate upload section
+        # Check for upload method: either upload.fields OR workflow required
         upload = config.get("upload", {})
+        workflow = config.get("workflow", [])
         fields = upload.get("fields", {})
 
-        # Torrent field is always required
-        if "torrent" not in fields:
-            errors.append("Missing required upload field: 'torrent'")
+        has_upload_fields = bool(fields)
+        has_workflow = bool(workflow)
 
-        # Validate field types
-        for field_name, field_config in fields.items():
-            if isinstance(field_config, dict):
-                field_type = field_config.get("type")
-                if field_type and field_type not in self.VALID_FIELD_TYPES:
-                    errors.append(
-                        f"Invalid field type for '{field_name}': '{field_type}'. "
-                        f"Valid types: {self.VALID_FIELD_TYPES}"
-                    )
+        if not has_upload_fields and not has_workflow:
+            errors.append("Either 'upload.fields' or 'workflow' section is required")
 
-        # Validate options section (if present)
+        # Validate legacy upload.fields section
+        if has_upload_fields:
+            # Torrent field is required in legacy mode
+            if "torrent" not in fields:
+                errors.append("Missing required upload field: 'torrent'")
+
+            # Validate field types
+            for field_name, field_config in fields.items():
+                if isinstance(field_config, dict):
+                    field_type = field_config.get("type")
+                    if field_type and field_type not in self.VALID_FIELD_TYPES:
+                        errors.append(
+                            f"Invalid field type for '{field_name}': '{field_type}'. "
+                            f"Valid types: {self.VALID_FIELD_TYPES}"
+                        )
+
+        # Validate workflow section (new format)
+        if has_workflow:
+            errors.extend(self._validate_workflow(workflow))
+
+        # Validate mappings section (new format)
+        mappings = config.get("mappings", {})
+        if mappings:
+            errors.extend(self._validate_mappings(mappings))
+
+        # Validate dynamic_sources section (new format)
+        dynamic_sources = config.get("dynamic_sources", {})
+        if dynamic_sources:
+            errors.extend(self._validate_dynamic_sources(dynamic_sources))
+
+        # Validate options section (legacy format - if present)
         options = config.get("options", {})
         for option_name, option_config in options.items():
             if isinstance(option_config, dict):
@@ -275,6 +311,138 @@ class TrackerConfigLoader:
                     errors.append(f"Option '{option_name}' missing 'type' field")
 
         return len(errors) == 0, errors
+
+    def _validate_workflow(self, workflow: List[Dict]) -> List[str]:
+        """
+        Validate workflow configuration.
+
+        Args:
+            workflow: List of workflow steps
+
+        Returns:
+            List of validation errors
+        """
+        errors = []
+
+        if not isinstance(workflow, list):
+            errors.append("Workflow must be a list of steps")
+            return errors
+
+        for i, step in enumerate(workflow):
+            step_name = step.get("name", f"step_{i}")
+
+            if not isinstance(step, dict):
+                errors.append(f"Workflow step '{step_name}' must be a dictionary")
+                continue
+
+            # URL is required
+            if not step.get("url"):
+                errors.append(f"Workflow step '{step_name}' missing required 'url' field")
+
+            # Validate method
+            method = step.get("method", "POST")
+            if method.upper() not in self.VALID_WORKFLOW_METHODS:
+                errors.append(
+                    f"Workflow step '{step_name}' has invalid method: '{method}'. "
+                    f"Valid methods: {self.VALID_WORKFLOW_METHODS}"
+                )
+
+            # Validate type (body type)
+            body_type = step.get("type", "multipart")
+            if body_type not in self.VALID_WORKFLOW_TYPES:
+                errors.append(
+                    f"Workflow step '{step_name}' has invalid type: '{body_type}'. "
+                    f"Valid types: {self.VALID_WORKFLOW_TYPES}"
+                )
+
+            # Validate extract section
+            extracts = step.get("extract", [])
+            for extract in extracts:
+                if not isinstance(extract, dict):
+                    errors.append(f"Workflow step '{step_name}' extract entry must be a dictionary")
+                    continue
+
+                if not extract.get("name"):
+                    errors.append(f"Workflow step '{step_name}' extract entry missing 'name' field")
+
+                extract_from = extract.get("from", "json")
+                if extract_from not in self.VALID_EXTRACT_SOURCES:
+                    errors.append(
+                        f"Workflow step '{step_name}' extract has invalid 'from': '{extract_from}'. "
+                        f"Valid sources: {self.VALID_EXTRACT_SOURCES}"
+                    )
+
+            # Validate fields section
+            fields = step.get("fields", {})
+            for field_name, field_config in fields.items():
+                if isinstance(field_config, dict):
+                    field_type = field_config.get("type")
+                    if field_type and field_type not in self.VALID_FIELD_TYPES:
+                        errors.append(
+                            f"Workflow step '{step_name}' field '{field_name}' has invalid type: '{field_type}'. "
+                            f"Valid types: {self.VALID_FIELD_TYPES}"
+                        )
+
+        return errors
+
+    def _validate_mappings(self, mappings: Dict[str, Any]) -> List[str]:
+        """
+        Validate mappings configuration.
+
+        Args:
+            mappings: Mappings configuration dictionary
+
+        Returns:
+            List of validation errors
+        """
+        errors = []
+
+        for mapping_name, mapping_config in mappings.items():
+            if not isinstance(mapping_config, dict):
+                errors.append(f"Mapping '{mapping_name}' must be a dictionary")
+                continue
+
+            # input_field is required
+            if not mapping_config.get("input_field"):
+                errors.append(f"Mapping '{mapping_name}' missing required 'input_field'")
+
+            # values should be a dictionary
+            values = mapping_config.get("values", {})
+            if values and not isinstance(values, dict):
+                errors.append(f"Mapping '{mapping_name}' 'values' must be a dictionary")
+
+        return errors
+
+    def _validate_dynamic_sources(self, dynamic_sources: Dict[str, Any]) -> List[str]:
+        """
+        Validate dynamic_sources configuration.
+
+        Args:
+            dynamic_sources: Dynamic sources configuration dictionary
+
+        Returns:
+            List of validation errors
+        """
+        errors = []
+
+        for source_name, source_config in dynamic_sources.items():
+            if not isinstance(source_config, dict):
+                errors.append(f"Dynamic source '{source_name}' must be a dictionary")
+                continue
+
+            # endpoint is required
+            if not source_config.get("endpoint"):
+                errors.append(f"Dynamic source '{source_name}' missing required 'endpoint'")
+
+            # response config should have id_field and name_field
+            response = source_config.get("response", {})
+            if response:
+                if not response.get("id_field"):
+                    errors.append(f"Dynamic source '{source_name}' response missing 'id_field'")
+                if not response.get("name_field"):
+                    errors.append(f"Dynamic source '{source_name}' response missing 'name_field'")
+
+        return errors
 
     def _find_config_file(self, slug: str) -> Optional[Path]:
         """Find configuration file by slug."""

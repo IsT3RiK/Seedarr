@@ -127,6 +127,9 @@ class Settings(Base):
     # Additional configuration (JSON for extensibility)
     extra_config = Column(Text, nullable=True)
 
+    # Wizard state (v2.3)
+    wizard_completed = Column(Boolean, nullable=True, default=False)  # Whether setup wizard has been completed
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -214,6 +217,8 @@ class Settings(Base):
             'smtp_use_tls': bool(self.smtp_use_tls) if self.smtp_use_tls is not None else True,
             # Additional
             'extra_config': self.extra_config,
+            # Wizard state
+            'wizard_completed': bool(self.wizard_completed) if self.wizard_completed is not None else False,
             # Timestamps
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None

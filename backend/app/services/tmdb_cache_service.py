@@ -519,10 +519,11 @@ class TMDBCacheService:
         name_without_ext = file_path.stem
 
         # Extract title and year from filename
-        # Pattern: "Title (Year)" or "Title.Year." or "Title 2013"
+        # Pattern: "Title (Year)" or "Title.Year." or "Title 2013" or "Title_(Year)_"
         patterns = [
-            r'^(.+?)\s*\((\d{4})\)',  # Title (2013)
+            r'^(.+?)\s*\((\d{4})\)',   # Title (2013) or Title_(2013)
             r'^(.+?)\.(\d{4})\.',      # Title.2013.
+            r'^(.+?)_(\d{4})_',        # Title_2013_
             r'^(.+?)\s+(\d{4})\s',     # Title 2013
         ]
 
@@ -532,14 +533,14 @@ class TMDBCacheService:
         for pattern in patterns:
             match = re.match(pattern, name_without_ext)
             if match:
-                title = match.group(1).replace('.', ' ').strip()
+                title = match.group(1).replace('.', ' ').replace('_', ' ').strip()
                 year = int(match.group(2))
                 break
 
         if not title:
             # Fallback: use the part before common release markers
             title = re.split(r'[\.\s](2160p|1080p|720p|480p|BluRay|WEB|HDTV|MULTi|FRENCH|TRUEFRENCH|VFF|VOSTFR|REMUX)', name_without_ext, flags=re.IGNORECASE)[0]
-            title = title.replace('.', ' ').strip()
+            title = title.replace('.', ' ').replace('_', ' ').strip()
 
         if not title:
             logger.warning(f"Could not extract title from filename: {filename}")

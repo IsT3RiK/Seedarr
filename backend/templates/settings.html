@@ -444,7 +444,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                 </svg>
                 <span>
-                    <strong>Security Notice:</strong> Export includes ALL settings including sensitive data (API keys, passwords, passkeys) for full backup capability. Store exported files securely.
+                    <strong>Security Notice:</strong> Export includes ALL settings including sensitive data (API keys, passwords) for full backup capability. Store exported files securely.
                 </span>
             </div>
 
@@ -484,7 +484,7 @@
                     This will export all your settings to a JSON file, including:
                 </p>
                 <ul style="list-style: disc; margin-left: 1.5rem; margin-bottom: 1rem; color: var(--text-muted);">
-                    <li>Tracker configuration (URL, passkey)</li>
+                    <li>Tracker configuration (URL, clé API)</li>
                     <li>External service URLs (FlareSolverr, qBittorrent, Prowlarr)</li>
                     <li>API keys (TMDB, Prowlarr)</li>
                     <li>Passwords (qBittorrent)</li>
@@ -678,7 +678,7 @@
     // Field labels for better display
     const fieldLabels = {
         'tracker_url': 'Tracker URL',
-        'tracker_passkey': 'Tracker Passkey',
+        'tracker_passkey': 'Tracker API Key / Passkey',
         'flaresolverr_url': 'FlareSolverr URL',
         'qbittorrent_host': 'qBittorrent Host',
         'qbittorrent_username': 'qBittorrent Username',

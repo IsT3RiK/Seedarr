@@ -1,0 +1,436 @@
+# Torr9 Tracker Configuration
+# French general tracker - Config-Driven v2.0
+
+tracker:
+  name: "Torr9"
+  slug: "torr9"
+  description: "Torr9 French general tracker"
+
+# ============================================================================
+# AUTHENTICATION
+# ============================================================================
+auth:
+  type: "bearer"
+  header: "Authorization"
+  prefix: "Bearer "
+
+# Cloudflare bypass configuration
+cloudflare:
+  enabled: false
+
+# ============================================================================
+# API ENDPOINTS
+# ============================================================================
+# Note: API is on api.torr9.xyz subdomain
+api_base_url: "https://api.torr9.xyz"
+
+endpoints:
+  base: "/api/v1"
+  upload: "/api/v1/torrents/upload"
+  categories: "/api/v1/categories"
+  search: "/torrents"
+
+# ============================================================================
+# MAPPINGS - Pure Value Conversion Tables (Zero Logic)
+# ============================================================================
+mappings:
+  # Resolution mapping
+  resolution:
+    input_field: "resolution"
+    output_field: "resolution_id"
+    default: "2"
+    values:
+      "2160p": "1"
+      "4k": "1"
+      "uhd": "1"
+      "1080p": "2"
+      "1080i": "3"
+      "720p": "5"
+      "480p": "6"
+      "sd": "6"
+    fallback: "10"
+
+  # Source type mapping
+  source_type:
+    input_field: "source"
+    output_field: "type_id"
+    default: "2"
+    values:
+      "bluray": "1"
+      "blu-ray": "1"
+      "bdrip": "1"
+      "brrip": "1"
+      "remux": "1"
+      "web-dl": "2"
+      "webdl": "2"
+      "web": "2"
+      "hdtv": "4"
+      "webrip": "5"
+      "web-rip": "5"
+      "dvd-r": "6"
+      "dvdrip": "6"
+      "dvd": "6"
+    fallback: "10"
+
+  # Category based on media type
+  category:
+    input_field: "media_type"
+    output_field: "category"
+    default: "Films"
+    values:
+      "movie": "Films"
+      "tv": "Séries"
+      "anime": "Séries"
+      "music": "Audio"
+      "game": "Jeux-vidéos"
+      "software": "Applications"
+      "book": "Livres"
+    fallback: "Films"
+
+# ============================================================================
+# WORKFLOW - Single Step Upload
+# ============================================================================
+workflow:
+  - name: "upload"
+    method: "POST"
+    url: "{api_base_url}/api/v1/torrents/upload"
+    type: "multipart"
+    fields:
+      torrent_file:
+        source: "torrent_data"
+        type: "file"
+        filename: "{release_name}.torrent"
+        name: "torrent_file"
+        required: true
+
+      nfo:
+        source: "nfo_data"
+        type: "file"
+        filename: "{release_name}.nfo"
+        name: "nfo"
+        required: false
+
+      title:
+        source: "release_name"
+        type: "string"
+        name: "title"
+        required: true
+
+      description:
+        source: "description"
+        type: "string"
+        name: "description"
+        required: false
+
+      category:
+        source: "category"
+        type: "string"
+        name: "category"
+        required: true
+
+      subcategory:
+        source: "subcategory"
+        type: "string"
+        name: "subcategory"
+        required: false
+
+      tmdb_id:
+        source: "tmdb_id"
+        type: "string"
+        name: "tmdb_id"
+        required: false
+
+      imdb_id:
+        source: "imdb_id"
+        type: "string"
+        name: "imdb_id"
+        required: false
+
+      tvdb_id:
+        source: "tvdb_id"
+        type: "string"
+        name: "tvdb_id"
+        required: false
+
+      mal_id:
+        source: "mal_id"
+        type: "string"
+        name: "mal_id"
+        required: false
+
+      igdb_id:
+        source: "igdb_id"
+        type: "string"
+        name: "igdb_id"
+        required: false
+
+      tags:
+        source: "tags"
+        type: "string"
+        name: "tags"
+        required: false
+
+      resolution_id:
+        source: "resolution_id"
+        type: "string"
+        name: "resolution_id"
+        required: true
+
+      type_id:
+        source: "type_id"
+        type: "string"
+        name: "type_id"
+        required: true
+
+      is_exclusive:
+        source: "is_exclusive"
+        type: "boolean"
+        name: "is_exclusive"
+        default: false
+
+      is_anonymous:
+        source: "is_anonymous"
+        type: "boolean"
+        name: "is_anonymous"
+        default: false
+
+      stream:
+        source: "stream"
+        type: "string"
+        name: "stream"
+        default: "0"
+
+# ============================================================================
+# LEGACY UPLOAD CONFIG (Fallback for backwards compatibility)
+# ============================================================================
+upload:
+  method: "POST"
+  content_type: "multipart/form-data"
+
+  fields:
+    torrent:
+      name: "torrent_file"
+      type: "file"
+      required: true
+
+    nfo:
+      name: "nfo"
+      type: "file"
+      required: false
+
+    title:
+      name: "title"
+      type: "string"
+      source: "release_name"
+      required: true
+
+    description:
+      name: "description"
+      type: "string"
+      source: "description"
+      required: false
+
+    category:
+      name: "category"
+      type: "string"
+      source: "category_id"
+      required: true
+
+    subcategory:
+      name: "subcategory"
+      type: "string"
+      source: "subcategory_id"
+      required: false
+
+    tmdb_id:
+      name: "tmdb_id"
+      type: "string"
+      source: "tmdb_id"
+      required: false
+
+    imdb_id:
+      name: "imdb_id"
+      type: "string"
+      source: "imdb_id"
+      required: false
+
+    tvdb_id:
+      name: "tvdb_id"
+      type: "string"
+      source: "tvdb_id"
+      required: false
+
+    mal_id:
+      name: "mal_id"
+      type: "string"
+      source: "mal_id"
+      required: false
+
+    igdb_id:
+      name: "igdb_id"
+      type: "string"
+      source: "igdb_id"
+      required: false
+
+    tags:
+      name: "tags"
+      type: "string"
+      source: "tags"
+      required: false
+
+    is_exclusive:
+      name: "is_exclusive"
+      type: "boolean"
+      default: false
+
+    is_anonymous:
+      name: "is_anonymous"
+      type: "boolean"
+      default: false
+
+    stream:
+      name: "stream"
+      type: "string"
+      default: "0"
+
+    resolution_id:
+      name: "resolution_id"
+      type: "string"
+      source: "resolution_id"
+      required: true
+
+    type_id:
+      name: "type_id"
+      type: "string"
+      source: "type_id"
+      required: true
+
+# ============================================================================
+# LEGACY OPTIONS MAPPING (For backwards compatibility)
+# ============================================================================
+options:
+  resolution:
+    type: "resolution_id"
+    multi_select: false
+    default: "2"
+    mappings:
+      2160p: "1"
+      4k: "1"
+      1080p: "2"
+      1080i: "3"
+      720p: "5"
+      480p: "6"
+      other: "10"
+    resolution_fallback:
+      2160p: "1"
+      1080p: "2"
+      1080i: "3"
+      720p: "5"
+      480p: "6"
+
+  type:
+    type: "type_id"
+    multi_select: false
+    default: "2"
+    mappings:
+      bluray: "1"
+      blu-ray: "1"
+      bdrip: "1"
+      brrip: "1"
+      web-dl: "2"
+      webdl: "2"
+      web: "2"
+      hdtv: "4"
+      webrip: "5"
+      web-rip: "5"
+      dvd-r: "6"
+      dvdrip: "6"
+      dvd: "6"
+      other: "10"
+
+# ============================================================================
+# CATEGORY CONFIGURATION
+# ============================================================================
+categories:
+  movie_category: "Films"
+  tv_category: "Séries"
+  audio_category: "Audio"
+  book_category: "Livres"
+  game_category: "Jeux-vidéos"
+  app_category: "Applications"
+  emulation_category: "Emulation"
+  other_category: "NULLED"
+
+  # Resolution mappings
+  movie_4k: "Films"
+  movie_2160p: "Films"
+  movie_1080p: "Films"
+  movie_720p: "Films"
+  movie_480p: "Films"
+
+  tv_4k: "Séries"
+  tv_2160p: "Séries"
+  tv_1080p: "Séries"
+  tv_720p: "Séries"
+  tv_480p: "Séries"
+
+# ============================================================================
+# DYNAMIC SOURCES (Optional - fetch from API)
+# ============================================================================
+dynamic_sources:
+  categories:
+    endpoint: "/api/v1/categories"
+    base_url: "https://api.torr9.xyz"
+    method: "GET"
+    cache_ttl: 3600
+    response:
+      path: "data"
+      id_field: "id"
+      name_field: "name"
+
+# ============================================================================
+# VALIDATION
+# ============================================================================
+validation:
+  torrent_data:
+    required: true
+  release_name:
+    required: true
+    min_length: 5
+    max_length: 255
+
+# ============================================================================
+# RATE LIMITING
+# ============================================================================
+rate_limiting:
+  upload:
+    requests_per_minute: 30
+  search:
+    requests_per_minute: 60
+
+# ============================================================================
+# PROWLARR INTEGRATION
+# ============================================================================
+prowlarr:
+  definitions: ["torr9"]
+  url_patterns: ["torr9"]
+  auto_config:
+    source_flag: "TORR9"
+    piece_size_strategy: "auto"
+    requires_cloudflare: false
+
+# ============================================================================
+# TORRENT GENERATION
+# ============================================================================
+torrent:
+  piece_size_strategy: "auto"
+  source_flag: "TORR9"
+
+# ============================================================================
+# RESPONSE PARSING
+# ============================================================================
+response:
+  success_field: "success"
+  error_field: "error"
+  torrent_id_field: "data.id"
+  torrent_url_template: "https://torr9.xyz/torrent/{torrent_id}"

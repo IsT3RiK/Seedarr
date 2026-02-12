@@ -1,25 +1,38 @@
 """
 LaCaleClient for Seedarr v2.0
 
-This module handles La Cale tracker API business logic including multipart form
-data preparation, passkey authentication, and upload execution.
+This module handles La Cale tracker External API business logic including multipart form
+data preparation, API key authentication, and upload execution.
+
+La Cale External API Documentation: https://la-cale.space/api/external/docs
 
 Key Features:
     - Multipart form-data preparation with CRITICAL repeated tags fields pattern
-    - Passkey authentication for tracker uploads
+    - X-Api-Key header authentication for all requests
     - Upload execution with comprehensive error handling
     - Tag and category fetching from tracker API
+    - Torrent search by text query or TMDB ID
     - Typed exception handling with retry logic
+
+API Endpoints:
+    - GET /api/external - Search torrents (q, tmdbId, cat params)
+    - GET /api/external/meta - Get categories, tag groups, ungrouped tags
+    - POST /api/external/upload - Upload torrent (multipart form-data)
+    - GET /api/torrents/download/<infoHash> - Download torrent file
+
+Authentication:
+    - All requests: X-Api-Key header (recommended)
+    - Alternative: apikey query param for GET requests
 
 CRITICAL Implementation Notes:
     - Tags MUST be sent as repeated form fields [('tags', 'ID1'), ('tags', 'ID2')]
-    - NEVER use JSON arrays for tags - this will cause HTTP 500 errors
-    - This is undocumented La Cale API behavior that MUST be preserved
+    - tmdbType must be uppercase: "MOVIE" or "TV"
+    - Torrent file must contain source flag "lacale"
 
 Usage:
     client = LaCaleClient(
-        tracker_url="https://lacale.example.com",
-        passkey="your_passkey_here"
+        tracker_url="https://la-cale.space",
+        api_key="your_api_key_here"
     )
 
     # Upload torrent with session from CloudflareSessionManager
@@ -27,9 +40,9 @@ Usage:
         session=authenticated_session,
         torrent_data=torrent_bytes,
         release_name="Movie.2023.1080p.BluRay.x264",
-        category_id="1",
-        tag_ids=["10", "15", "20"],
-        nfo_content="NFO content here"
+        category_id="cat_films",
+        tag_ids=["tag_1080p", "tag_bluray"],
+        nfo_data=nfo_bytes
     )
 """
 
@@ -54,48 +67,69 @@ logger = logging.getLogger(__name__)
 
 class LaCaleClient:
     """
-    La Cale tracker API client for business logic operations.
+    La Cale tracker External API client for business logic operations.
 
     This class handles all La Cale tracker API interactions including:
         - Multipart form data preparation (with CRITICAL repeated tags fields)
         - Torrent upload execution
         - Tag and category fetching
-        - Passkey authentication
+        - Torrent search by text or TMDB ID
+        - X-Api-Key header authentication
         - API error handling and retry logic
 
     CRITICAL: This client implements La Cale's specific API requirements:
         - Tags MUST be sent as repeated form fields, NOT JSON arrays
         - Multipart form-data is required for uploads
-        - Passkey authentication in API calls
+        - X-Api-Key header authentication for all requests
+        - tmdbType must be uppercase: "MOVIE" or "TV"
 
     Attributes:
         tracker_url: La Cale tracker base URL
-        passkey: User's tracker passkey for authentication
+        api_key: User's API key for authentication (X-Api-Key)
         upload_endpoint: Full URL for torrent upload endpoint
-        tags_endpoint: Full URL for tags API endpoint
-        categories_endpoint: Full URL for categories API endpoint
+        meta_endpoint: Full URL for metadata API endpoint
+        search_endpoint: Full URL for search API endpoint
     """
 
     # API endpoint paths (La Cale External API)
     UPLOAD_PATH = "/api/external/upload"
     META_PATH = "/api/external/meta"
+    SEARCH_PATH = "/api/external"  # Search endpoint (same as base external API)
 
-    def __init__(self, tracker_url: str, passkey: str):
+    def __init__(self, tracker_url: str, api_key: str = None, passkey: str = None):
         """
         Initialize LaCaleClient.
 
         Args:
-            tracker_url: La Cale tracker base URL (e.g., https://lacale.example.com)
-            passkey: User's tracker passkey for authentication
+            tracker_url: La Cale tracker base URL (e.g., https://la-cale.space)
+            api_key: User's API key for authentication (X-Api-Key)
+            passkey: Alias for api_key (for backwards compatibility)
+
+        Note:
+            Either api_key or passkey can be provided. They are the same value
+            (the La Cale API key). passkey is kept for backwards compatibility.
         """
         self.tracker_url = tracker_url.rstrip('/')
-        self.passkey = passkey
+        # Accept either api_key or passkey (backwards compatibility)
+        self.api_key = api_key or passkey
+        if not self.api_key:
+            raise ValueError("Either api_key or passkey must be provided")
 
         # Construct API endpoints
         self.upload_endpoint = f"{self.tracker_url}{self.UPLOAD_PATH}"
         self.meta_endpoint = f"{self.tracker_url}{self.META_PATH}"
+        self.search_endpoint = f"{self.tracker_url}{self.SEARCH_PATH}"
 
         logger.info(f"LaCaleClient initialized for tracker: {self.tracker_url}")
+
+    def _get_auth_headers(self) -> Dict[str, str]:
+        """
+        Get authentication headers for API requests.
+
+        Returns:
+            Dictionary with X-Api-Key header
+        """
+        return {"X-Api-Key": self.api_key}
 
     def _prepare_multipart_data(
         self,
@@ -111,13 +145,15 @@ class LaCaleClient:
         Prepare multipart form data for La Cale upload API.
 
         Uses La Cale External API parameter names:
-        - title: Release name
-        - categoryId: Category ID
-        - tags[]: Tag IDs (repeated field)
+        - title: Release name (required)
+        - categoryId: Category ID (required)
+        - tags: Tag IDs (repeated field)
         - description: Optional description
         - tmdbId: Optional TMDB ID
-        - tmdbType: Optional TMDB type (movie/tv)
+        - tmdbType: Optional TMDB type (MOVIE/TV - uppercase)
         - coverUrl: Optional cover image URL
+
+        Note: Authentication is via X-Api-Key header, not form data.
 
         Args:
             release_name: Release name/title
@@ -125,7 +161,7 @@ class LaCaleClient:
             tag_ids: List of tracker tag IDs
             description: Optional description/plot
             tmdb_id: Optional TMDB ID
-            tmdb_type: Optional TMDB type (movie or tv)
+            tmdb_type: Optional TMDB type (MOVIE or TV)
             cover_url: Optional cover image URL
 
         Returns:
@@ -134,23 +170,23 @@ class LaCaleClient:
         Example:
             data = client._prepare_multipart_data(
                 release_name="Movie.2023.1080p",
-                category_id="1",
-                tag_ids=["10", "15", "20"]
+                category_id="cat_films",
+                tag_ids=["tag_1080p", "tag_bluray"]
             )
-            # Returns: [('title', 'Movie.2023.1080p'), ('categoryId', '1'),
-            #           ('tags[]', '10'), ('tags[]', '15'), ('tags[]', '20'), ...]
+            # Returns: [('title', 'Movie.2023.1080p'), ('categoryId', 'cat_films'),
+            #           ('tags', 'tag_1080p'), ('tags', 'tag_bluray'), ...]
         """
         logger.debug(f"Preparing multipart data for release: {release_name}")
 
         # Start with required fields (using La Cale API parameter names)
+        # Note: Authentication via X-Api-Key header (handled in upload_torrent method)
         data = [
-            ('passkey', self.passkey),  # Passkey authentication
             ('title', release_name),
             ('categoryId', category_id)
         ]
 
         # Add tags as repeated 'tags' fields (per La Cale API docs)
-        # Note: tags should be tag slugs, not IDs
+        # Tags expect IDs (not slugs) per docs
         for tag in tag_ids:
             data.append(('tags', str(tag)))
             logger.debug(f"Added tag as repeated field: {tag}")
@@ -163,7 +199,8 @@ class LaCaleClient:
             data.append(('tmdbId', str(tmdb_id)))
 
         if tmdb_type:
-            data.append(('tmdbType', tmdb_type))
+            # tmdbType must be uppercase: MOVIE or TV
+            data.append(('tmdbType', tmdb_type.upper() if tmdb_type else None))
 
         if cover_url:
             data.append(('coverUrl', cover_url))
@@ -325,12 +362,10 @@ class LaCaleClient:
         logger.info("Equivalent curl command:")
         logger.info("-" * 80)
         curl_cmd = f"curl -X POST '{self.upload_endpoint}' \\\n"
+        curl_cmd += f"  -H 'X-Api-Key: YOUR_API_KEY' \\\n"
         for field_name, field_value in data:
-            if field_name == 'passkey':
-                curl_cmd += f"  -F '{field_name}=YOUR_PASSKEY' \\\n"
-            else:
-                escaped_value = str(field_value).replace("'", "'\\''")
-                curl_cmd += f"  -F '{field_name}={escaped_value}' \\\n"
+            escaped_value = str(field_value).replace("'", "'\\''")
+            curl_cmd += f"  -F '{field_name}={escaped_value}' \\\n"
         for file_field, (filename, _, content_type) in files.items():
             curl_cmd += f"  -F '{file_field}=@{filename}' \\\n"
         logger.info(curl_cmd.rstrip(' \\\n'))
@@ -339,9 +374,11 @@ class LaCaleClient:
 
         try:
             # Execute upload request (async wrapper for sync requests)
+            # Authentication via X-Api-Key header
             response = await asyncio.to_thread(
                 session.post,
                 self.upload_endpoint,
+                headers=self._get_auth_headers(),
                 data=data,  # Multipart form data with repeated tags fields
                 files=files,
                 timeout=config.API_REQUEST_TIMEOUT
@@ -394,12 +431,15 @@ class LaCaleClient:
                 )
 
             # Extract torrent info from response
-            torrent_id = response_data.get('torrent_id', response_data.get('id', 'unknown'))
-            torrent_url = response_data.get('torrent_url', f"{self.tracker_url}/torrents/{torrent_id}")
+            # New API returns: success, id, slug, link
+            torrent_id = response_data.get('id', response_data.get('torrent_id', 'unknown'))
+            torrent_slug = response_data.get('slug', '')
+            torrent_url = response_data.get('link', response_data.get('torrent_url', f"{self.tracker_url}/torrents/{torrent_slug or torrent_id}"))
 
             result = {
-                'success': True,
+                'success': response_data.get('success', True),
                 'torrent_id': str(torrent_id),
+                'torrent_slug': torrent_slug,
                 'torrent_url': torrent_url,
                 'message': response_data.get('message', 'Upload successful'),
                 'response_data': response_data
@@ -446,7 +486,7 @@ class LaCaleClient:
             session: Authenticated requests.Session
 
         Returns:
-            Dictionary with categories, tagGroups, and tags
+            Dictionary with categories, tagGroups, ungroupedTags
 
         Raises:
             NetworkRetryableError: If network issues occur (retryable)
@@ -458,7 +498,7 @@ class LaCaleClient:
             response = await asyncio.to_thread(
                 session.get,
                 self.meta_endpoint,
-                params={'passkey': self.passkey},
+                headers=self._get_auth_headers(),
                 timeout=config.API_REQUEST_TIMEOUT
             )
 
@@ -622,151 +662,192 @@ class LaCaleClient:
             logger.error(f"{error_msg}: {e}", exc_info=True)
             raise TrackerAPIError(error_msg)
 
-    async def validate_passkey(self, session: Session) -> bool:
+    async def validate_api_key(self, session: Session) -> bool:
         """
-        Validate passkey by making a lightweight API call.
+        Validate API key by making a lightweight API call.
 
         Args:
             session: Authenticated requests.Session
 
         Returns:
-            True if passkey is valid, False otherwise
+            True if API key is valid, False otherwise
 
         Example:
-            is_valid = await client.validate_passkey(session)
+            is_valid = await client.validate_api_key(session)
             if is_valid:
-                print("Passkey is valid")
+                print("API key is valid")
         """
         try:
             # Try fetching metadata as a lightweight validation check
             await self.get_metadata(session)
-            logger.info("Passkey validation successful")
+            logger.info("API key validation successful")
             return True
 
         except TrackerAPIError as e:
-            # 401/403 indicates invalid passkey
+            # 401/403 indicates invalid API key
             if e.status_code in (401, 403):
-                logger.warning(f"Passkey validation failed: {e}")
+                logger.warning(f"API key validation failed: {e}")
                 return False
             # Other errors might be temporary
             raise
 
         except Exception as e:
-            logger.error(f"Passkey validation error: {e}")
+            logger.error(f"API key validation error: {e}")
             return False
 
-    # API endpoint for search
-    SEARCH_PATH = "/api/external/search"
+    # Alias for backwards compatibility
+    async def validate_passkey(self, session: Session) -> bool:
+        """Alias for validate_api_key for backwards compatibility."""
+        return await self.validate_api_key(session)
 
     @retry_on_network_error(max_retries=3)
     async def search_torrents(
         self,
         session: Session,
         query: str,
-        search_type: str = "name"
+        search_type: str = "name",
+        category: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Search for torrents on La Cale.
 
+        Uses the new La Cale External API format:
+        - GET /api/external with X-Api-Key header + apikey query param
+        - Parameters: apikey, q (text search), tmdbId (TMDB ID), cat (category slug)
+        - Returns max 50 results sorted by date descending
+
         Args:
             session: Authenticated requests.Session (with FlareSolverr cookies)
-            query: Search query (TMDB ID, IMDB ID, or name)
-            search_type: Type of search ('tmdb', 'imdb', 'name')
+            query: Search query (TMDB ID or text search)
+            search_type: Type of search ('tmdb' or 'name')
+            category: Optional category slug to filter (e.g., 'films', 'series')
 
         Returns:
-            List of matching torrents
+            List of matching torrents with normalized format
 
         Raises:
             NetworkRetryableError: If network issues occur
             TrackerAPIError: If API returns error
-        """
-        logger.info(f"Searching La Cale torrents: query={query}, type={search_type}")
 
-        search_endpoint = f"{self.tracker_url}{self.SEARCH_PATH}"
+        Note:
+            IMDB search is not directly supported by the new API.
+            Use TMDB ID or text search instead.
+        """
+        logger.info(f"Searching La Cale torrents: query={query}, type={search_type}, category={category}")
 
         try:
             # Build search parameters based on search type
-            params = {"passkey": self.passkey}
+            # Per Prowlarr YAML: apikey as query param, q always provided (default "FRENCH")
+            params = {
+                "apikey": self.api_key  # API key as query param (alternative auth)
+            }
 
             if search_type == "tmdb":
                 params["tmdbId"] = query
-            elif search_type == "imdb":
-                # Ensure tt prefix for IMDB
-                imdb_id = query if query.startswith("tt") else f"tt{query}"
-                params["imdbId"] = imdb_id
+                # Per Prowlarr YAML: q defaults to "FRENCH" when searching by TMDB ID only
+                params["q"] = "FRENCH"
             else:
-                # Name search - use the query directly
-                params["name"] = query
+                # Text search - use 'q' parameter (max 200 chars)
+                params["q"] = query[:200] if query else "FRENCH"
 
-            # Add limit
-            params["perPage"] = 25
+            # Add category filter if provided
+            if category:
+                params["cat"] = category
+
+            # Log params without exposing full API key
+            log_params = {k: (v[:10] + '...' if k == 'apikey' else v) for k, v in params.items()}
+            logger.info(f"La Cale search request: GET {self.search_endpoint} params={log_params}")
 
             response = await asyncio.to_thread(
                 session.get,
-                search_endpoint,
+                self.search_endpoint,
+                headers=self._get_auth_headers(),
                 params=params,
                 timeout=config.API_REQUEST_TIMEOUT
             )
 
-            logger.debug(f"La Cale search response: {response.status_code}")
+            logger.info(f"La Cale search response: HTTP {response.status_code}, length={len(response.content)}")
 
             if response.status_code == 401:
                 raise TrackerAPIError(
-                    "La Cale authentication failed during search",
+                    "La Cale authentication failed during search - check API key",
                     status_code=401
                 )
 
             if response.status_code == 403:
                 raise TrackerAPIError(
-                    "La Cale search forbidden - check permissions",
+                    "La Cale search forbidden - invalid API key",
                     status_code=403
                 )
+
+            if response.status_code == 400:
+                logger.warning(
+                    f"La Cale search bad request (400): {response.text[:500]}"
+                )
+                # Try to parse error details
+                try:
+                    error_data = response.json()
+                    logger.warning(f"La Cale search error details: {error_data}")
+                except:
+                    pass
+                return []
 
             if response.status_code != 200:
                 logger.warning(
                     f"La Cale search returned status {response.status_code}: "
-                    f"{response.text[:200]}"
+                    f"{response.text[:500]}"
                 )
+                # Try to parse error details
+                try:
+                    error_data = response.json()
+                    logger.warning(f"La Cale search error details: {error_data}")
+                except:
+                    pass
                 return []
 
-            # Parse response
+            # Parse response - new API returns JSON array directly
             try:
+                # Log raw response for debugging
+                logger.info(f"La Cale search raw response (first 500 chars): {response.text[:500]}")
                 data = response.json()
+                logger.info(f"La Cale search parsed response type: {type(data)}, length: {len(data) if isinstance(data, list) else 'N/A'}")
 
-                # Handle different response formats
+                # API returns a list of torrents directly
                 if isinstance(data, list):
                     torrents = data
-                elif isinstance(data, dict):
-                    # Common API patterns: data, results, torrents, items
-                    torrents = (
-                        data.get("data") or
-                        data.get("results") or
-                        data.get("torrents") or
-                        data.get("items") or
-                        []
-                    )
+                    logger.info(f"La Cale API returned {len(torrents)} raw results")
                 else:
+                    logger.warning(f"La Cale API returned non-list response: {type(data)}")
                     torrents = []
 
-                # Normalize torrent format
+                # Normalize torrent format from new API response
+                # Per Prowlarr YAML: title, infoHash, link, size, pubDate, category, seeders, leechers
                 results = []
                 for t in torrents:
+                    # Use infoHash as ID if guid is not present
+                    torrent_id = t.get("guid") or t.get("id") or t.get("infoHash") or "unknown"
                     results.append({
-                        "id": t.get("id"),
-                        "name": t.get("name") or t.get("title") or t.get("release_name", ""),
+                        "id": torrent_id,
+                        "name": t.get("title", ""),
                         "size": t.get("size", 0),
                         "seeders": t.get("seeders", 0),
                         "leechers": t.get("leechers", 0),
-                        "tmdb_id": t.get("tmdb_id") or t.get("tmdbId"),
-                        "imdb_id": t.get("imdb_id") or t.get("imdbId"),
-                        "created_at": t.get("created_at") or t.get("createdAt"),
+                        "info_hash": t.get("infoHash"),
+                        "category": t.get("category"),
+                        "download_link": t.get("link"),
+                        "pub_date": t.get("pubDate"),
                     })
+                    # Debug log each result
+                    logger.debug(f"  Parsed torrent: {t.get('title', 'N/A')[:50]} (hash={t.get('infoHash', 'N/A')[:16] if t.get('infoHash') else 'N/A'})")
 
                 logger.info(f"La Cale search found {len(results)} torrents")
+                if results:
+                    logger.debug(f"First result: {results[0].get('name', 'N/A')}")
                 return results
 
             except Exception as e:
                 logger.error(f"Error parsing La Cale search response: {e}")
+                logger.error(f"Raw response text: {response.text[:500]}")
                 return []
 
         except (TrackerAPIError, NetworkRetryableError):
@@ -786,9 +867,14 @@ class LaCaleClient:
             logger.error(f"Error searching La Cale: {type(e).__name__}: {e}")
             return []
 
+    @property
+    def passkey(self) -> str:
+        """Alias for api_key for backwards compatibility."""
+        return self.api_key
+
     def __repr__(self) -> str:
         """String representation of LaCaleClient."""
         return (
             f"<LaCaleClient(tracker_url='{self.tracker_url}', "
-            f"passkey='***{self.passkey[-4:] if self.passkey else 'None'}')>"
+            f"api_key='***{self.api_key[-4:] if self.api_key else 'None'}')>"
         )

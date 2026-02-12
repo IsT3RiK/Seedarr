@@ -1,22 +1,26 @@
 # C411 Tracker Configuration
-# This file defines how to interact with the C411 tracker API
+# French private tracker - Config-Driven v2.0
 
 tracker:
   name: "C411"
   slug: "c411"
   description: "C411 French private tracker"
 
-# Authentication configuration
+# ============================================================================
+# AUTHENTICATION
+# ============================================================================
 auth:
-  type: "bearer"              # bearer | passkey | cookie | api_key
-  header: "Authorization"     # HTTP header name
-  prefix: "Bearer "           # Prefix before the token
+  type: "bearer"
+  header: "Authorization"
+  prefix: "Bearer "
 
 # Cloudflare bypass configuration
 cloudflare:
-  enabled: false              # C411 doesn't use Cloudflare
+  enabled: false
 
-# API endpoints
+# ============================================================================
+# API ENDPOINTS
+# ============================================================================
 endpoints:
   base: "/api"
   upload: "/api/torrents"
@@ -25,12 +29,175 @@ endpoints:
   search: "/api/torrents/search"
   health: "/api/health"
 
-# Upload form configuration
+# ============================================================================
+# MAPPINGS - Pure Value Conversion Tables (Zero Logic)
+# ============================================================================
+mappings:
+  # Language mapping
+  language:
+    input_field: "languages"
+    output_field: "language_ids"
+    multi: true
+    default: "4"
+    values:
+      "english": "1"
+      "anglais": "1"
+      "en": "1"
+      "french": "2"
+      "vff": "2"
+      "francais": "2"
+      "fr": "2"
+      "multi": "4"
+      "multi_french": "4"
+      "multilingual": "4"
+      "quebec": "6"
+      "vfq": "6"
+      "quebecois": "6"
+      "vostfr": "8"
+      "subfrench": "8"
+    fallback: "4"
+
+  # Quality mapping (resolution + source combined)
+  quality:
+    input_field: "quality_key"
+    output_field: "quality_id"
+    default: "25"
+    values:
+      # Light encodings
+      "4klight": "415"
+      "2160p_light": "415"
+      "4k_light": "415"
+      "hdlight_1080": "413"
+      "1080p_light": "413"
+      "hdlight_720": "414"
+      "720p_light": "414"
+      # BluRay 4K
+      "2160p_bluray": "10"
+      "4k_bluray": "10"
+      "uhd_bluray": "10"
+      # BluRay Remux
+      "remux": "12"
+      # WEB-DL 4K
+      "2160p_web": "26"
+      "4k_web": "26"
+      # WEB-DL 1080p
+      "1080p_web": "25"
+      "1080p_webrip": "25"
+      # WEB-DL 720p
+      "720p_web": "24"
+      # HDRip 1080p
+      "1080p_hdrip": "16"
+      "1080p_bdrip": "16"
+      # HDRip 720p
+      "720p_hdrip": "15"
+      "720p_bdrip": "15"
+      # BluRay 1080p
+      "1080p_bluray": "11"
+      # BluRay 720p
+      "720p_bluray": "13"
+      # HDTV
+      "1080p_hdtv": "17"
+      "1080i_hdtv": "17"
+      "720p_hdtv": "14"
+      # DVD
+      "dvdrip": "18"
+      "dvd": "18"
+      # CAM/TS
+      "cam": "19"
+      "ts": "20"
+      "hdts": "20"
+    fallback: "25"
+
+  # NOTE: Category resolution is handled by the pipeline (_resolve_category_for_tracker)
+  # using the 'categories' section below. No mapping needed here.
+
+# ============================================================================
+# WORKFLOW - Single Step Upload with JSON options
+# ============================================================================
+workflow:
+  - name: "upload"
+    method: "POST"
+    url: "{tracker_url}/api/torrents"
+    type: "multipart"
+    fields:
+      torrent:
+        source: "torrent_data"
+        type: "file"
+        filename: "{release_name}.torrent"
+        name: "torrent"
+        required: true
+
+      nfo:
+        source: "nfo_data"
+        type: "file"
+        filename: "{release_name}.nfo"
+        name: "nfo"
+        required: false
+
+      title:
+        source: "release_name"
+        type: "string"
+        name: "title"
+        sanitize:
+          replace_spaces: "."
+          max_length: 255
+        required: true
+
+      category:
+        source: "category_id"
+        type: "string"
+        name: "categoryId"
+        required: true
+
+      subcategory:
+        source: "subcategory_id"
+        type: "string"
+        name: "subcategoryId"
+        required: true
+
+      options:
+        source: "options"
+        type: "json"
+        name: "options"
+        required: false
+
+      tmdb_data:
+        source: "tmdb_data"
+        type: "json"
+        name: "tmdbData"
+        required: false
+
+      rawg_data:
+        source: "rawg_data"
+        type: "json"
+        name: "rawgData"
+        required: false
+
+      is_exclusive:
+        source: "is_exclusive"
+        type: "boolean"
+        name: "isExclusive"
+        default: false
+
+      uploader_note:
+        source: "uploader_note"
+        type: "string"
+        name: "uploaderNote"
+        required: false
+
+      description:
+        source: "description"
+        type: "string"
+        name: "description"
+        required: true
+
+# ============================================================================
+# LEGACY UPLOAD CONFIG (Fallback for backwards compatibility)
+# ============================================================================
 upload:
   method: "POST"
   content_type: "multipart/form-data"
 
-  # Field mappings: how to map internal data to API fields
   fields:
     torrent:
       name: "torrent"
@@ -90,7 +257,15 @@ upload:
       source: "uploader_note"
       required: false
 
-# Options mapping (for build_options)
+    description:
+      name: "description"
+      type: "string"
+      source: "description"
+      required: true
+
+# ============================================================================
+# LEGACY OPTIONS MAPPING (For backwards compatibility with OptionsMapper)
+# ============================================================================
 options:
   language:
     type: "1"
@@ -257,27 +432,159 @@ options:
     base_value: 96         # E01 = 97, E02 = 98, etc.
     max_value: 116         # E20
 
-# Category configuration
+# ============================================================================
+# CATEGORY CONFIGURATION
+# ============================================================================
+# C411 uses a HIERARCHICAL category system:
+#   - categoryId: PARENT category (e.g., "Films & Vidéos")
+#   - subcategoryId: SPECIFIC type (e.g., "Film", "Série TV")
+#
+# These are DEFAULTS that get overridden by API sync.
+# Run "Sync Categories" on the tracker page to fetch correct IDs from C411 API.
+#
+# *_category keys = PARENT categoryId (same parent for all media types)
+# Other keys = subcategoryId
+# ============================================================================
 categories:
-  # Map media_type_resolution to category IDs
-  movie_4k: "42"
-  movie_2160p: "42"
+  # Parent category ID - "Films & Vidéos" parent (overridden by sync)
+  movie_category: "1"
+  tv_category: "1"
+  anime_category: "1"
+  documentary_category: "1"
+
+  # Subcategory IDs (overridden by sync)
+  # Movies
+  movie: "6"
+  movie_4k: "6"
+  movie_2160p: "6"
   movie_1080p: "6"
   movie_720p: "6"
+
+  # TV Series
+  tv: "7"
+  tv_4k: "7"
+  tv_2160p: "7"
   tv_1080p: "7"
   tv_720p: "7"
-  tv_4k: "43"
-  tv_2160p: "43"
+  series: "7"
+  series_4k: "7"
+  series_1080p: "7"
+  series_720p: "7"
+
+  # Animation / Anime - detected via TMDB genre ID 16
+  anime_movie: "8"
+  anime_series: "8"
+  anime: "8"
+  anime_4k: "8"
+  anime_2160p: "8"
   anime_1080p: "8"
   anime_720p: "8"
-  documentary: "9"
 
-# Piece size strategy
+  # Documentary - detected via TMDB genre ID 99
+  documentary: "9"
+  documentary_4k: "9"
+  documentary_2160p: "9"
+  documentary_1080p: "9"
+  documentary_720p: "9"
+
+# ============================================================================
+# DYNAMIC SOURCES (Optional - fetch from API)
+# ============================================================================
+dynamic_sources:
+  categories:
+    endpoint: "/api/categories"
+    method: "GET"
+    cache_ttl: 3600
+    response:
+      path: "data"
+      id_field: "id"
+      name_field: "name"
+
+  tags:
+    endpoint: "/api/tags"
+    method: "GET"
+    cache_ttl: 3600
+    response:
+      path: "data"
+      id_field: "id"
+      name_field: "name"
+
+# ============================================================================
+# SEARCH CONFIGURATION
+# ============================================================================
+search:
+  method: "GET"
+  endpoint: "/api/torrents/search"
+  auth_header: true
+  default_query: "FRENCH"
+  params:
+    query: "q"
+    tmdb_id: "tmdbId"
+    imdb_id: "imdbId"
+  response:
+    format: "json"  # C411 returns JSON (not Torznab XML)
+
+# ============================================================================
+# SANITIZATION
+# ============================================================================
+sanitize:
+  operations:
+    - type: "replace_spaces"
+      replacement: "."
+    - type: "remove_pattern"
+      pattern: "\\(.*?\\)"
+    - type: "remove_pattern"
+      pattern: "\\[.*?\\]"
+    - type: "collapse_dots"
+    - type: "strip_dots"
+    - type: "max_length"
+      length: 255
+
+# ============================================================================
+# VALIDATION
+# ============================================================================
+validation:
+  torrent_data:
+    required: true
+  release_name:
+    required: true
+    min_length: 5
+    max_length: 255
+  category_id:
+    required: true
+  description:
+    required: true
+
+# ============================================================================
+# RATE LIMITING
+# ============================================================================
+rate_limiting:
+  upload:
+    requests_per_minute: 30
+  search:
+    requests_per_minute: 60
+
+# ============================================================================
+# PROWLARR INTEGRATION
+# ============================================================================
+prowlarr:
+  definitions: ["cinema411", "c411"]
+  url_patterns: ["c411", "cinema411"]
+  auto_config:
+    source_flag: "C411"
+    piece_size_strategy: "c411"
+    requires_cloudflare: false
+
+# ============================================================================
+# TORRENT GENERATION
+# ============================================================================
 torrent:
   piece_size_strategy: "c411"  # c411 | auto | standard
   source_flag: "C411"          # Makes torrent hash unique per tracker
 
-# Response parsing
+# ============================================================================
+# RESPONSE PARSING
+# ============================================================================
 response:
   success_field: "success"
   error_field: "error"
