@@ -7,7 +7,7 @@ WORKDIR /build
 
 COPY backend/requirements.txt .
 
-RUN pip install --user --no-cache-dir --no-warn-script-location -r requirements.txt
+RUN pip install --prefix=/install --no-cache-dir --no-warn-script-location -r requirements.txt
 
 # ===========================
 # Stage 2: Runtime
@@ -21,8 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gosu \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy installed dependencies from builder stage
-COPY --from=builder /root/.local /root/.local
+# Copy installed dependencies from builder stage into standard location
+COPY --from=builder /install /usr/local/
 
 # Copy application code
 COPY backend/ ./backend/
@@ -37,7 +37,6 @@ RUN chmod +x /docker-entrypoint.sh
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
-    PATH=/root/.local/bin:$PATH \
     PUID=1000 \
     PGID=1000
 

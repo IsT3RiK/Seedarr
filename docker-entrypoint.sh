@@ -22,9 +22,8 @@ fi
 # Create data directory if it doesn't exist
 mkdir -p /app/backend/data
 
-# Fix permissions on data directory (writable) and pip packages
+# Fix permissions on data directory (writable)
 chown -R seedarr:seedarr /app/backend/data
-chown -R seedarr:seedarr /root/.local
 
 # Run database migrations as seedarr user
 echo "Running database migrations..."
