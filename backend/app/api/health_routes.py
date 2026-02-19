@@ -212,7 +212,7 @@ async def get_config_status(db: Session = Depends(get_db)) -> Dict[str, Any]:
 
     # Check all trackers for API key and categories
     for tracker in trackers:
-        if tracker.is_enabled:
+        if tracker.enabled:
             # Check API key for trackers that need it
             if not tracker.api_key and not tracker.passkey:
                 issues.append({

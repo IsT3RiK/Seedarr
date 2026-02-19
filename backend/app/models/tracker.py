@@ -105,6 +105,11 @@ class Tracker(Base):
     # If None, the original file name (without extension) is used as-is
     naming_template = Column(String(500), nullable=True)
 
+    # Hardlink & torrent management (v2.5)
+    hardlink_dir = Column(String(1000), nullable=True)       # Per-tracker hardlink output directory
+    torrent_dir = Column(String(1000), nullable=True)        # Per-tracker torrent output directory
+    inject_to_qbit = Column(Boolean, default=True)           # Auto-inject torrent to qBittorrent
+
     # Options
     requires_cloudflare = Column(Boolean, default=False)
     upload_enabled = Column(Boolean, default=True)
@@ -261,6 +266,9 @@ class Tracker(Base):
             'upload_config': self.upload_config,
             'default_template_id': self.default_template_id,
             'naming_template': self.naming_template,
+            'hardlink_dir': self.hardlink_dir,
+            'torrent_dir': self.torrent_dir,
+            'inject_to_qbit': bool(self.inject_to_qbit) if self.inject_to_qbit is not None else True,
             'requires_cloudflare': self.requires_cloudflare,
             'upload_enabled': self.upload_enabled,
             'priority': self.priority,

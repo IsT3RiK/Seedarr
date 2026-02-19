@@ -20,11 +20,16 @@ depends_on = None
 
 def upgrade() -> None:
     """Migrate legacy adapter_type values to 'config'."""
-    # Update lacale and c411 adapter types to config
-    op.execute(
-        "UPDATE trackers SET adapter_type = 'config' "
-        "WHERE adapter_type IN ('lacale', 'c411')"
+    conn = op.get_bind()
+    # Check if trackers table exists before updating (may not exist in all envs)
+    result = conn.execute(
+        sa.text("SELECT name FROM sqlite_master WHERE type='table' AND name='trackers'")
     )
+    if result.fetchone():
+        op.execute(
+            "UPDATE trackers SET adapter_type = 'config' "
+            "WHERE adapter_type IN ('lacale', 'c411')"
+        )
 
 
 def downgrade() -> None:

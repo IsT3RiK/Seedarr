@@ -261,7 +261,9 @@ class TorrentGenerator:
         release_name: str,
         output_dir: Optional[str] = None,
         tracker_slugs: Optional[List[str]] = None,
-        tracker_release_names: Optional[Dict[str, str]] = None
+        tracker_release_names: Optional[Dict[str, str]] = None,
+        tracker_output_dirs: Optional[Dict[str, str]] = None,
+        tracker_file_paths: Optional[Dict[str, str]] = None
     ) -> Dict[str, str]:
         """
         Generate torrent files for all enabled trackers.
@@ -271,7 +273,7 @@ class TorrentGenerator:
 
         Args:
             db: SQLAlchemy database session
-            file_path: Path to the media file
+            file_path: Path to the media file (default for all trackers)
             release_name: Default release name for the torrents
             output_dir: Output directory (defaults to file's directory)
             tracker_slugs: Optional list of tracker slugs to generate for.
@@ -279,6 +281,12 @@ class TorrentGenerator:
             tracker_release_names: Optional dict mapping tracker slugs to tracker-specific
                                   release names (from naming_templates).
                                   Example: {"c411": "Custom.Name.For.C411-FW"}
+            tracker_output_dirs: Optional dict mapping tracker slugs to per-tracker
+                                output directories. Takes precedence over output_dir.
+                                Example: {"lacale": "/torrents/lacale", "c411": "/torrents/c411"}
+            tracker_file_paths: Optional dict mapping tracker slugs to per-tracker
+                               media file paths (from per-tracker hardlinks).
+                               Takes precedence over file_path for that tracker.
 
         Returns:
             Dictionary mapping tracker slugs to torrent file paths:
@@ -319,11 +327,21 @@ class TorrentGenerator:
                 if tracker_release_names:
                     tracker_specific_name = tracker_release_names.get(tracker.slug)
 
+                # Use per-tracker output dir if provided, otherwise fallback to output_dir
+                tracker_out_dir = output_dir
+                if tracker_output_dirs and tracker.slug in tracker_output_dirs:
+                    tracker_out_dir = tracker_output_dirs[tracker.slug]
+
+                # Use per-tracker file path if provided (from per-tracker hardlinks)
+                tracker_file_path = file_path
+                if tracker_file_paths and tracker.slug in tracker_file_paths:
+                    tracker_file_path = tracker_file_paths[tracker.slug]
+
                 path = await self.generate_for_tracker(
-                    file_path=file_path,
+                    file_path=tracker_file_path,
                     tracker=tracker,
                     release_name=release_name,
-                    output_dir=output_dir,
+                    output_dir=tracker_out_dir,
                     tracker_release_name=tracker_specific_name
                 )
                 torrent_paths[tracker.slug] = path

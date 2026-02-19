@@ -95,6 +95,11 @@ class Settings(Base):
     # Directory Paths
     input_media_path = Column(String(1000), nullable=True)
     output_dir = Column(String(1000), nullable=True)
+    torrent_output_dir = Column(String(1000), nullable=True)  # Dedicated folder for .torrent files (default: {output_dir}/.torrents)
+
+    # Hardlink settings (v2.5)
+    hardlink_enabled = Column(Boolean, nullable=True, default=True)  # Enable hardlink creation for release structures
+    hardlink_fallback_copy = Column(Boolean, nullable=True, default=True)  # Fallback to copy if hardlink fails (cross-partition)
 
     # Application Settings
     log_level = Column(String(50), nullable=True, default='INFO')
@@ -110,6 +115,12 @@ class Settings(Base):
     # Prowlarr integration (v2.1)
     prowlarr_url = Column(String(500), nullable=True)  # Prowlarr instance URL (e.g., http://localhost:9696)
     prowlarr_api_key = Column(String(200), nullable=True)  # Prowlarr API key
+
+    # Radarr/Sonarr integration (v2.4)
+    radarr_url = Column(String(500), nullable=True)  # Radarr instance URL (e.g., http://localhost:7878)
+    radarr_api_key = Column(String(200), nullable=True)  # Radarr API key
+    sonarr_url = Column(String(500), nullable=True)  # Sonarr instance URL (e.g., http://localhost:8989)
+    sonarr_api_key = Column(String(200), nullable=True)  # Sonarr API key
 
     # Rate limiting settings (v2.2)
     tmdb_rate_limit = Column(Integer, nullable=True, default=40)  # TMDB requests per 10 seconds
@@ -194,6 +205,10 @@ class Settings(Base):
             # Directory paths
             'input_media_path': self.input_media_path,
             'output_dir': self.output_dir,
+            'torrent_output_dir': self.torrent_output_dir,
+            # Hardlink settings (v2.5)
+            'hardlink_enabled': bool(self.hardlink_enabled) if self.hardlink_enabled is not None else True,
+            'hardlink_fallback_copy': bool(self.hardlink_fallback_copy) if self.hardlink_fallback_copy is not None else True,
             # Application settings
             'log_level': self.log_level,
             'tmdb_cache_ttl_days': self.tmdb_cache_ttl_days,
@@ -205,6 +220,11 @@ class Settings(Base):
             # Prowlarr integration (v2.1)
             'prowlarr_url': self.prowlarr_url,
             'prowlarr_api_key': mask_value(self.prowlarr_api_key),
+            # Radarr/Sonarr integration (v2.4)
+            'radarr_url': self.radarr_url,
+            'radarr_api_key': mask_value(self.radarr_api_key),
+            'sonarr_url': self.sonarr_url,
+            'sonarr_api_key': mask_value(self.sonarr_api_key),
             # Rate limiting (v2.2)
             'tmdb_rate_limit': self.tmdb_rate_limit,
             'tracker_rate_limit': self.tracker_rate_limit,
@@ -287,11 +307,34 @@ class Settings(Base):
         db.refresh(settings)
         return settings
 
+    def resolve_path(self, path_value: Optional[str]) -> Optional[str]:
+        """
+        Resolve a path, making relative paths absolute using input_media_path as base.
+
+        If the path is relative (no drive letter on Windows, doesn't start with / on Linux),
+        it is resolved against input_media_path. If input_media_path is not set, falls back
+        to the current working directory.
+
+        Args:
+            path_value: The path to resolve (may be relative or absolute)
+
+        Returns:
+            Absolute path string, or None if path_value is empty/None
+        """
+        if not path_value:
+            return None
+        from pathlib import Path
+        p = Path(path_value)
+        if not p.is_absolute():
+            base = Path(self.input_media_path) if self.input_media_path else Path.cwd()
+            p = base / p
+        return str(p)
+
     def get_output_dir_for_file(self, source_file_path: str) -> str:
         """
         Get the output directory for a given source file.
 
-        If output_dir is configured, returns output_dir.
+        If output_dir is configured, resolves it (relative paths use input_media_path as base).
         Otherwise, returns the parent directory of the source file
         (files are generated in the same folder as the source).
 
@@ -302,7 +345,7 @@ class Settings(Base):
             Path to the directory where output files should be saved
         """
         if self.output_dir:
-            return self.output_dir
+            return self.resolve_path(self.output_dir)
         # Default: same folder as source file
         from pathlib import Path
         return str(Path(source_file_path).parent)

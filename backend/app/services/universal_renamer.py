@@ -604,6 +604,15 @@ class UniversalRenamer:
             if not is_false_positive:
                 return match.group(1)
 
+        # Pattern 1b: Codec.TEAM format "-x264.GHT", "-x265.SPARKS", "-HEVC.FGT"
+        # When the team follows a known codec separated by a dot
+        match = re.search(
+            r'-(?:x264|x265|h264|h265|XviD|DivX|HEVC|AVC|VP9|AV1)\.([A-Za-z0-9]+)$',
+            name, re.IGNORECASE
+        )
+        if match:
+            return match.group(1)
+
         # Pattern 2: Space format " - TEAM" or "- TEAM" or " -TEAM"
         match = re.search(r'\s+-\s*([A-Za-z0-9]+)$', name)
         if match:

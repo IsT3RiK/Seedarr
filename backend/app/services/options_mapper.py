@@ -532,7 +532,14 @@ class OptionsMapper:
         source = None
         mediainfo = getattr(file_entry, 'mediainfo_data', None)
         if mediainfo and isinstance(mediainfo, dict):
-            resolution = mediainfo.get('resolution') or mediainfo.get('video', {}).get('resolution')
+            # Check parsed_from_filename first (most reliable)
+            parsed = mediainfo.get('parsed_from_filename', {})
+            resolution = parsed.get('resolution')
+            source = parsed.get('source')
+
+            # Fallback to top-level keys
+            if not resolution:
+                resolution = mediainfo.get('resolution') or mediainfo.get('video', {}).get('resolution')
 
         # Extract from release name if not in mediainfo
         if not resolution and name:
@@ -540,19 +547,33 @@ class OptionsMapper:
             if res_match:
                 resolution = res_match.group(1)
 
-        # Detect source from release name
-        if name:
-            name_upper = name.upper()
-            if 'WEB-DL' in name_upper or 'WEBDL' in name_upper:
+        # Detect source from release name if not in parsed metadata
+        # Check both the tracker release name (name) AND the original file_entry.release_name
+        _names_to_check = [name]
+        _orig_rn = getattr(file_entry, 'release_name', None)
+        if _orig_rn and _orig_rn != name:
+            _names_to_check.append(_orig_rn)
+
+        for _check_name in _names_to_check:
+            if source:
+                break
+            if not _check_name:
+                continue
+            _upper = _check_name.upper()
+            if 'WEB-DL' in _upper or 'WEBDL' in _upper:
                 source = 'WEB-DL'
-            elif 'WEBRIP' in name_upper:
+            elif 'WEBRIP' in _upper or 'WEB-RIP' in _upper:
                 source = 'WEBRip'
-            elif 'BLURAY' in name_upper or 'BLU-RAY' in name_upper:
+            elif 'BLURAY' in _upper or 'BLU-RAY' in _upper:
                 source = 'BluRay'
-            elif 'REMUX' in name_upper:
+            elif 'REMUX' in _upper:
                 source = 'Remux'
-            elif 'HDTV' in name_upper:
+            elif 'HDTV' in _upper:
                 source = 'HDTV'
+            elif 'DVDRIP' in _upper:
+                source = 'DVDRip'
+            elif re.search(r'(?<![A-Z])WEB(?![A-Z\-])', _upper):
+                source = 'WEB-DL'  # Standalone "WEB" → WEB-DL
 
         return self.build_options(
             resolution=resolution,

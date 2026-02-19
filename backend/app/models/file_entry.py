@@ -598,7 +598,9 @@ class FileEntry(Base):
             retry_count: Number of retry attempts
         """
         statuses = self.get_tracker_statuses()
-        statuses[tracker_slug] = {
+        # Preserve existing extra fields (release_dir, media_file, hardlink_method, qbit_status)
+        existing = statuses.get(tracker_slug, {})
+        updated = {
             'status': status,
             'torrent_id': torrent_id,
             'torrent_url': torrent_url,
@@ -606,6 +608,11 @@ class FileEntry(Base):
             'retry_count': retry_count,
             'updated_at': datetime.utcnow().isoformat()
         }
+        # Merge: keep extra fields from existing, overwrite with new upload fields
+        for key in ('release_dir', 'media_file', 'hardlink_method', 'hardlink_error', 'qbit_status'):
+            if key in existing:
+                updated[key] = existing[key]
+        statuses[tracker_slug] = updated
         self.tracker_statuses = statuses
         self.updated_at = datetime.utcnow()
         # Force SQLAlchemy to detect JSON column change

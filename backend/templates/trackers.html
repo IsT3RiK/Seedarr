@@ -482,6 +482,47 @@
                     <label class="label"><span class="label-text-alt">Variables: {url}, {passkey}</span></label>
                 </div>
 
+                <!-- Hardlink & Torrent Management -->
+                <div class="divider" style="margin:0.5rem 0;font-size:0.75rem;color:var(--text-muted);">Hardlinks & Torrents</div>
+
+                <div class="form-control full-width">
+                    <label class="label"><span class="label-text">Hardlink Directory</span></label>
+                    <div style="display:flex;gap:0.5rem;">
+                        <input type="text" id="tracker-hardlink-dir" name="hardlink_dir" class="input input-bordered"
+                               placeholder="Laisser vide = dossier de sortie global" style="font-family:monospace;flex:1;">
+                        <button type="button" onclick="openTrackerDirPicker('tracker-hardlink-dir')" class="btn btn-secondary btn-sm" style="flex-shrink:0;" title="Parcourir">
+                            <svg style="width:1rem;height:1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <label class="label"><span class="label-text-alt">Dossier pour les hardlinks de ce tracker (chemin relatif = basé sur dossier source)</span></label>
+                </div>
+
+                <div class="form-control full-width">
+                    <label class="label"><span class="label-text">Torrent Directory</span></label>
+                    <div style="display:flex;gap:0.5rem;">
+                        <input type="text" id="tracker-torrent-dir" name="torrent_dir" class="input input-bordered"
+                               placeholder="Laisser vide = dossier torrents global" style="font-family:monospace;flex:1;">
+                        <button type="button" onclick="openTrackerDirPicker('tracker-torrent-dir')" class="btn btn-secondary btn-sm" style="flex-shrink:0;" title="Parcourir">
+                            <svg style="width:1rem;height:1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <label class="label"><span class="label-text-alt">Dossier pour les fichiers .torrent de ce tracker</span></label>
+                </div>
+
+                <div class="form-control">
+                    <label class="cursor-pointer label justify-start gap-2">
+                        <input type="checkbox" id="tracker-inject-qbit" name="inject_to_qbit" class="checkbox checkbox-primary" checked>
+                        <span class="label-text">Injection qBittorrent automatique</span>
+                    </label>
+                    <label class="label"><span class="label-text-alt" style="font-size:0.7rem;">Si désactivé, le .torrent est sauvegardé mais doit être injecté manuellement</span></label>
+                </div>
+
+                <div class="divider" style="margin:0.5rem 0;font-size:0.75rem;color:var(--text-muted);">Options</div>
+
                 <!-- Checkboxes -->
                 <div class="form-control">
                     <label class="cursor-pointer label justify-start gap-2">
@@ -591,6 +632,37 @@
     </form>
 </dialog>
 
+<!-- Directory Picker Modal (for tracker fields) -->
+<div id="tracker-dir-picker-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:1100;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+    <div style="background:var(--bg-primary);border-radius:0.75rem;padding:1.5rem;max-width:550px;width:90%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 25px -5px rgba(0,0,0,0.3);border:1px solid var(--border-color);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+            <h3 style="font-size:1.15rem;font-weight:600;margin:0;">Parcourir les dossiers</h3>
+            <button type="button" onclick="closeTrackerDirPicker()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;padding:0.25rem;">&times;</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+            <button type="button" id="tracker-dir-picker-up" onclick="trackerDirPickerUp()" class="btn btn-secondary btn-sm" title="Dossier parent">
+                <svg style="width:1rem;height:1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"/>
+                </svg>
+            </button>
+            <div id="tracker-dir-picker-path" style="flex:1;font-family:monospace;font-size:0.85rem;padding:0.4rem 0.6rem;background:var(--bg-secondary);border-radius:0.375rem;border:1px solid var(--border-color);overflow-x:auto;white-space:nowrap;">/</div>
+        </div>
+        <div id="tracker-dir-picker-list" style="max-height:350px;overflow-y:auto;border:1px solid var(--border-color);border-radius:0.5rem;background:var(--bg-secondary);">
+            <div style="padding:2rem;text-align:center;color:var(--text-muted);">Chargement...</div>
+        </div>
+        <div id="tracker-dir-picker-error" style="display:none;margin-top:0.5rem;padding:0.5rem 0.75rem;border-radius:0.375rem;background:rgba(239,68,68,0.1);color:#ef4444;font-size:0.8rem;"></div>
+        <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
+            <button type="button" onclick="closeTrackerDirPicker()" class="btn btn-secondary">Annuler</button>
+            <button type="button" onclick="selectTrackerDir()" class="btn btn-primary">
+                <svg style="width:1rem;height:1rem;margin-right:0.3rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                Sélectionner
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- Prowlarr Import Modal -->
 <dialog id="prowlarr-modal" class="modal">
     <div class="modal-box" style="max-width: 800px;">
@@ -696,6 +768,9 @@
             updateNamingTemplateSelectFromValue(tracker.naming_template || '');
             document.getElementById('tracker-announce').value = tracker.announce_url_template || '';
             updateAnnouncePresetFromValue(tracker.announce_url_template || '');
+            document.getElementById('tracker-hardlink-dir').value = tracker.hardlink_dir || '';
+            document.getElementById('tracker-torrent-dir').value = tracker.torrent_dir || '';
+            document.getElementById('tracker-inject-qbit').checked = tracker.inject_to_qbit !== false;
             document.getElementById('tracker-cloudflare').checked = tracker.requires_cloudflare;
             document.getElementById('tracker-upload').checked = tracker.upload_enabled;
             document.getElementById('tracker-enabled').checked = tracker.enabled;
@@ -723,6 +798,9 @@
             default_template_id: formData.get('default_template_id') ? parseInt(formData.get('default_template_id')) : null,
             naming_template: formData.get('naming_template') || null,
             announce_url_template: formData.get('announce_url_template') || null,
+            hardlink_dir: formData.get('hardlink_dir') || null,
+            torrent_dir: formData.get('torrent_dir') || null,
+            inject_to_qbit: formData.get('inject_to_qbit') === 'on',
             requires_cloudflare: formData.get('requires_cloudflare') === 'on',
             upload_enabled: formData.get('upload_enabled') === 'on',
             enabled: formData.get('enabled') === 'on',
@@ -1290,6 +1368,109 @@
         } catch (error) {
             showMessage('error', error.message);
         }
+    }
+
+    // ========================================
+    // Directory Picker (for tracker fields)
+    // ========================================
+    let trackerDirPickerTargetId = null;
+    let trackerDirPickerCurrentPath = '';
+    let trackerDirPickerParentPath = null;
+    let trackerDirSelectedPath = null;
+
+    function openTrackerDirPicker(inputId) {
+        trackerDirPickerTargetId = inputId;
+        const input = document.getElementById(inputId);
+        const startPath = input?.value || '';
+
+        const modal = document.getElementById('tracker-dir-picker-modal');
+        modal.style.display = 'flex';
+        document.getElementById('tracker-dir-picker-error').style.display = 'none';
+        trackerDirSelectedPath = null;
+        loadTrackerDirPicker(startPath);
+    }
+
+    function closeTrackerDirPicker() {
+        document.getElementById('tracker-dir-picker-modal').style.display = 'none';
+        trackerDirPickerTargetId = null;
+        trackerDirSelectedPath = null;
+    }
+
+    function trackerDirPickerUp() {
+        if (trackerDirPickerParentPath !== null) {
+            loadTrackerDirPicker(trackerDirPickerParentPath);
+        }
+    }
+
+    async function loadTrackerDirPicker(path) {
+        const listEl = document.getElementById('tracker-dir-picker-list');
+        const pathEl = document.getElementById('tracker-dir-picker-path');
+        const errorEl = document.getElementById('tracker-dir-picker-error');
+        const upBtn = document.getElementById('tracker-dir-picker-up');
+
+        listEl.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--text-muted);">Chargement...</div>';
+        errorEl.style.display = 'none';
+        trackerDirSelectedPath = null;
+
+        try {
+            const url = `/api/settings/browse-dirs?path=${encodeURIComponent(path || '')}`;
+            const resp = await fetch(url);
+            const data = await resp.json();
+
+            trackerDirPickerCurrentPath = data.path || '';
+            trackerDirPickerParentPath = data.parent !== undefined ? data.parent : null;
+
+            pathEl.textContent = trackerDirPickerCurrentPath || 'Racine';
+            upBtn.disabled = trackerDirPickerParentPath === null;
+
+            if (data.error) {
+                errorEl.textContent = data.error;
+                errorEl.style.display = 'block';
+            }
+
+            if (data.dirs.length === 0 && !data.error) {
+                listEl.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--text-muted);font-size:0.85rem;">Aucun sous-dossier</div>';
+                return;
+            }
+
+            let html = '';
+            for (const dir of data.dirs) {
+                const isDrive = dir.is_drive;
+                const iconColor = isDrive ? '#3b82f6' : '#eab308';
+                const icon = isDrive
+                    ? `<svg style="width:1.25rem;height:1.25rem;color:${iconColor};flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>`
+                    : `<svg style="width:1.25rem;height:1.25rem;color:${iconColor};flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>`;
+                // Store path as data attribute to avoid backslash escaping issues in onclick
+                // Drives: single click navigates. Folders: single click highlights, double click navigates.
+                const clickAction = dir.is_drive
+                    ? 'onclick="loadTrackerDirPicker(this.dataset.path)"'
+                    : 'onclick="highlightTrackerDir(this, this.dataset.path)" ondblclick="loadTrackerDirPicker(this.dataset.path)"';
+                html += `<div style="display:flex;align-items:center;gap:0.6rem;padding:0.5rem 0.75rem;cursor:pointer;transition:background 0.15s;border-bottom:1px solid var(--border-color);font-size:0.85rem;" data-path="${dir.path.replace(/"/g, '&quot;')}" ${clickAction}>
+                    ${icon}
+                    <span>${dir.name}</span>
+                </div>`;
+            }
+            listEl.innerHTML = html;
+
+        } catch (e) {
+            listEl.innerHTML = '<div style="padding:1.5rem;text-align:center;color:#ef4444;">Erreur de chargement</div>';
+            console.error('Dir picker error:', e);
+        }
+    }
+
+    function highlightTrackerDir(el, path) {
+        el.parentElement.querySelectorAll('div').forEach(d => d.style.background = '');
+        el.style.background = 'var(--bg-tertiary)';
+        trackerDirSelectedPath = path;
+    }
+
+    function selectTrackerDir() {
+        const pathToUse = trackerDirSelectedPath || trackerDirPickerCurrentPath;
+        if (trackerDirPickerTargetId && pathToUse) {
+            const input = document.getElementById(trackerDirPickerTargetId);
+            if (input) input.value = pathToUse;
+        }
+        closeTrackerDirPicker();
     }
 </script>
 {% endblock %}

@@ -1,5 +1,5 @@
 """
-HardlinkManager Service for Seedarr v2.1
+HardlinkManager Service for Seedarr v2.5
 
 This module provides functionality for creating release folder structures
 with hardlinks (or fallback copies) for media files. Hardlinks save disk space
@@ -7,37 +7,31 @@ by pointing to the same data blocks as the original file.
 
 Features:
     - Create release folder structure with hardlinks
-    - Automatic fallback to copy if cross-filesystem
+    - Per-tracker release structure creation with configurable output dirs
+    - Automatic fallback to copy if cross-filesystem (controlled by hardlink_fallback_copy)
+    - Toggle system: hardlink_enabled controls whether hardlinks are attempted
     - Support for NFO and screenshot subfolder creation
     - Cleanup utilities for old release structures
+    - OS detection for hardlink compatibility warnings
 
-Folder Structure:
-    OUTPUT_DIR/{release_name}/
+Folder Structure (per-tracker):
+    TRACKER_HARDLINK_DIR/{release_name}/
         {release_name}.mkv  (hardlink or copy)
-        {release_name}.nfo
-        screens/
-            screen_001.png
-            screen_002.png
-            ...
 
 Usage Example:
     manager = HardlinkManager()
-    result = manager.create_release_structure(
+    result = manager.create_tracker_release(
         source_file="/media/movie.mkv",
         release_name="Movie.2024.1080p.BluRay.x264-GROUP",
-        output_dir="/output"
+        output_dir="/output/lacale",
+        hardlink_enabled=True,
+        fallback_copy=True
     )
-    # result = {
-    #     'release_dir': '/output/Movie.2024.1080p.BluRay.x264-GROUP',
-    #     'media_file': '/output/Movie.2024.1080p.BluRay.x264-GROUP/Movie.2024.1080p.BluRay.x264-GROUP.mkv',
-    #     'nfo_path': '/output/Movie.2024.1080p.BluRay.x264-GROUP/Movie.2024.1080p.BluRay.x264-GROUP.nfo',
-    #     'screens_dir': '/output/Movie.2024.1080p.BluRay.x264-GROUP/screens',
-    #     'hardlink_used': True
-    # }
 """
 
 import logging
 import os
+import platform
 import shutil
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -156,6 +150,162 @@ class HardlinkManager:
         )
 
         return result
+
+    def create_tracker_release(
+        self,
+        source_file: str,
+        release_name: str,
+        output_dir: str,
+        hardlink_enabled: bool = True,
+        fallback_copy: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Create a per-tracker release folder with hardlink or copy of the media file.
+
+        Unlike create_release_structure, this method:
+        - Does NOT create screens/ or NFO paths (those are in the main release)
+        - Respects hardlink_enabled toggle (skips hardlink attempt if False)
+        - Respects fallback_copy toggle (blocks instead of copying if False)
+        - Returns 'method' field indicating 'hardlink', 'copy', or 'direct'
+
+        When hardlink_enabled is False, returns 'direct' method pointing to source.
+
+        Args:
+            source_file: Path to the source media file
+            release_name: The release name (folder and file name)
+            output_dir: Output directory for this tracker
+            hardlink_enabled: Whether to attempt hardlink creation
+            fallback_copy: Whether to fallback to copy if hardlink fails
+
+        Returns:
+            Dictionary with paths:
+                {
+                    'release_dir': str,     # Path to release folder
+                    'media_file': str,      # Path to media file (hardlink, copy, or source)
+                    'hardlink_used': bool,  # True if hardlink was created
+                    'method': str,          # 'hardlink', 'copy', or 'direct'
+                    'source_file': str      # Original source file path
+                }
+
+        Raises:
+            HardlinkError: If hardlink fails and fallback_copy is False
+            FileNotFoundError: If source file doesn't exist
+        """
+        source_path = Path(source_file)
+
+        if not source_path.exists():
+            raise FileNotFoundError(f"Source file not found: {source_file}")
+
+        # When hardlinks are disabled, return source path directly
+        if not hardlink_enabled:
+            logger.info(f"Hardlinks disabled - using source file directly: {source_path.name}")
+            return {
+                'release_dir': str(source_path.parent),
+                'media_file': str(source_path),
+                'hardlink_used': False,
+                'method': 'direct',
+                'source_file': str(source_path),
+            }
+
+        # Create release directory
+        release_dir = Path(output_dir) / release_name
+        release_dir.mkdir(parents=True, exist_ok=True)
+
+        # Determine target media file path
+        extension = source_path.suffix.lower()
+        media_file = release_dir / f"{release_name}{extension}"
+
+        # Check if target already exists and is the same file
+        if media_file.exists():
+            if self._is_same_file(source_path, media_file):
+                logger.info(f"Target already linked to source: {media_file}")
+                return {
+                    'release_dir': str(release_dir),
+                    'media_file': str(media_file),
+                    'hardlink_used': True,
+                    'method': 'hardlink',
+                    'source_file': str(source_path),
+                }
+            else:
+                logger.warning(f"Removing existing file to replace: {media_file}")
+                media_file.unlink()
+
+        # Try hardlink
+        try:
+            os.link(str(source_path), str(media_file))
+            logger.info(f"Created hardlink for tracker release: {media_file.name}")
+            return {
+                'release_dir': str(release_dir),
+                'media_file': str(media_file),
+                'hardlink_used': True,
+                'method': 'hardlink',
+                'source_file': str(source_path),
+            }
+
+        except OSError as e:
+            logger.warning(f"Hardlink failed ({e})")
+
+            if not fallback_copy:
+                error_msg = (
+                    f"Hardlink creation failed and copy fallback is disabled. "
+                    f"Source: {source_path}, Target: {media_file}. "
+                    f"Error: {e}. "
+                    f"Ensure source and target are on the same filesystem, "
+                    f"or enable 'Copy fallback' in settings."
+                )
+                logger.error(error_msg)
+                raise HardlinkError(error_msg) from e
+
+            # Fallback to copy
+            try:
+                shutil.copy2(str(source_path), str(media_file))
+                logger.info(f"Created copy (hardlink unavailable): {media_file.name}")
+                return {
+                    'release_dir': str(release_dir),
+                    'media_file': str(media_file),
+                    'hardlink_used': False,
+                    'method': 'copy',
+                    'source_file': str(source_path),
+                }
+
+            except Exception as copy_err:
+                error_msg = f"Both hardlink and copy failed for {media_file}: {copy_err}"
+                logger.error(error_msg)
+                raise HardlinkError(error_msg) from copy_err
+
+    @staticmethod
+    def detect_os_info() -> Dict[str, Any]:
+        """
+        Detect OS information relevant to hardlink support.
+
+        Returns:
+            Dictionary with:
+                {
+                    'os_name': str,           # 'Linux', 'Windows', 'Darwin'
+                    'os_version': str,         # OS version string
+                    'hardlink_warning': str|None,  # Warning message if OS has constraints
+                }
+        """
+        os_name = platform.system()
+        os_version = platform.version()
+
+        warning = None
+        if os_name == 'Windows':
+            warning = (
+                "Windows detected: hardlinks require source and target on the same NTFS volume. "
+                "Cross-volume hardlinks are not supported. Consider using the copy fallback "
+                "option if your media and output directories are on different drives."
+            )
+        elif os_name == 'Darwin':
+            warning = (
+                "macOS detected: hardlinks work on APFS/HFS+ but only on the same volume."
+            )
+
+        return {
+            'os_name': os_name,
+            'os_version': os_version,
+            'hardlink_warning': warning,
+        }
 
     def _create_hardlink_or_copy(self, source: Path, target: Path) -> bool:
         """

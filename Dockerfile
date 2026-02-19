@@ -7,7 +7,7 @@ WORKDIR /build
 
 COPY backend/requirements.txt .
 
-RUN pip install --no-cache-dir --no-warn-script-location -r requirements.txt
+RUN pip install --user --no-cache-dir --no-warn-script-location -r requirements.txt
 
 # ===========================
 # Stage 2: Runtime
@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed dependencies from builder stage
-COPY --from=builder /usr/local /usr/local
+COPY --from=builder /root/.local /root/.local
 
 # Copy application code
 COPY backend/ ./backend/
@@ -31,12 +31,13 @@ COPY backend/ ./backend/
 # Only /app/backend/data needs write permissions (handled at runtime by entrypoint)
 RUN chmod -R a+rX /app/backend/
 
-# Copy entrypoint script and fix Windows line endings
+# Copy entrypoint script
 COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
+    PATH=/root/.local/bin:$PATH \
     PUID=1000 \
     PGID=1000
 

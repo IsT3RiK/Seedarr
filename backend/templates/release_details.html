@@ -24,7 +24,7 @@
     </div>
     {% elif release %}
 
-    <!-- Hero Header with Backdrop -->
+    <!-- Hero Header (compact) -->
     <div class="release-hero">
         {% if release.cover_url %}
         <div class="hero-backdrop" style="background-image: url('{{ release.cover_url }}')"></div>
@@ -36,7 +36,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                 </svg>
-                Back to Queue
+                Queue
             </a>
 
             <div class="hero-main">
@@ -44,14 +44,15 @@
                 <img src="{{ release.cover_url }}" alt="Cover" class="hero-poster">
                 {% else %}
                 <div class="hero-poster-placeholder">
-                    <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
                     </svg>
                 </div>
                 {% endif %}
 
                 <div class="hero-info">
-                    <div class="hero-badges">
+                    <h1 class="hero-title">{{ release.display_name }}</h1>
+                    <div class="hero-pills">
                         <span class="status-pill status-{{ release.status.value }}">{{ release.status_display }}</span>
                         {% if release.tmdb_id %}
                         <span class="tmdb-badge">
@@ -61,53 +62,29 @@
                             TMDB {{ release.tmdb_id }}
                         </span>
                         {% endif %}
-                    </div>
-
-                    <h1 class="hero-title">{{ release.display_name }}</h1>
-
-                    {% if release.description %}
-                    <p class="hero-description">{{ release.description[:200] }}{% if release.description|length > 200 %}...{% endif %}</p>
-                    {% endif %}
-
-                    <div class="hero-meta">
-                        <div class="meta-item">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7C5 4 4 5 4 7z"></path>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6"></path>
-                            </svg>
-                            <span>{{ release.file_size_display }}</span>
-                        </div>
                         {% if release.mediainfo_raw and release.mediainfo.video %}
-                        <div class="meta-item">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                            </svg>
-                            <span>{{ release.mediainfo.video.resolution }} {{ release.mediainfo.video.codec }}</span>
-                        </div>
+                        <span class="info-pill">{{ release.mediainfo.video.resolution }}</span>
                         {% endif %}
-                        <div class="meta-item">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            <span>{{ release.progress }}% Complete</span>
-                        </div>
+                        <span class="info-pill">{{ release.file_size_display }}</span>
+                        <span class="info-pill">{{ release.progress }}%</span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Pipeline Steps -->
+    <!-- Pipeline Steps (4 steps) -->
     <div class="pipeline-section">
         <div class="pipeline-header">
             <h2>Processing Pipeline</h2>
             <div id="action-result"></div>
         </div>
         <div class="pipeline-steps">
-            <div class="pipeline-step {% if release.scanned_at %}completed{% elif not release.scanned_at and not release.analyzed_at %}current{% endif %}">
-                <button class="step-button" onclick="executeStep({{ release.id }}, 'scan')" {% if release.scanned_at %}disabled{% endif %}>
+            <!-- Scan & Analyze (combined) -->
+            <div class="pipeline-step {% if release.analyzed_at %}completed{% elif not release.analyzed_at %}current{% endif %}">
+                <button class="step-button" onclick="executeStep({{ release.id }}, 'scan_analyze')" {% if release.analyzed_at %}disabled{% endif %}>
                     <div class="step-icon">
-                        {% if release.scanned_at %}
+                        {% if release.analyzed_at %}
                         <svg class="w-5 h-5 check" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
                         </svg>
@@ -117,48 +94,13 @@
                         </svg>
                         {% endif %}
                     </div>
-                    <span class="step-label">Scan</span>
+                    <span class="step-label">Scan & Analyze</span>
                 </button>
                 <div class="step-connector"></div>
             </div>
 
-            <div class="pipeline-step {% if release.analyzed_at %}completed{% elif release.scanned_at and not release.analyzed_at %}current{% endif %}">
-                <button class="step-button" onclick="executeStep({{ release.id }}, 'analyze')" {% if release.analyzed_at %}disabled{% endif %}>
-                    <div class="step-icon">
-                        {% if release.analyzed_at %}
-                        <svg class="w-5 h-5 check" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                        </svg>
-                        {% else %}
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                        </svg>
-                        {% endif %}
-                    </div>
-                    <span class="step-label">Analyze</span>
-                </button>
-                <div class="step-connector"></div>
-            </div>
-
-            <div class="pipeline-step {% if release.renamed_at %}completed{% elif release.analyzed_at and not release.renamed_at %}current{% endif %}">
-                <button class="step-button" onclick="executeStep({{ release.id }}, 'rename')" {% if release.renamed_at %}disabled{% endif %}>
-                    <div class="step-icon">
-                        {% if release.renamed_at %}
-                        <svg class="w-5 h-5 check" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                        </svg>
-                        {% else %}
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                        </svg>
-                        {% endif %}
-                    </div>
-                    <span class="step-label">Rename</span>
-                </button>
-                <div class="step-connector"></div>
-            </div>
-
-            <div class="pipeline-step {% if release.metadata_generated_at %}completed{% elif release.renamed_at and not release.metadata_generated_at %}current{% endif %}">
+            <!-- Metadata -->
+            <div class="pipeline-step {% if release.metadata_generated_at %}completed{% elif release.analyzed_at and not release.metadata_generated_at %}current{% endif %}">
                 <button class="step-button" onclick="executeStep({{ release.id }}, 'metadata')" {% if release.metadata_generated_at %}disabled{% endif %}>
                     <div class="step-icon">
                         {% if release.metadata_generated_at %}
@@ -176,6 +118,7 @@
                 <div class="step-connector"></div>
             </div>
 
+            <!-- Upload -->
             <div class="pipeline-step {% if release.uploaded_at %}completed{% elif release.metadata_generated_at and not release.uploaded_at %}current{% endif %}">
                 <button class="step-button step-upload" onclick="executeStep({{ release.id }}, 'upload')" {% if release.uploaded_at %}disabled{% endif %}>
                     <div class="step-icon">
@@ -195,17 +138,115 @@
         </div>
     </div>
 
-    <!-- Content Grid -->
+    <!-- Content Area -->
     <div class="content-grid">
-        <!-- Left Column -->
+        <!-- Left Column: Release Info (file + mediainfo merged) -->
         <div class="content-left">
-            <!-- File Information -->
             <div class="card">
                 <div class="card-header">
-                    <h3><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg> File Information</h3>
+                    <h3>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Release Info
+                    </h3>
                 </div>
                 <div class="card-body">
-                    <div class="info-list">
+                    {% if release.mediainfo_raw %}
+                    <div class="release-info-grid">
+                        <div class="info-section">
+                            <div class="info-row">
+                                <span class="info-label">Filename</span>
+                                <span class="info-value mono">{{ release.filename }}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Release Name</span>
+                                <span class="info-value mono">{{ release.final_release_name or release.release_name or 'Not set' }}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Size</span>
+                                <span class="info-value">{{ release.file_size_display }}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Duration</span>
+                                <span class="info-value">{{ release.mediainfo.duration_display }}</span>
+                            </div>
+                            <div class="info-row full">
+                                <span class="info-label">Path</span>
+                                <span class="info-value mono small">{{ release.file_path }}</span>
+                            </div>
+                        </div>
+
+                        <div class="specs-columns">
+                            <div class="spec-col">
+                                <div class="spec-title">Video</div>
+                                <div class="spec-grid">
+                                    <div class="spec-item">
+                                        <span class="spec-label">Codec</span>
+                                        <span class="spec-value">{{ release.mediainfo.video.codec }}</span>
+                                    </div>
+                                    <div class="spec-item">
+                                        <span class="spec-label">Resolution</span>
+                                        <span class="spec-value">{{ release.mediainfo.video.resolution }}</span>
+                                    </div>
+                                    <div class="spec-item">
+                                        <span class="spec-label">FPS</span>
+                                        <span class="spec-value">{{ release.mediainfo.video.frame_rate }}</span>
+                                    </div>
+                                    <div class="spec-item">
+                                        <span class="spec-label">Bit Depth</span>
+                                        <span class="spec-value">{{ release.mediainfo.video.bit_depth }}-bit</span>
+                                    </div>
+                                    {% if release.mediainfo.video.hdr %}
+                                    <div class="spec-item highlight">
+                                        <span class="spec-label">HDR</span>
+                                        <span class="spec-value">Yes</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="spec-col">
+                                <div class="spec-title">Audio</div>
+                                <div class="spec-grid">
+                                    <div class="spec-item">
+                                        <span class="spec-label">Codec</span>
+                                        <span class="spec-value">{{ release.mediainfo.audio.codec }}</span>
+                                    </div>
+                                    <div class="spec-item">
+                                        <span class="spec-label">Channels</span>
+                                        <span class="spec-value">{{ release.mediainfo.audio.channels }}</span>
+                                    </div>
+                                    <div class="spec-item">
+                                        <span class="spec-label">Language</span>
+                                        <span class="spec-value">{{ release.mediainfo.audio.language }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if release.tracker_upload_names %}
+                        <div class="tracker-names-section">
+                            <div class="spec-title">Titre par tracker</div>
+                            <div class="tracker-names-list">
+                                {% for t in release.tracker_upload_names %}
+                                <div class="tracker-name-item" id="tracker-name-row-{{ t.slug }}">
+                                    <span class="tracker-slug">{{ t.name }}</span>
+                                    <div class="tracker-name-editable">
+                                        <span class="tracker-name mono" id="tracker-name-display-{{ t.slug }}" onclick="startEditTrackerName('{{ t.slug }}', '{{ t.name }}', this)">{{ t.release_name }}{% if t.is_preview %} <span class="preview-badge">aperçu</span>{% endif %}</span>
+                                        <input type="text" class="tracker-name-input mono" id="tracker-name-input-{{ t.slug }}" value="{{ t.release_name }}" style="display:none"
+                                            onkeydown="handleTrackerNameKey(event, {{ release.id }}, '{{ t.slug }}')"
+                                            onblur="cancelEditTrackerName('{{ t.slug }}')">
+                                    </div>
+                                    <button class="edit-btn" onclick="startEditTrackerName('{{ t.slug }}', '{{ t.name }}', document.getElementById('tracker-name-display-{{ t.slug }}'))" title="Éditer">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                    </button>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <!-- No mediainfo yet -->
+                    <div class="info-section">
                         <div class="info-row">
                             <span class="info-label">Filename</span>
                             <span class="info-value mono">{{ release.filename }}</span>
@@ -214,108 +255,23 @@
                             <span class="info-label">Size</span>
                             <span class="info-value">{{ release.file_size_display }}</span>
                         </div>
-                        <div class="info-row">
-                            <span class="info-label">Release Name</span>
-                            <span class="info-value mono">{{ release.final_release_name or release.release_name or 'Not set' }}</span>
-                        </div>
-                        {% if release.tracker_release_names %}
-                        <div class="info-row full">
-                            <span class="info-label">Noms par Tracker</span>
-                            <div class="tracker-names-list">
-                                {% for tracker_slug, tracker_name in release.tracker_release_names.items() %}
-                                <div class="tracker-name-item">
-                                    <span class="tracker-slug">{{ tracker_slug }}</span>
-                                    <span class="tracker-name mono">{{ tracker_name }}</span>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        {% endif %}
                         <div class="info-row full">
                             <span class="info-label">Path</span>
                             <span class="info-value mono small">{{ release.file_path }}</span>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <!-- MediaInfo -->
-            <div class="card">
-                <div class="card-header">
-                    <h3><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> MediaInfo</h3>
-                </div>
-                <div class="card-body">
-                    {% if release.mediainfo_raw %}
-                    <div class="media-specs">
-                        <div class="spec-group">
-                            <div class="spec-title">Video</div>
-                            <div class="spec-grid">
-                                <div class="spec-item">
-                                    <span class="spec-label">Resolution</span>
-                                    <span class="spec-value">{{ release.mediainfo.video.resolution }}</span>
-                                </div>
-                                <div class="spec-item">
-                                    <span class="spec-label">Codec</span>
-                                    <span class="spec-value">{{ release.mediainfo.video.codec }}</span>
-                                </div>
-                                <div class="spec-item">
-                                    <span class="spec-label">FPS</span>
-                                    <span class="spec-value">{{ release.mediainfo.video.frame_rate }}</span>
-                                </div>
-                                <div class="spec-item">
-                                    <span class="spec-label">Bit Depth</span>
-                                    <span class="spec-value">{{ release.mediainfo.video.bit_depth }}-bit</span>
-                                </div>
-                                {% if release.mediainfo.video.hdr %}
-                                <div class="spec-item highlight">
-                                    <span class="spec-label">HDR</span>
-                                    <span class="spec-value">Yes</span>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-
-                        <div class="spec-group">
-                            <div class="spec-title">Audio</div>
-                            <div class="spec-grid">
-                                <div class="spec-item">
-                                    <span class="spec-label">Codec</span>
-                                    <span class="spec-value">{{ release.mediainfo.audio.codec }}</span>
-                                </div>
-                                <div class="spec-item">
-                                    <span class="spec-label">Channels</span>
-                                    <span class="spec-value">{{ release.mediainfo.audio.channels }}</span>
-                                </div>
-                                <div class="spec-item">
-                                    <span class="spec-label">Language</span>
-                                    <span class="spec-value">{{ release.mediainfo.audio.language }}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="spec-group">
-                            <div class="spec-title">General</div>
-                            <div class="spec-grid">
-                                <div class="spec-item">
-                                    <span class="spec-label">Duration</span>
-                                    <span class="spec-value">{{ release.mediainfo.duration_display }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% else %}
-                    <div class="empty-state">
-                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M12 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    <div class="empty-hint">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
-                        <p>Run Analyze step to get MediaInfo</p>
+                        Run Scan & Analyze to get file details
                     </div>
                     {% endif %}
                 </div>
             </div>
         </div>
 
-        <!-- Right Column -->
+        <!-- Right Column: Tracker info -->
         <div class="content-right">
             <!-- Duplicate Check -->
             <div class="card">
@@ -386,7 +342,7 @@
                 </div>
             </div>
 
-            <!-- Upload Status -->
+            <!-- Upload Status (conditional) -->
             {% if release.tracker_statuses %}
             <div class="card">
                 <div class="card-header">
@@ -395,14 +351,49 @@
                 <div class="card-body">
                     <div class="upload-list">
                         {% for slug, status_data in release.tracker_statuses.items() %}
-                        <div class="upload-item">
+                        <div class="upload-item" style="flex-wrap:wrap;gap:0.5rem;">
                             <span class="upload-tracker">{{ slug }}</span>
+
+                            <!-- Hardlink status -->
+                            {% if status_data.hardlink_method %}
+                            <span style="font-size:0.7rem;padding:0.1rem 0.4rem;border-radius:0.25rem;
+                                {% if status_data.hardlink_method == 'hardlink' %}background:rgba(34,197,94,0.1);color:#22c55e;border:1px solid rgba(34,197,94,0.3);
+                                {% elif status_data.hardlink_method == 'copy' %}background:rgba(251,191,36,0.1);color:#f59e0b;border:1px solid rgba(251,191,36,0.3);
+                                {% elif status_data.hardlink_method == 'direct' %}background:rgba(148,163,184,0.1);color:#94a3b8;border:1px solid rgba(148,163,184,0.3);
+                                {% elif status_data.hardlink_method == 'failed' %}background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.3);
+                                {% endif %}"
+                                title="{% if status_data.hardlink_method == 'hardlink' %}Hardlink created{% elif status_data.hardlink_method == 'copy' %}File copied (hardlink failed){% elif status_data.hardlink_method == 'direct' %}Using source directly{% elif status_data.hardlink_method == 'failed' %}{{ status_data.hardlink_error or 'Hardlink failed' }}{% endif %}">
+                                {% if status_data.hardlink_method == 'hardlink' %}HL
+                                {% elif status_data.hardlink_method == 'copy' %}CP
+                                {% elif status_data.hardlink_method == 'direct' %}SRC
+                                {% elif status_data.hardlink_method == 'failed' %}HL!{% endif %}
+                            </span>
+                            {% endif %}
+
+                            <!-- Upload status -->
                             <span class="upload-status {{ status_data.status }}">
                                 {% if status_data.status == 'success' %}Uploaded
                                 {% elif status_data.status == 'failed' %}Failed
                                 {% elif status_data.status == 'skipped_duplicate' %}Skipped
                                 {% else %}Pending{% endif %}
                             </span>
+
+                            <!-- qBittorrent status -->
+                            {% if status_data.qbit_status %}
+                            <span style="font-size:0.7rem;padding:0.1rem 0.4rem;border-radius:0.25rem;
+                                {% if status_data.qbit_status == 'success' %}background:rgba(34,197,94,0.1);color:#22c55e;border:1px solid rgba(34,197,94,0.3);
+                                {% elif status_data.qbit_status == 'failed' %}background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.3);
+                                {% elif status_data.qbit_status == 'manual' %}background:rgba(251,191,36,0.1);color:#f59e0b;border:1px solid rgba(251,191,36,0.3);
+                                {% else %}background:rgba(148,163,184,0.1);color:#94a3b8;border:1px solid rgba(148,163,184,0.3);
+                                {% endif %}"
+                                title="{% if status_data.qbit_status == 'success' %}Injected to qBittorrent{% elif status_data.qbit_status == 'failed' %}qBittorrent injection failed{% elif status_data.qbit_status == 'manual' %}Manual injection required{% else %}qBittorrent not configured{% endif %}">
+                                qB:{% if status_data.qbit_status == 'success' %}OK
+                                {% elif status_data.qbit_status == 'failed' %}ERR
+                                {% elif status_data.qbit_status == 'manual' %}MAN
+                                {% else %}N/A{% endif %}
+                            </span>
+                            {% endif %}
+
                             {% if status_data.torrent_url %}
                             <a href="{{ status_data.torrent_url }}" target="_blank" class="upload-link">View</a>
                             {% endif %}
@@ -411,120 +402,113 @@
                                 qB
                             </button>
                             {% endif %}
+
+                            <!-- Torrent file path (small detail) -->
+                            {% if release.torrent_paths.get(slug) %}
+                            <div style="width:100%;font-size:0.65rem;color:var(--text-muted);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                {{ release.torrent_paths.get(slug) }}
+                            </div>
+                            {% endif %}
                         </div>
                         {% endfor %}
                     </div>
                 </div>
             </div>
             {% endif %}
+        </div>
+    </div>
 
-            <!-- Screenshots -->
-            {% if release.screenshot_urls %}
-            <div class="card">
-                <div class="card-header">
-                    <h3><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg> Screenshots</h3>
-                </div>
-                <div class="card-body">
-                    <div class="screenshot-grid">
-                        {% for screenshot in release.screenshot_urls %}
-                        <a href="{{ screenshot.url }}" target="_blank" class="screenshot-item">
-                            <img src="{{ screenshot.thumb_url or screenshot.url }}" alt="Screenshot">
-                        </a>
-                        {% endfor %}
-                    </div>
-                </div>
+    <!-- Screenshots (horizontal band, conditional) -->
+    {% if release.screenshot_urls %}
+    <div class="screenshots-band">
+        <div class="screenshots-scroll">
+            {% for screenshot in release.screenshot_urls %}
+            <a href="{{ screenshot.url }}" target="_blank" class="screenshot-thumb">
+                <img src="{{ screenshot.thumb_url or screenshot.url }}" alt="Screenshot">
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- BBCode Preview (collapsible) -->
+    <details class="bbcode-details">
+        <summary class="bbcode-summary">
+            <div class="bbcode-summary-left">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                <span>BBCode Preview</span>
             </div>
-            {% endif %}
-
-            <!-- Timeline -->
-            <div class="card">
-                <div class="card-header">
-                    <h3><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Timeline</h3>
-                </div>
-                <div class="card-body">
-                    <div class="timeline">
-                        <div class="timeline-item {% if release.created_at %}done{% endif %}">
-                            <div class="timeline-dot"></div>
-                            <div class="timeline-content">
-                                <span class="timeline-label">Created</span>
-                                <span class="timeline-date">{{ release.created_at.strftime('%d/%m %H:%M') if release.created_at else '-' }}</span>
-                            </div>
-                        </div>
-                        <div class="timeline-item {% if release.scanned_at %}done{% endif %}">
-                            <div class="timeline-dot"></div>
-                            <div class="timeline-content">
-                                <span class="timeline-label">Scanned</span>
-                                <span class="timeline-date">{{ release.scanned_at.strftime('%d/%m %H:%M') if release.scanned_at else '-' }}</span>
-                            </div>
-                        </div>
-                        <div class="timeline-item {% if release.analyzed_at %}done{% endif %}">
-                            <div class="timeline-dot"></div>
-                            <div class="timeline-content">
-                                <span class="timeline-label">Analyzed</span>
-                                <span class="timeline-date">{{ release.analyzed_at.strftime('%d/%m %H:%M') if release.analyzed_at else '-' }}</span>
-                            </div>
-                        </div>
-                        <div class="timeline-item {% if release.renamed_at %}done{% endif %}">
-                            <div class="timeline-dot"></div>
-                            <div class="timeline-content">
-                                <span class="timeline-label">Renamed</span>
-                                <span class="timeline-date">{{ release.renamed_at.strftime('%d/%m %H:%M') if release.renamed_at else '-' }}</span>
-                            </div>
-                        </div>
-                        <div class="timeline-item {% if release.metadata_generated_at %}done{% endif %}">
-                            <div class="timeline-dot"></div>
-                            <div class="timeline-content">
-                                <span class="timeline-label">Metadata</span>
-                                <span class="timeline-date">{{ release.metadata_generated_at.strftime('%d/%m %H:%M') if release.metadata_generated_at else '-' }}</span>
-                            </div>
-                        </div>
-                        <div class="timeline-item {% if release.uploaded_at %}done{% endif %}">
-                            <div class="timeline-dot"></div>
-                            <div class="timeline-content">
-                                <span class="timeline-label">Uploaded</span>
-                                <span class="timeline-date">{{ release.uploaded_at.strftime('%d/%m %H:%M') if release.uploaded_at else '-' }}</span>
-                            </div>
-                        </div>
-                    </div>
+            <div class="bbcode-summary-actions" onclick="event.stopPropagation()">
+                <select id="template-selector" class="template-select" title="Selectionner un template">
+                    <option value="">Template par defaut</option>
+                </select>
+                <button class="btn-icon" onclick="toggleBBCodeView()" id="toggle-view-btn" style="display: none;" title="Toggle BBCode/HTML">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                    </svg>
+                </button>
+                <button class="btn-icon" onclick="loadBBCode({{ release.id }})" title="Generate">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                </button>
+                <button class="btn-icon" onclick="copyBBCode()" id="copy-bbcode-btn" style="display: none;" title="Copy BBCode">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                </button>
+            </div>
+        </summary>
+        <div class="bbcode-body">
+            <div id="bbcode-container">
+                <div class="empty-state small">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                    </svg>
+                    <p>Click generate to create BBCode</p>
                 </div>
             </div>
         </div>
+    </details>
 
-        <!-- BBCode Preview - Full Width (2 columns) -->
-        <div class="card" style="grid-column: 1 / -1;">
-            <div class="card-header">
-                <h3><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg> BBCode Preview</h3>
-                <div class="header-actions">
-                    <select id="template-selector" class="template-select" title="Selectionner un template">
-                        <option value="">Template par defaut</option>
-                    </select>
-                    <button class="btn-icon" onclick="toggleBBCodeView()" id="toggle-view-btn" style="display: none;" title="Toggle BBCode/HTML">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                        </svg>
-                    </button>
-                    <button class="btn-icon" onclick="loadBBCode({{ release.id }})" title="Generate">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                        </svg>
-                    </button>
-                    <button class="btn-icon" onclick="copyBBCode()" id="copy-bbcode-btn" style="display: none;" title="Copy BBCode">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                        </svg>
-                    </button>
-                </div>
+    <!-- Timeline (horizontal compact) -->
+    <div class="timeline-band">
+        <div class="timeline-h">
+            <div class="timeline-h-item {% if release.created_at %}done{% endif %}">
+                <div class="timeline-h-dot"></div>
+                <span class="timeline-h-label">Created</span>
+                <span class="timeline-h-date">{{ release.created_at.strftime('%d/%m %H:%M') if release.created_at else '-' }}</span>
             </div>
-            <div class="card-body">
-                <div id="bbcode-container">
-                    <div class="empty-state small">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
-                        </svg>
-                        <p>Click generate to create BBCode</p>
-                    </div>
-                </div>
+            <div class="timeline-h-line {% if release.scanned_at %}done{% endif %}"></div>
+            <div class="timeline-h-item {% if release.scanned_at %}done{% endif %}">
+                <div class="timeline-h-dot"></div>
+                <span class="timeline-h-label">Scanned</span>
+                <span class="timeline-h-date">{{ release.scanned_at.strftime('%d/%m %H:%M') if release.scanned_at else '-' }}</span>
+            </div>
+            <div class="timeline-h-line {% if release.analyzed_at %}done{% endif %}"></div>
+            <div class="timeline-h-item {% if release.analyzed_at %}done{% endif %}">
+                <div class="timeline-h-dot"></div>
+                <span class="timeline-h-label">Analyzed</span>
+                <span class="timeline-h-date">{{ release.analyzed_at.strftime('%d/%m %H:%M') if release.analyzed_at else '-' }}</span>
+            </div>
+            <div class="timeline-h-line {% if release.renamed_at %}done{% endif %}"></div>
+            <div class="timeline-h-item {% if release.renamed_at %}done{% endif %}">
+                <div class="timeline-h-dot"></div>
+                <span class="timeline-h-label">Renamed</span>
+                <span class="timeline-h-date">{{ release.renamed_at.strftime('%d/%m %H:%M') if release.renamed_at else '-' }}</span>
+            </div>
+            <div class="timeline-h-line {% if release.metadata_generated_at %}done{% endif %}"></div>
+            <div class="timeline-h-item {% if release.metadata_generated_at %}done{% endif %}">
+                <div class="timeline-h-dot"></div>
+                <span class="timeline-h-label">Metadata</span>
+                <span class="timeline-h-date">{{ release.metadata_generated_at.strftime('%d/%m %H:%M') if release.metadata_generated_at else '-' }}</span>
+            </div>
+            <div class="timeline-h-line {% if release.uploaded_at %}done{% endif %}"></div>
+            <div class="timeline-h-item {% if release.uploaded_at %}done{% endif %}">
+                <div class="timeline-h-dot"></div>
+                <span class="timeline-h-label">Uploaded</span>
+                <span class="timeline-h-date">{{ release.uploaded_at.strftime('%d/%m %H:%M') if release.uploaded_at else '-' }}</span>
             </div>
         </div>
     </div>
@@ -554,13 +538,12 @@
     margin-bottom: 0.5rem;
 }
 
-/* Hero Section */
+/* ─── Hero Section (compact) ─── */
 .release-hero {
     position: relative;
     border-radius: 1rem;
     overflow: hidden;
     margin-bottom: 1.5rem;
-    min-height: 280px;
 }
 
 .hero-backdrop {
@@ -580,16 +563,16 @@
 
 .hero-content {
     position: relative;
-    padding: 1.5rem;
+    padding: 1.25rem 1.5rem;
 }
 
 .back-link {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.375rem;
     color: var(--text-muted);
-    font-size: 0.875rem;
-    margin-bottom: 1.5rem;
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
     transition: color 0.2s;
 }
 
@@ -599,24 +582,24 @@
 
 .hero-main {
     display: flex;
-    gap: 1.5rem;
-    align-items: flex-start;
+    gap: 1.25rem;
+    align-items: center;
 }
 
 .hero-poster {
-    width: 140px;
-    height: 210px;
+    width: 100px;
+    height: 150px;
     object-fit: cover;
-    border-radius: 0.75rem;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
     flex-shrink: 0;
 }
 
 .hero-poster-placeholder {
-    width: 140px;
-    height: 210px;
+    width: 100px;
+    height: 150px;
     background: rgba(255, 255, 255, 0.1);
-    border-radius: 0.75rem;
+    border-radius: 0.5rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -629,17 +612,25 @@
     min-width: 0;
 }
 
-.hero-badges {
+.hero-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 0.5rem;
+    line-height: 1.2;
+}
+
+.hero-pills {
     display: flex;
     gap: 0.5rem;
-    margin-bottom: 0.75rem;
     flex-wrap: wrap;
+    align-items: center;
 }
 
 .status-pill {
-    padding: 0.25rem 0.75rem;
+    padding: 0.2rem 0.6rem;
     border-radius: 9999px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
 }
@@ -658,53 +649,29 @@
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
-    padding: 0.25rem 0.75rem;
+    padding: 0.2rem 0.6rem;
     background: rgba(1, 180, 228, 0.2);
     color: #01b4e4;
     border-radius: 9999px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 500;
 }
 
-.hero-title {
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: #fff;
-    margin-bottom: 0.5rem;
-    line-height: 1.2;
-}
-
-.hero-description {
+.info-pill {
+    padding: 0.2rem 0.6rem;
+    background: rgba(255, 255, 255, 0.1);
     color: rgba(255, 255, 255, 0.7);
-    font-size: 0.875rem;
-    line-height: 1.5;
-    margin-bottom: 1rem;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 500;
 }
 
-.hero-meta {
-    display: flex;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-}
-
-.meta-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 0.875rem;
-}
-
-.meta-item svg {
-    color: var(--accent-color);
-}
-
-/* Pipeline Section */
+/* ─── Pipeline Section ─── */
 .pipeline-section {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 1rem;
-    padding: 1.5rem;
+    padding: 1.25rem;
     margin-bottom: 1.5rem;
 }
 
@@ -712,7 +679,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1.25rem;
 }
 
 .pipeline-header h2 {
@@ -737,14 +704,14 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
-    padding: 1rem;
+    gap: 0.375rem;
+    padding: 0.75rem 1rem;
     background: var(--bg-tertiary);
     border: 2px solid var(--border-color);
-    border-radius: 1rem;
+    border-radius: 0.75rem;
     cursor: pointer;
     transition: all 0.2s;
-    min-width: 90px;
+    min-width: 80px;
 }
 
 .step-button:hover:not(:disabled) {
@@ -757,8 +724,8 @@
 }
 
 .step-icon {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     background: var(--bg-secondary);
     display: flex;
@@ -768,13 +735,14 @@
 }
 
 .step-label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 500;
     color: var(--text-muted);
+    white-space: nowrap;
 }
 
 .step-connector {
-    width: 40px;
+    width: 36px;
     height: 2px;
     background: var(--border-color);
 }
@@ -806,7 +774,7 @@
 
 .pipeline-step.current .step-button {
     border-color: var(--accent-color);
-    box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.3);
+    box-shadow: 0 0 15px rgba(var(--accent-rgb), 0.3);
 }
 
 .pipeline-step.current .step-icon {
@@ -828,38 +796,15 @@
     color: #22c55e;
 }
 
-/* Content Grid */
+/* ─── Content Grid ─── */
 .content-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1.5rem;
+    margin-bottom: 1.5rem;
 }
 
-@media (max-width: 1024px) {
-    .content-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .hero-main {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-    }
-
-    .hero-meta {
-        justify-content: center;
-    }
-
-    .pipeline-steps {
-        flex-wrap: wrap;
-    }
-
-    .step-connector {
-        display: none;
-    }
-}
-
-/* Cards */
+/* ─── Cards ─── */
 .card {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
@@ -876,7 +821,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 1.25rem;
+    padding: 0.875rem 1.25rem;
     border-bottom: 1px solid var(--border-color);
     background: var(--bg-tertiary);
 }
@@ -922,18 +867,17 @@
     padding: 1.25rem;
 }
 
-/* BBCode container - full height */
-#bbcode-container {
+/* ─── Release Info (merged file + mediainfo) ─── */
+.release-info-grid {
     display: flex;
     flex-direction: column;
-    min-height: 600px;
+    gap: 1.25rem;
 }
 
-/* Info List */
-.info-list {
+.info-section {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.625rem;
 }
 
 .info-row {
@@ -949,7 +893,7 @@
 }
 
 .info-label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--text-muted);
     text-transform: uppercase;
     flex-shrink: 0;
@@ -972,21 +916,18 @@
     text-align: left;
 }
 
-/* Media Specs */
-.media-specs {
+.specs-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.spec-col {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
-}
-
-.spec-group {
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.spec-group:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
+    gap: 0.75rem;
 }
 
 .spec-title {
@@ -995,19 +936,19 @@
     color: var(--accent-color);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    margin-bottom: 0.75rem;
 }
 
 .spec-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-    gap: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 
 .spec-item {
     display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .spec-item.highlight .spec-value {
@@ -1015,18 +956,40 @@
 }
 
 .spec-label {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     color: var(--text-muted);
-    text-transform: uppercase;
 }
 
 .spec-value {
-    font-size: 0.875rem;
+    font-size: 0.85rem;
     color: var(--text-primary);
     font-weight: 500;
 }
 
-/* Empty State */
+.tracker-names-section {
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.empty-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    margin-top: 1rem;
+    background: rgba(var(--accent-rgb), 0.08);
+    border: 1px dashed rgba(var(--accent-rgb), 0.3);
+    border-radius: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.empty-hint svg {
+    color: var(--accent-color);
+    flex-shrink: 0;
+}
+
+/* ─── Empty State ─── */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -1054,15 +1017,15 @@
     margin-top: 1rem;
 }
 
-/* Duplicate Check */
+/* ─── Duplicate Check ─── */
 .dup-status {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.75rem 1rem;
+    padding: 0.625rem 0.875rem;
     border-radius: 0.5rem;
-    margin-bottom: 1rem;
-    font-size: 0.875rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
     font-weight: 500;
 }
 
@@ -1085,7 +1048,7 @@
 .tracker-item {
     background: var(--bg-tertiary);
     border-radius: 0.5rem;
-    padding: 0.75rem;
+    padding: 0.625rem 0.75rem;
     border-left: 3px solid var(--border-color);
 }
 
@@ -1106,7 +1069,7 @@
 
 .tracker-name {
     font-weight: 500;
-    font-size: 0.875rem;
+    font-size: 0.85rem;
 }
 
 .dup-count {
@@ -1114,7 +1077,7 @@
     color: #fb923c;
     padding: 0.125rem 0.5rem;
     border-radius: 9999px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
 }
 
@@ -1123,7 +1086,7 @@
     color: #ef4444;
     padding: 0.125rem 0.5rem;
     border-radius: 9999px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 700;
     animation: pulse 2s infinite;
 }
@@ -1135,12 +1098,12 @@
 
 .dup-clear {
     color: #22c55e;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
 }
 
 .dup-error {
     color: #ef4444;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
 }
 
 .existing-list {
@@ -1150,7 +1113,7 @@
 }
 
 .existing-item {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--text-muted);
     padding: 0.25rem 0;
     font-family: monospace;
@@ -1171,7 +1134,7 @@
     color: white;
     padding: 0.1rem 0.4rem;
     border-radius: 0.25rem;
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     font-weight: 700;
     margin-right: 0.5rem;
     font-family: sans-serif;
@@ -1179,12 +1142,12 @@
 
 .size-info {
     color: var(--text-muted);
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     margin-left: 0.5rem;
     opacity: 0.8;
 }
 
-/* Upload Status */
+/* ─── Upload Status ─── */
 .upload-list {
     display: flex;
     flex-direction: column;
@@ -1194,22 +1157,22 @@
 .upload-item {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    padding: 0.75rem;
+    gap: 0.75rem;
+    padding: 0.625rem 0.75rem;
     background: var(--bg-tertiary);
     border-radius: 0.5rem;
 }
 
 .upload-tracker {
     font-weight: 500;
-    font-size: 0.875rem;
+    font-size: 0.85rem;
     flex: 1;
 }
 
 .upload-status {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 500;
-    padding: 0.25rem 0.75rem;
+    padding: 0.2rem 0.6rem;
     border-radius: 9999px;
 }
 
@@ -1234,8 +1197,8 @@
 }
 
 .btn-qb {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.65rem;
     font-weight: 600;
     background: rgba(59, 130, 246, 0.2);
     color: #60a5fa;
@@ -1260,96 +1223,141 @@
     pointer-events: none;
 }
 
-/* Screenshots */
-.screenshot-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 0.5rem;
-}
-
-.screenshot-item {
-    border-radius: 0.5rem;
+/* ─── Screenshots (horizontal band) ─── */
+.screenshots-band {
+    margin-bottom: 1.5rem;
     overflow: hidden;
-    transition: transform 0.2s;
+    border-radius: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: 0.75rem;
 }
 
-.screenshot-item:hover {
-    transform: scale(1.02);
+.screenshots-scroll {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
 }
 
-.screenshot-item img {
-    width: 100%;
-    height: auto;
+.screenshots-scroll::-webkit-scrollbar {
+    height: 4px;
+}
+
+.screenshots-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.screenshots-scroll::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 2px;
+}
+
+.screenshot-thumb {
+    flex-shrink: 0;
+    height: 80px;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.screenshot-thumb:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.screenshot-thumb img {
+    height: 100%;
+    width: auto;
     display: block;
 }
 
-/* Timeline */
-.timeline {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
+/* ─── BBCode (collapsible) ─── */
+.bbcode-details {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
 }
 
-.timeline-item {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.5rem 0;
-    position: relative;
-}
-
-.timeline-item:not(:last-child)::after {
-    content: '';
-    position: absolute;
-    left: 7px;
-    top: 28px;
-    bottom: -8px;
-    width: 2px;
-    background: var(--border-color);
-}
-
-.timeline-item.done:not(:last-child)::after {
-    background: #22c55e;
-}
-
-.timeline-dot {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--border-color);
-    flex-shrink: 0;
-}
-
-.timeline-item.done .timeline-dot {
-    background: #22c55e;
-}
-
-.timeline-content {
+.bbcode-summary {
     display: flex;
     justify-content: space-between;
-    flex: 1;
+    align-items: center;
+    padding: 0.875rem 1.25rem;
+    background: var(--bg-tertiary);
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s;
 }
 
-.timeline-label {
+.bbcode-details[open] .bbcode-summary {
+    border-bottom-color: var(--border-color);
+}
+
+.bbcode-summary::-webkit-details-marker {
+    display: none;
+}
+
+.bbcode-summary::marker {
+    display: none;
+    content: '';
+}
+
+.bbcode-summary-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     font-size: 0.875rem;
-    color: var(--text-muted);
-}
-
-.timeline-item.done .timeline-label {
+    font-weight: 600;
     color: var(--text-primary);
 }
 
-.timeline-date {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    font-family: monospace;
+.bbcode-summary-left svg {
+    color: var(--accent-color);
 }
 
-/* BBCode */
+.bbcode-summary-left::before {
+    content: '';
+    display: inline-block;
+    width: 0;
+    height: 0;
+    border-left: 5px solid var(--text-muted);
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    transition: transform 0.2s;
+    margin-right: 0.25rem;
+}
+
+.bbcode-details[open] .bbcode-summary-left::before {
+    transform: rotate(90deg);
+}
+
+.bbcode-summary-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.bbcode-body {
+    padding: 1.25rem;
+}
+
+#bbcode-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 300px;
+}
+
 #bbcode-content {
     width: 100%;
     flex: 1;
-    min-height: 600px;
+    min-height: 400px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: 0.5rem;
@@ -1365,7 +1373,7 @@
 #bbcode-html-preview {
     width: 100%;
     flex: 1;
-    min-height: 600px;
+    min-height: 400px;
 }
 
 #bbcode-html-preview img {
@@ -1393,31 +1401,6 @@
     opacity: 0.8;
 }
 
-/* Alerts */
-.alert {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-}
-
-.alert-success {
-    background: rgba(34, 197, 94, 0.1);
-    color: #22c55e;
-}
-
-.alert-error {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
-}
-
-.alert-warning {
-    background: rgba(251, 146, 60, 0.1);
-    color: #fb923c;
-}
-
 /* Template Selector */
 .template-select {
     background: var(--bg-tertiary);
@@ -1437,7 +1420,97 @@
     outline: none;
 }
 
-/* Buttons */
+/* ─── Timeline (horizontal compact) ─── */
+.timeline-band {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    overflow-x: auto;
+}
+
+.timeline-h {
+    display: flex;
+    align-items: flex-start;
+    min-width: max-content;
+}
+
+.timeline-h-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 80px;
+}
+
+.timeline-h-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--border-color);
+    flex-shrink: 0;
+}
+
+.timeline-h-item.done .timeline-h-dot {
+    background: #22c55e;
+    box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
+}
+
+.timeline-h-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.timeline-h-item.done .timeline-h-label {
+    color: var(--text-primary);
+}
+
+.timeline-h-date {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    font-family: monospace;
+}
+
+.timeline-h-line {
+    width: 40px;
+    height: 2px;
+    background: var(--border-color);
+    margin-top: 5px;
+    flex-shrink: 0;
+}
+
+.timeline-h-line.done {
+    background: #22c55e;
+}
+
+/* ─── Alerts ─── */
+.alert {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.875rem;
+    border-radius: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.alert-success {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+}
+
+.alert-error {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.alert-warning {
+    background: rgba(251, 146, 60, 0.1);
+    color: #fb923c;
+}
+
+/* ─── Buttons ─── */
 .btn {
     display: inline-flex;
     align-items: center;
@@ -1472,7 +1545,7 @@
     font-size: 0.75rem;
 }
 
-/* Loading animation */
+/* ─── Loading animation ─── */
 .step-button.loading .step-icon svg {
     animation: spin 1s linear infinite;
 }
@@ -1482,36 +1555,108 @@
     to { transform: rotate(360deg); }
 }
 
-/* Tracker release names */
+/* ─── Tracker release names ─── */
 .tracker-names-list {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.375rem;
     width: 100%;
+    margin-top: 0.5rem;
 }
 
 .tracker-name-item {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    padding: 0.5rem 0.75rem;
+    gap: 0.75rem;
+    padding: 0.375rem 0.625rem;
     background: var(--bg-tertiary, #1e293b);
     border-radius: 0.375rem;
     border-left: 3px solid var(--accent-primary, #3b82f6);
 }
 
 .tracker-slug {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
     color: var(--accent-primary, #3b82f6);
-    min-width: 60px;
+    min-width: 50px;
 }
 
 .tracker-name {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--text-secondary, #94a3b8);
     word-break: break-all;
+}
+
+.preview-badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--warning, #f59e0b);
+    opacity: 0.8;
+    vertical-align: middle;
+}
+
+.tracker-name-editable {
+    flex: 1;
+    min-width: 0;
+}
+
+.tracker-name-input {
+    width: 100%;
+    background: var(--bg-primary, #0f172a);
+    border: 1px solid var(--accent-primary, #3b82f6);
+    border-radius: 0.25rem;
+    color: var(--text-primary, #e2e8f0);
+    font-size: 0.8rem;
+    padding: 0.1rem 0.4rem;
+    outline: none;
+}
+
+.edit-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--text-muted, #475569);
+    cursor: pointer;
+    padding: 0.1rem 0.25rem;
+    border-radius: 0.2rem;
+    opacity: 0.5;
+    transition: opacity 0.15s;
+}
+.edit-btn:hover { opacity: 1; color: var(--accent-primary, #3b82f6); }
+
+.tracker-name span[id^="tracker-name-display-"] { cursor: pointer; }
+.tracker-name span[id^="tracker-name-display-"]:hover { color: var(--text-primary, #e2e8f0); }
+
+/* ─── Responsive ─── */
+@media (max-width: 1024px) {
+    .content-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hero-main {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .hero-pills {
+        justify-content: center;
+    }
+
+    .pipeline-steps {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .step-connector {
+        display: none;
+    }
+
+    .specs-columns {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 
@@ -1575,7 +1720,7 @@ async function sendToQBittorrent(releaseId, trackerSlug) {
         const result = await response.json();
 
         if (result.status === 'success') {
-            button.textContent = '✓';
+            button.textContent = '\u2713';
             button.style.background = 'rgba(34, 197, 94, 0.2)';
             button.style.color = '#22c55e';
             button.style.borderColor = '#22c55e';
@@ -1603,59 +1748,34 @@ async function sendToQBittorrent(releaseId, trackerSlug) {
 function bbcodeToHtml(bbcode) {
     let html = bbcode;
 
-    // [center]...[/center]
     html = html.replace(/\[center\]([\s\S]*?)\[\/center\]/gi, '<div style="text-align: center;">$1</div>');
-
-    // [img]url[/img]
     html = html.replace(/\[img\](.*?)\[\/img\]/gi, '<img src="$1" style="max-width: 100%; height: auto;" />');
-
-    // [h1]...[/h1], [h2]...[/h2], [h3]...[/h3]
     html = html.replace(/\[h1\]([\s\S]*?)\[\/h1\]/gi, '<h1 style="font-size:1.8em;margin:0.5em 0;">$1</h1>');
     html = html.replace(/\[h2\]([\s\S]*?)\[\/h2\]/gi, '<h2 style="font-size:1.4em;margin:0.5em 0;">$1</h2>');
     html = html.replace(/\[h3\]([\s\S]*?)\[\/h3\]/gi, '<h3 style="font-size:1.2em;margin:0.4em 0;">$1</h3>');
-
-    // [size=X]...[/size]
     html = html.replace(/\[size=(\d+)\]([\s\S]*?)\[\/size\]/gi, (m, size, text) => {
         const px = parseInt(size) * 4 + 8;
         return `<span style="font-size:${px}px;">${text}</span>`;
     });
-
-    // [color=#XXX]...[/color]
     html = html.replace(/\[color=(#?[\w]+)\]([\s\S]*?)\[\/color\]/gi, '<span style="color: $1;">$2</span>');
-
-    // [b]...[/b]
     html = html.replace(/\[b\]([\s\S]*?)\[\/b\]/gi, '<strong>$1</strong>');
-
-    // [i]...[/i]
     html = html.replace(/\[i\]([\s\S]*?)\[\/i\]/gi, '<em>$1</em>');
-
-    // [u]...[/u]
     html = html.replace(/\[u\]([\s\S]*?)\[\/u\]/gi, '<u>$1</u>');
-
-    // [quote]...[/quote]
     html = html.replace(/\[quote\]([\s\S]*?)\[\/quote\]/gi, '<blockquote style="border-left: 3px solid #4a5568; padding-left: 1rem; margin: 1rem 0; color: #a0aec0;">$1</blockquote>');
-
-    // [table], [tr], [td]
     html = html.replace(/\[table\]([\s\S]*?)\[\/table\]/gi, '<table style="border-collapse:collapse;margin:0.5em auto;width:auto;">$1</table>');
     html = html.replace(/\[tr\]([\s\S]*?)\[\/tr\]/gi, '<tr>$1</tr>');
     html = html.replace(/\[td\]([\s\S]*?)\[\/td\]/gi, '<td style="padding:4px 12px;border:1px solid #4a5568;">$1</td>');
-
-    // [url]...[/url] or [url=...]...[/url]
     html = html.replace(/\[url=(.*?)\]([\s\S]*?)\[\/url\]/gi, '<a href="$1" style="color: #60a5fa; text-decoration: underline;">$2</a>');
     html = html.replace(/\[url\](.*?)\[\/url\]/gi, '<a href="$1" style="color: #60a5fa; text-decoration: underline;">$1</a>');
-
-    // Convert newlines to <br>
     html = html.replace(/\n/g, '<br>');
 
     return html;
 }
 
-// Store current view mode
-let bbcodeViewMode = 'bbcode'; // 'bbcode' or 'html'
+let bbcodeViewMode = 'bbcode';
 let currentBBCodeContent = '';
 let templatesLoaded = false;
 
-// Load available templates on page load
 async function loadTemplates() {
     if (templatesLoaded) return;
 
@@ -1684,7 +1804,6 @@ async function loadTemplates() {
     }
 }
 
-// Load templates when the page loads
 document.addEventListener('DOMContentLoaded', loadTemplates);
 
 async function loadBBCode(releaseId) {
@@ -1699,7 +1818,6 @@ async function loadBBCode(releaseId) {
     toggleBtn.style.display = 'none';
 
     try {
-        // Build URL with optional template_id parameter
         let url = `/api/releases/${releaseId}/bbcode`;
         if (selectedTemplateId) {
             url += `?template_id=${selectedTemplateId}`;
@@ -1731,13 +1849,11 @@ function toggleBBCodeView() {
     if (!currentBBCodeContent) return;
 
     if (bbcodeViewMode === 'bbcode') {
-        // Switch to HTML view
         bbcodeViewMode = 'html';
         const html = bbcodeToHtml(currentBBCodeContent);
         container.innerHTML = `<div id="bbcode-html-preview" style="padding: 1rem; background: #1a202c; border-radius: 0.5rem; overflow-x: auto; font-family: 'Segoe UI', sans-serif; line-height: 1.6;">${html}</div>`;
         toggleBtn.title = 'Show BBCode';
     } else {
-        // Switch to BBCode view
         bbcodeViewMode = 'bbcode';
         const escaped = currentBBCodeContent.replace(/</g, '&lt;').replace(/>/g, '&gt;');
         container.innerHTML = `<textarea id="bbcode-content" readonly>${escaped}</textarea>`;
@@ -1759,6 +1875,59 @@ async function copyBBCode() {
     } catch (e) {
         textarea.select();
         document.execCommand('copy');
+    }
+}
+
+// ── Tracker name inline edit ──────────────────────────────────────────────
+function startEditTrackerName(slug, trackerName, displayEl) {
+    const input = document.getElementById('tracker-name-input-' + slug);
+    const display = document.getElementById('tracker-name-display-' + slug);
+    display.style.display = 'none';
+    input.style.display = 'block';
+    input.focus();
+    input.select();
+}
+
+function cancelEditTrackerName(slug) {
+    const input = document.getElementById('tracker-name-input-' + slug);
+    const display = document.getElementById('tracker-name-display-' + slug);
+    // Small delay so click-save fires before blur-cancel
+    setTimeout(() => {
+        input.style.display = 'none';
+        display.style.display = '';
+    }, 150);
+}
+
+function handleTrackerNameKey(event, releaseId, slug) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        saveTrackerName(releaseId, slug);
+    } else if (event.key === 'Escape') {
+        cancelEditTrackerName(slug);
+    }
+}
+
+async function saveTrackerName(releaseId, slug) {
+    const input = document.getElementById('tracker-name-input-' + slug);
+    const display = document.getElementById('tracker-name-display-' + slug);
+    const newName = input.value.trim();
+    if (!newName) return;
+
+    try {
+        const resp = await fetch(`/api/releases/${releaseId}/tracker-name`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tracker_slug: slug, release_name: newName }),
+        });
+        if (!resp.ok) throw new Error(await resp.text());
+
+        // Update display (strip preview badge if present)
+        display.textContent = newName;
+        input.style.display = 'none';
+        display.style.display = '';
+    } catch (e) {
+        console.error('Failed to save tracker name:', e);
+        input.style.border = '1px solid #ef4444';
     }
 }
 </script>

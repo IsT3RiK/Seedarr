@@ -107,13 +107,13 @@ class ProcessingPipeline:
         If any stage fails, the error is logged and the file_entry status is
         updated to FAILED with error details.
 
-        Pipeline Stages (v2.1):
-            1. PENDING → SCANNED: Scan and validate file
+        Pipeline Stages (v2.5):
+            1. PENDING → SCANNED: Scan and validate file, lookup sceneName
             2. SCANNED → ANALYZED: Extract metadata, map tags
             3. ANALYZED → PENDING_APPROVAL: Wait for user approval (PAUSE)
-            4. APPROVED → PREPARING: Create hardlinks, screenshots
-            5. PREPARING → RENAMED: Format release name
-            6. RENAMED → METADATA_GENERATED: Generate .torrent and NFO
+            4. APPROVED → RENAMED: Format release name
+            5. RENAMED → PREPARING: Create release folder (hardlinks, screenshots)
+            6. PREPARING → METADATA_GENERATED: Generate .torrent and NFO
             7. METADATA_GENERATED → UPLOADED: Upload to trackers
 
         Args:
@@ -166,21 +166,21 @@ class ProcessingPipeline:
                     logger.info("⏸ Pipeline waiting for approval - not continuing")
                     return  # Still waiting for approval
 
-            # Stage 4: Prepare files (v2.1 - hardlinks, screenshots)
-            if not file_entry.is_preparing():
-                logger.info(f"Stage 4/7: Preparing files (hardlinks, screenshots): {file_entry.file_path}")
-                await self._prepare_files_stage(file_entry)
-                logger.info("✓ File preparation stage completed")
-            else:
-                logger.info("⊘ File preparation already completed, skipping")
-
-            # Stage 5: Rename (if not already renamed)
+            # Stage 4: Rename (if not already renamed)
             if not file_entry.is_renamed():
-                logger.info(f"Stage 5/7: Renaming file: {file_entry.file_path}")
+                logger.info(f"Stage 4/7: Renaming file: {file_entry.file_path}")
                 await self._rename_stage(file_entry)
                 logger.info("✓ Rename stage completed")
             else:
                 logger.info("⊘ Rename stage already completed, skipping")
+
+            # Stage 5: Prepare files (v2.1 - hardlinks, screenshots)
+            if not file_entry.is_preparing():
+                logger.info(f"Stage 5/7: Preparing files (hardlinks, screenshots): {file_entry.file_path}")
+                await self._prepare_files_stage(file_entry)
+                logger.info("✓ File preparation stage completed")
+            else:
+                logger.info("⊘ File preparation already completed, skipping")
 
             # Stage 6: Metadata Generation (if not already generated)
             if not file_entry.is_metadata_generated():
@@ -264,6 +264,57 @@ class ProcessingPipeline:
                 f"Supported formats: {', '.join(valid_extensions)}"
             )
 
+        # =====================================================================
+        # Try to get original sceneName from Radarr/Sonarr and create hardlink
+        # =====================================================================
+        from app.models.settings import Settings as _Settings
+        _settings = _Settings.get_settings(self.db)
+        _scene_name = None
+        _scene_source = None
+
+        _radarr_managed = False
+        if _settings.radarr_url and _settings.radarr_api_key:
+            try:
+                from app.services.radarr_client import RadarrClient
+                _radarr = RadarrClient(_settings.radarr_url, _settings.radarr_api_key)
+                _scene_name, _radarr_managed = await _radarr.find_scene_name_by_path(str(file_path))
+                if _scene_name:
+                    _scene_source = 'radarr'
+                    logger.info(f"✓ sceneName from Radarr: {_scene_name}")
+            except Exception as e:
+                logger.warning(f"⚠ Radarr lookup failed: {e}")
+
+        # Only check Sonarr if Radarr didn't recognise the file (avoids 130+ requests for movies)
+        if not _scene_name and not _radarr_managed and _settings.sonarr_url and _settings.sonarr_api_key:
+            try:
+                from app.services.sonarr_client import SonarrClient
+                _sonarr = SonarrClient(_settings.sonarr_url, _settings.sonarr_api_key)
+                _scene_name = await _sonarr.find_scene_name_by_path(str(file_path))
+                if _scene_name:
+                    _scene_source = 'sonarr'
+                    logger.info(f"✓ sceneName from Sonarr: {_scene_name}")
+            except Exception as e:
+                logger.warning(f"⚠ Sonarr lookup failed: {e}")
+
+        if _scene_name:
+            # Extract clean scene stem (strip video extension if present)
+            _video_exts = {'.mkv', '.mp4', '.avi', '.m4v', '.ts', '.mov', '.wmv'}
+            _scene_path = Path(_scene_name)
+            _scene_stem = _scene_path.stem if _scene_path.suffix.lower() in _video_exts else _scene_name
+
+            # Persist arrs data so rename/analyze stages can use the original sceneName
+            if not file_entry.mediainfo_data:
+                file_entry.mediainfo_data = {}
+            file_entry.mediainfo_data['arrs'] = {
+                'scene_name': _scene_stem,
+                'source': _scene_source,
+            }
+            logger.info(f"✓ sceneName stored: {_scene_stem} (source: {_scene_source})")
+
+            # Set release_name immediately so it's visible before analyze runs
+            file_entry.release_name = _scene_stem
+            logger.info(f"✓ release_name set from sceneName: {_scene_stem}")
+
         # Mark checkpoint and update status
         file_entry.mark_scanned()
         self.db.commit()
@@ -291,10 +342,16 @@ class ProcessingPipeline:
         file_path = Path(file_entry.file_path)
         filename = file_path.name
 
+        # Use sceneName for metadata parsing if available (better metadata extraction)
+        _arrs = (file_entry.mediainfo_data or {}).get('arrs', {})
+        if _arrs.get('scene_name'):
+            filename = _arrs['scene_name'] + file_path.suffix
+            logger.info(f"Using sceneName for metadata parsing: {filename}")
+
         # =====================================================================
         # Step 1: Extract full MediaInfo data
         # =====================================================================
-        logger.info(f"Extracting MediaInfo from: {filename}")
+        logger.info(f"Extracting MediaInfo from: {file_path.name}")
         try:
             nfo_generator = get_nfo_generator()
             media_data = await nfo_generator.extract_mediainfo(str(file_path))
@@ -375,9 +432,16 @@ class ProcessingPipeline:
                 else:
                     logger.warning(f"⚠ Source '{detected_source}' detected from MediaInfo but no matching tag found")
 
+        # Preserve arrs data (sceneName from Radarr/Sonarr) stored in scan stage
+        _arrs_data = (file_entry.mediainfo_data or {}).get('arrs')
+
         # Merge parsed filename metadata with MediaInfo data
         mediainfo_dict['parsed_from_filename'] = mapping_result['parsed_metadata']
         file_entry.mediainfo_data = mediainfo_dict
+
+        # Restore arrs data after mediainfo_data rebuild
+        if _arrs_data:
+            file_entry.mediainfo_data['arrs'] = _arrs_data
 
         # Log warnings if any tags couldn't be mapped
         warnings = mapping_result.get('warnings', [])
@@ -393,8 +457,12 @@ class ProcessingPipeline:
         else:
             logger.warning("⚠ No tags were mapped from filename - upload will proceed without tags")
 
-        # Determine release name from filename (strip extension)
-        file_entry.release_name = file_path.stem
+        # Determine release name: use sceneName if available, else filename stem
+        _arrs_restored = (file_entry.mediainfo_data or {}).get('arrs', {})
+        if _arrs_restored.get('scene_name'):
+            file_entry.release_name = _arrs_restored['scene_name']
+        else:
+            file_entry.release_name = file_path.stem
 
         # =====================================================================
         # Step 3: Fetch TMDB metadata
@@ -490,16 +558,18 @@ class ProcessingPipeline:
 
     async def _prepare_files_stage(self, file_entry: FileEntry) -> None:
         """
-        Stage 4 (v2.1): Prepare release files - hardlinks and screenshots.
+        Stage 4 (v2.5): Prepare release files - hardlinks and screenshots.
 
         This stage creates the release folder structure and captures screenshots:
-        1. Create release folder with hardlinked media file
-        2. Generate screenshots at key timestamps
-        3. Upload screenshots to ImgBB (if configured)
-        4. Store paths and URLs in file_entry
+        1. Create main release folder with hardlinked media file (for NFO/screenshots)
+        2. Create per-tracker release structures (hardlinks in tracker-specific dirs)
+        3. Generate screenshots at key timestamps
+        4. Upload screenshots to ImgBB (if configured)
+        5. Store paths and URLs in file_entry
 
-        The hardlink saves disk space by pointing to the same data as the original.
-        If cross-filesystem, falls back to copy.
+        Hardlink Toggle System:
+        - hardlink_enabled=True: create hardlinks (or fallback to copy per hardlink_fallback_copy)
+        - hardlink_enabled=False: skip all hardlinks, use source file directly
 
         Args:
             file_entry: FileEntry to prepare
@@ -508,6 +578,7 @@ class ProcessingPipeline:
             TrackerAPIError: If critical preparation fails
         """
         from app.models.settings import Settings
+        from app.models.tracker import Tracker
         from ..services.hardlink_manager import get_hardlink_manager, HardlinkError
         from ..services.screenshot_generator import get_screenshot_generator, ScreenshotError
 
@@ -519,26 +590,39 @@ class ProcessingPipeline:
         # Use effective release name (user-corrected or original)
         release_name = file_entry.get_effective_release_name() or file_path.stem
 
-        # Step 1: Create release structure with hardlinks
-        logger.info("Creating release structure with hardlinks...")
+        # Read hardlink toggle settings
+        hardlink_enabled = bool(settings.hardlink_enabled) if settings.hardlink_enabled is not None else True
+        fallback_copy = bool(settings.hardlink_fallback_copy) if settings.hardlink_fallback_copy is not None else True
+
+        hardlink_manager = get_hardlink_manager()
+        output_dir = settings.resolve_path(settings.output_dir) if settings else None
+
+        # Step 1: Create main release structure (for screenshots/NFO)
+        logger.info(f"Creating main release structure (hardlink_enabled={hardlink_enabled})...")
         try:
-            hardlink_manager = get_hardlink_manager()
-            output_dir = settings.output_dir if settings else None
-
-            structure = hardlink_manager.create_release_structure(
-                source_file=str(file_path),
-                release_name=release_name,
-                output_dir=output_dir
-            )
-
-            # Store paths in file_entry
-            file_entry.release_dir = structure['release_dir']
-            file_entry.prepared_media_path = structure['media_file']
-
-            logger.info(
-                f"✓ Release structure created: {structure['release_dir']} "
-                f"(hardlink={'yes' if structure['hardlink_used'] else 'no'})"
-            )
+            if hardlink_enabled:
+                structure = hardlink_manager.create_release_structure(
+                    source_file=str(file_path),
+                    release_name=release_name,
+                    output_dir=output_dir
+                )
+                file_entry.release_dir = structure['release_dir']
+                file_entry.prepared_media_path = structure['media_file']
+                logger.info(
+                    f"✓ Main release structure created: {structure['release_dir']} "
+                    f"(hardlink={'yes' if structure['hardlink_used'] else 'no'})"
+                )
+            else:
+                # Hardlinks disabled: create folder structure for NFO/screenshots only
+                base_output = output_dir or str(file_path.parent)
+                release_dir = Path(base_output) / release_name
+                release_dir.mkdir(parents=True, exist_ok=True)
+                screens_dir = release_dir / "screens"
+                screens_dir.mkdir(exist_ok=True)
+                file_entry.release_dir = str(release_dir)
+                file_entry.prepared_media_path = str(file_path)  # Point to source directly
+                structure = {'screens_dir': str(screens_dir)}
+                logger.info(f"✓ Release folder created (no hardlink): {release_dir}")
 
         except HardlinkError as e:
             logger.error(f"Hardlink creation failed: {e}")
@@ -547,6 +631,54 @@ class ProcessingPipeline:
         except FileNotFoundError as e:
             logger.error(f"Source file not found: {e}")
             raise TrackerAPIError(f"Source file not found: {e}") from e
+
+        # Step 1b: Create per-tracker release structures
+        trackers = Tracker.get_upload_enabled(self.db)
+        if trackers:
+            logger.info(f"Creating per-tracker release structures for {len(trackers)} tracker(s)...")
+
+        for tracker in trackers:
+            tracker_release_name = file_entry.get_effective_release_name_for_tracker(tracker.slug) or release_name
+            tracker_output_dir = settings.resolve_path(tracker.hardlink_dir) or output_dir or str(file_path.parent)
+
+            try:
+                tracker_result = hardlink_manager.create_tracker_release(
+                    source_file=str(file_path),
+                    release_name=tracker_release_name,
+                    output_dir=tracker_output_dir,
+                    hardlink_enabled=hardlink_enabled,
+                    fallback_copy=fallback_copy,
+                )
+
+                # Store per-tracker release info in tracker_statuses
+                statuses = file_entry.get_tracker_statuses()
+                tracker_data = statuses.get(tracker.slug, {})
+                tracker_data['release_dir'] = tracker_result['release_dir']
+                tracker_data['media_file'] = tracker_result['media_file']
+                tracker_data['hardlink_method'] = tracker_result['method']
+                statuses[tracker.slug] = tracker_data
+                file_entry.tracker_statuses = statuses
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(file_entry, 'tracker_statuses')
+
+                logger.info(
+                    f"  ✓ {tracker.name}: {tracker_result['method']} → {tracker_result['release_dir']}"
+                )
+
+            except HardlinkError as e:
+                logger.error(f"  ✗ {tracker.name}: hardlink failed - {e}")
+                # Store failure in tracker_statuses but don't block other trackers
+                statuses = file_entry.get_tracker_statuses()
+                tracker_data = statuses.get(tracker.slug, {})
+                tracker_data['hardlink_method'] = 'failed'
+                tracker_data['hardlink_error'] = str(e)
+                statuses[tracker.slug] = tracker_data
+                file_entry.tracker_statuses = statuses
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(file_entry, 'tracker_statuses')
+
+            except FileNotFoundError as e:
+                logger.error(f"  ✗ {tracker.name}: source file not found - {e}")
 
         # Step 2: Generate screenshots (optional - degrades gracefully)
         logger.info("Generating screenshots...")
@@ -824,40 +956,47 @@ class ProcessingPipeline:
             if audio_channels:
                 logger.info(f"Audio channels from MediaInfo: {audio_channels}")
 
-        # Generate universal release name
-        try:
-            release_name = renamer.format_release_name(
-                title=title,
-                year=year if not is_tv_show else None,
-                language=language,
-                resolution=resolution,
-                source=source,
-                audio_codec=audio_codec,
-                video_codec=video_codec,
-                team=team,
-                season=season,
-                episode=episode,
-                hdr=hdr,
-                remux=remux,
-                repack=repack,
-                imax=imax,
-                edition=edition,
-                language_variant=language_variant,
-                audio_channels=audio_channels,
+        # Check if we have an original sceneName from Radarr/Sonarr
+        arrs = metadata.get('arrs', {})
+        arrs_scene_name = arrs.get('scene_name')
+
+        if arrs_scene_name:
+            # Use the original scene release name as-is (already properly formatted)
+            logger.info(
+                f"Using original sceneName from {arrs.get('source', 'arr')}: {arrs_scene_name}"
             )
+            file_entry.release_name = arrs_scene_name
+        else:
+            # Generate universal release name
+            try:
+                release_name = renamer.format_release_name(
+                    title=title,
+                    year=year if not is_tv_show else None,
+                    language=language,
+                    resolution=resolution,
+                    source=source,
+                    audio_codec=audio_codec,
+                    video_codec=video_codec,
+                    team=team,
+                    season=season,
+                    episode=episode,
+                    hdr=hdr,
+                    remux=remux,
+                    repack=repack,
+                    imax=imax,
+                    edition=edition,
+                    language_variant=language_variant,
+                    audio_channels=audio_channels,
+                )
 
-            logger.info(f"Generated release name: {release_name}")
-            file_entry.release_name = release_name
+                logger.info(f"Generated release name: {release_name}")
+                file_entry.release_name = release_name
 
-            # Note: Physical file renaming is optional - can be configured
-            # For now, we just update the release_name but keep original file
-            # This allows the original file structure to be preserved
-
-        except Exception as e:
-            logger.warning(f"Could not generate release name: {e}")
-            # Fallback to original filename stem
-            file_entry.release_name = file_path.stem
-            logger.info(f"Using original filename as release name: {file_entry.release_name}")
+            except Exception as e:
+                logger.warning(f"Could not generate release name: {e}")
+                # Fallback to original filename stem
+                file_entry.release_name = file_path.stem
+                logger.info(f"Using original filename as release name: {file_entry.release_name}")
 
         # Mark checkpoint and update status
         file_entry.mark_renamed()
@@ -892,8 +1031,18 @@ class ProcessingPipeline:
         logger.debug(f"Executing metadata generation stage for: {file_entry.file_path}")
 
         file_path = Path(file_entry.file_path)
-        output_dir = file_path.parent  # Store torrent/NFO next to the media file
         release_name = file_entry.release_name or file_path.stem
+
+        # Use prepared media path (hardlink in release folder) for torrent generation
+        # so the torrent's internal filename matches the release folder structure.
+        # This allows qBittorrent to seed directly from the release folder.
+        torrent_source_path = file_entry.prepared_media_path or str(file_path)
+
+        # Determine torrent output directory (dedicated folder, not source dir)
+        settings = Settings.get_settings(self.db)
+        resolved_torrent_dir = settings.resolve_path(settings.torrent_output_dir)
+        resolved_output_dir = settings.resolve_path(settings.output_dir)
+        torrent_base = resolved_torrent_dir or resolved_output_dir or str(file_path.parent)
 
         # Step 1: Generate .torrent files for all enabled trackers
         logger.info("Generating .torrent files for enabled trackers...")
@@ -915,22 +1064,42 @@ class ProcessingPipeline:
             if trackers_with_templates:
                 # Extract metadata for template formatting from file_entry
                 metadata = file_entry.mediainfo_data or {}
-                parsed = metadata.get('parsed_from_filename', {})
+                orig_parsed = metadata.get('parsed_from_filename', {})
                 tmdb = metadata.get('tmdb', {})
                 video_tracks = metadata.get('video_tracks', [])
                 audio_tracks = metadata.get('audio_tracks', [])
 
-                # Get components for template formatting
-                existing_team = renamer.extract_team_from_filename(file_path.name)
+                # Hybrid approach (same as _compute_tracker_upload_names in dashboard_routes):
+                # - release_name  → title, year, language, resolution, video_codec, team
+                # - audio_tracks  → audio codec + channels (from MediaInfo, most accurate)
+                # - orig_parsed   → source/quality fallback (from original filename)
+                from app.services.metadata_mapper import MetadataMapper
+                mapper = MetadataMapper(self.db)
+                release_parsed = mapper.parse_filename(release_name) if release_name else {}
 
-                # Extract audio channels from first audio track
+                # Team: parse release_name (append .mkv to prevent group tag being stripped as extension)
+                existing_team = renamer.extract_team_from_filename(
+                    (release_name or '') + '.mkv'
+                ) or 'NOTAG'
+
+                # Audio codec: MediaInfo tracks first, then parsed fallbacks
+                audio_codec = release_parsed.get('audio') or orig_parsed.get('audio')
+                if not audio_codec and audio_tracks:
+                    af = (audio_tracks[0].get('codec') or '').upper()
+                    for k, v in [('TRUEHD', 'TrueHD'), ('ATMOS', 'Atmos'),
+                                 ('DTS-HD MA', 'DTS-HD.MA'), ('DTS-HD', 'DTS-HD'),
+                                 ('DTS', 'DTS'), ('EAC3', 'EAC3'), ('E-AC-3', 'EAC3'),
+                                 ('AC3', 'AC3'), ('AC-3', 'AC3'),
+                                 ('AAC', 'AAC'), ('FLAC', 'FLAC')]:
+                        if k in af:
+                            audio_codec = v
+                            break
+
+                # Audio channels: from MediaInfo tracks
                 audio_channels = None
-                if audio_tracks and audio_tracks[0].get('channels'):
-                    channels = audio_tracks[0].get('channels', '')
-                    # Normalize channels format (e.g., "6" -> "5.1", "2" -> "2.0", "8" -> "7.1")
-                    channel_map = {'2': '2.0', '6': '5.1', '8': '7.1', '1': '1.0'}
-                    audio_channels = channel_map.get(str(channels), str(channels))
-                    # Also check for explicit channel layout like "5.1"
+                if audio_tracks:
+                    ch = str(audio_tracks[0].get('channels', ''))
+                    audio_channels = {'2': '2.0', '6': '5.1', '8': '7.1', '1': '1.0'}.get(ch, ch or None)
                     if audio_tracks[0].get('channel_layout'):
                         layout = audio_tracks[0].get('channel_layout', '')
                         if '5.1' in layout:
@@ -940,44 +1109,77 @@ class ProcessingPipeline:
                         elif '2.0' in layout or 'stereo' in layout.lower():
                             audio_channels = '2.0'
 
-                # Determine quality indicator
-                quality = parsed.get('quality', '')
-                source = parsed.get('source', '')
-                if not quality:
-                    # Try to infer quality from source/filename
-                    filename_lower = file_path.name.lower()
-                    if 'hdlight' in filename_lower or 'hd.light' in filename_lower:
-                        quality = 'HDLight'
-                    elif 'remux' in filename_lower:
-                        quality = 'REMUX'
-                    elif source and 'web' in source.lower():
-                        # WEB encodes (x264 or x265) are typically HDLight style
-                        quality = 'HDLight'
+                # Video codec: from release_name first, then MediaInfo
+                video_codec = release_parsed.get('codec')
+                if not video_codec and video_tracks:
+                    vf = (video_tracks[0].get('codec') or '').upper()
+                    if 'HEVC' in vf or 'H265' in vf:
+                        video_codec = 'x265'
+                    elif 'AVC' in vf or 'H264' in vf:
+                        video_codec = 'x264'
 
-                # Build template metadata
-                # TMDB 'title' is the French title (API called with language=fr-FR)
-                # TMDB 'original_title' is the original (usually English) title
-                # Apply .title() to parsed fallback for proper capitalization
-                parsed_title = parsed.get('title')
-                if parsed_title:
-                    parsed_title = parsed_title.title()
+                # Source: from original parsed first, then release_name
+                source = orig_parsed.get('source') or release_parsed.get('source') or ''
+
+                # Quality: check release_name then original file path
+                release_lower = (release_name or '').lower()
+                orig_lower = (file_entry.file_path or '').lower()
+                quality = ''
+                if 'hdlight' in release_lower or 'hd.light' in release_lower:
+                    quality = 'HDLight'
+                elif 'remux' in release_lower:
+                    quality = 'REMUX'
+                elif 'hdlight' in orig_lower:
+                    quality = 'HDLight'
+                elif 'remux' in orig_lower:
+                    quality = 'REMUX'
+                # NOTE: WEB source does NOT imply HDLight quality
+                # HDLight is a specific re-encode quality, not related to WEB source
+
+                # Source inference when not detected from filename
+                # HDLight files are re-encodes (typically BluRay or WEB source)
+                # REMUX files are always from BluRay
+                if not source:
+                    if quality == 'REMUX':
+                        source = 'BluRay'
+                    elif quality == 'HDLight':
+                        # Check audio codec for hints: AAC/EAC3/DD+ → WEB, AC3/DTS → BluRay
+                        audio_hint = (audio_codec or '').upper()
+                        if audio_hint in ('AAC', 'EAC3', 'DD+', 'OPUS'):
+                            source = 'WEB-DL'
+                        else:
+                            source = 'BluRay'
+                    else:
+                        # Last resort: try MediaInfo detection
+                        source = self.metadata_mapper.detect_source_from_mediainfo(
+                            file_entry.mediainfo_data or {}
+                        ) or ''
+
+                # Titles: TMDB first (French API), then release_name parse fallback
+                parsed_title = (release_parsed.get('title') or '').title() or None
                 title_fr = tmdb.get('title') or parsed_title or file_path.stem
-                title_en = tmdb.get('original_title') or parsed_title or file_path.stem
-                # base_title uses French title if available
-                base_title = title_fr
+                title_en = tmdb.get('original_title') or parsed_title or title_fr
+
+                # Language: normalize VFF/TRUEFRENCH/etc. → FRENCH
+                # (template {langue}.{vff} handles the VFF suffix separately)
+                lang = release_parsed.get('language') or orig_parsed.get('language') or 'FRENCH'
+                if lang in ('VFF', 'TRUEFRENCH', 'VOF', 'VFQ', 'VFI', 'VF2'):
+                    lang = 'FRENCH'
+
+                parsed = release_parsed  # alias for season/episode/hdr below
 
                 template_metadata = renamer.build_template_metadata(
-                    title=base_title,
-                    year=tmdb.get('year') or parsed.get('year'),
-                    language=parsed.get('language') or 'FRENCH',
-                    resolution=parsed.get('resolution'),
+                    title=title_fr,
+                    year=tmdb.get('year') or release_parsed.get('year'),
+                    language=lang,
+                    resolution=release_parsed.get('resolution') or orig_parsed.get('resolution'),
                     source=source,
-                    audio_codec=parsed.get('audio'),
-                    video_codec=parsed.get('codec'),
-                    team=existing_team or 'NOTAG',
-                    season=parsed.get('season'),
-                    episode=parsed.get('episode'),
-                    hdr=parsed.get('hdr') or (video_tracks[0].get('hdr_format') if video_tracks else None),
+                    audio_codec=audio_codec,
+                    video_codec=video_codec,
+                    team=existing_team,
+                    season=release_parsed.get('season'),
+                    episode=release_parsed.get('episode'),
+                    hdr=release_parsed.get('hdr') or (video_tracks[0].get('hdr_format') if video_tracks else None),
                     title_fr=title_fr,
                     title_en=title_en,
                     audio_channels=audio_channels,
@@ -1000,12 +1202,45 @@ class ProcessingPipeline:
                         )
 
             try:
+                # Build per-tracker output directories and file paths
+                # Structure: {base}/{Films|Series}/{Title (Year)}/{tracker_slug}/
+                tracker_output_dirs = {}
+                tracker_file_paths = {}
+                tracker_statuses = file_entry.get_tracker_statuses()
+
+                # Determine media type folder (Films or Series)
+                import re
+                media_type_folder = 'Series' if file_entry.tmdb_type == 'tv' else 'Films'
+                tmdb_meta = (file_entry.mediainfo_data or {}).get('tmdb', {})
+                title_name = tmdb_meta.get('title') or release_name
+                year = tmdb_meta.get('year')
+                title_folder = f"{title_name} ({year})" if year else title_name
+                # Sanitize for filesystem (remove invalid chars)
+                title_folder = re.sub(r'[<>:"/\\|?*]', '', title_folder).strip()
+
+                for tracker in trackers:
+                    # Torrent output dir: tracker.torrent_dir > torrent_base
+                    # Then: {Films|Series}/{Title (Year)}/{tracker_slug}/
+                    resolved_tracker_torrent_dir = settings.resolve_path(tracker.torrent_dir)
+                    base = resolved_tracker_torrent_dir or torrent_base
+                    tracker_dir = os.path.join(base, media_type_folder, title_folder, tracker.slug)
+                    os.makedirs(tracker_dir, exist_ok=True)
+                    tracker_output_dirs[tracker.slug] = tracker_dir
+
+                    # Per-tracker media file path (from per-tracker hardlinks in prepare stage)
+                    tracker_data = tracker_statuses.get(tracker.slug, {})
+                    per_tracker_media = tracker_data.get('media_file')
+                    if per_tracker_media and os.path.exists(per_tracker_media):
+                        tracker_file_paths[tracker.slug] = per_tracker_media
+
                 torrent_paths = await torrent_generator.generate_all(
                     db=self.db,
-                    file_path=str(file_path),
+                    file_path=torrent_source_path,
                     release_name=release_name,
-                    output_dir=str(output_dir),
-                    tracker_release_names=tracker_release_names if tracker_release_names else None
+                    output_dir=torrent_base,
+                    tracker_release_names=tracker_release_names if tracker_release_names else None,
+                    tracker_output_dirs=tracker_output_dirs,
+                    tracker_file_paths=tracker_file_paths if tracker_file_paths else None
                 )
 
                 if not torrent_paths:
@@ -1040,9 +1275,8 @@ class ProcessingPipeline:
         else:
             # Fallback: Legacy single-tracker mode from Settings
             logger.warning("No trackers configured, falling back to Settings announce URL")
-            settings = Settings.get_settings(self.db)
 
-            if not settings or not settings.announce_url:
+            if not settings.announce_url:
                 raise TrackerAPIError(
                     "Cannot generate torrent: No trackers configured and no "
                     "announce URL in Settings. Please add trackers or configure Settings."
@@ -1050,14 +1284,16 @@ class ProcessingPipeline:
 
             # Generate single torrent using TorrentGenerator
             torrent_generator = get_torrent_generator()
+            default_torrent_dir = os.path.join(torrent_base, 'default')
+            os.makedirs(default_torrent_dir, exist_ok=True)
             try:
                 torrent_path = await torrent_generator.generate_single_tracker_torrent(
-                    file_path=str(file_path),
+                    file_path=torrent_source_path,
                     announce_url=settings.announce_url,
                     release_name=release_name,
                     source_flag="seedarr",
                     piece_size_strategy="auto",
-                    output_dir=str(output_dir)
+                    output_dir=default_torrent_dir
                 )
 
                 file_entry.torrent_path = torrent_path
@@ -1070,12 +1306,17 @@ class ProcessingPipeline:
                 raise TrackerAPIError(error_msg) from e
 
         # Step 2: Generate technical NFO file using MediaInfo
+        # NFO goes into the release folder (from prepare files stage)
         logger.info("Generating technical NFO file with MediaInfo...")
+
+        nfo_output_dir = file_entry.release_dir or str(file_path.parent)
 
         try:
             nfo_generator = get_nfo_generator()
+            nfo_output_path = os.path.join(nfo_output_dir, f"{release_name}.nfo")
             nfo_path = await nfo_generator.generate_nfo(
                 file_path=file_entry.file_path,
+                output_path=nfo_output_path,
                 media_type="Movies",  # TODO: Detect media type from file analysis
                 release_name=release_name  # Use release name for NFO filename and content
             )
@@ -1219,16 +1460,29 @@ class ProcessingPipeline:
         if tmdb_genres:
             logger.info(f"  - genres: {[g.get('name', g) for g in tmdb_genres[:5]]}")
 
-        # Initialize tracker statuses as PENDING
-        qbittorrent_injected = False
-
+        # Initialize tracker statuses as PENDING (preserve existing hardlink info)
         for tracker in trackers:
-            # Initialize status as PENDING for each tracker
-            file_entry.set_tracker_status(
-                tracker_slug=tracker.slug,
-                status=TrackerStatus.PENDING.value
-            )
+            existing_data = file_entry.get_tracker_status(tracker.slug) or {}
+            # Only set PENDING if not already set with hardlink info
+            if existing_data.get('status') != TrackerStatus.PENDING.value:
+                file_entry.set_tracker_status(
+                    tracker_slug=tracker.slug,
+                    status=TrackerStatus.PENDING.value
+                )
+                # Re-merge hardlink info that was set during prepare stage
+                if existing_data.get('release_dir') or existing_data.get('hardlink_method'):
+                    statuses = file_entry.get_tracker_statuses()
+                    for key in ('release_dir', 'media_file', 'hardlink_method', 'hardlink_error'):
+                        if key in existing_data:
+                            statuses[tracker.slug][key] = existing_data[key]
+                    file_entry.tracker_statuses = statuses
+                    from sqlalchemy.orm.attributes import flag_modified
+                    flag_modified(file_entry, 'tracker_statuses')
         self.db.commit()
+
+        # Create qBittorrent client for injection
+        from ..services.qbittorrent_client import get_qbittorrent_client_from_settings
+        qbit_client = get_qbittorrent_client_from_settings(settings)
 
         for tracker in trackers:
             logger.info(f"\n{'='*50}")
@@ -1237,6 +1491,58 @@ class ProcessingPipeline:
 
             # Get tracker-specific release name (from naming_template) or default
             tracker_release_name = file_entry.get_effective_release_name_for_tracker(tracker.slug)
+
+            # Ensure release name contains a source tag (required by trackers like C411)
+            import re as _re
+            _source_pattern = r'(?:BluRay|Blu[\.\-]?Ray|WEB[\.\-]?DL|WEB[\.\-]?Rip|WEBRip|HDTV|DVDRip|HDRip|BDRip|REMUX|CAM|VOD|(?<![A-Za-z])WEB(?![A-Za-z\-]))'
+            if tracker_release_name and not _re.search(_source_pattern, tracker_release_name, _re.IGNORECASE):
+                # Source tag missing - try to infer and inject it
+                # Priority: 1) parsed_from_filename, 2) file_entry.release_name, 3) HDLight/Remux heuristics, 4) MediaInfo
+                _parsed = (file_entry.mediainfo_data or {}).get('parsed_from_filename', {})
+                _source = _parsed.get('source', '')
+
+                # Fallback: extract source from original release_name (before naming template)
+                if not _source and file_entry.release_name:
+                    _orig_rn = file_entry.release_name
+                    _src_m = _re.search(
+                        r'(?:BluRay|Blu[\.\-]?Ray|WEB[\.\-]?DL|WEB[\.\-]?Rip|WEBRip|HDTV|DVDRip|HDRip|BDRip|REMUX|CAM|VOD|(?<=[.\-\s])WEB(?=[.\-\s]))',
+                        _orig_rn, _re.IGNORECASE
+                    )
+                    if _src_m:
+                        _source = _src_m.group(0)
+                        # Normalize: standalone "WEB" → "WEB-DL"
+                        if _source.upper() == 'WEB':
+                            _source = 'WEB-DL'
+                        logger.info(f"  - source extracted from original release_name: {_source} (from {_orig_rn})")
+
+                if not _source:
+                    _rl = (tracker_release_name or '').lower()
+                    _audio_tracks = (file_entry.mediainfo_data or {}).get('audio_tracks', [])
+                    _audio_codec = (_audio_tracks[0].get('codec') or '').upper() if _audio_tracks else ''
+                    if 'remux' in _rl:
+                        _source = 'BluRay'
+                    elif 'hdlight' in _rl or 'hd.light' in _rl:
+                        _source = 'WEB-DL' if any(x in _audio_codec for x in ('AAC', 'EAC', 'DD+', 'OPUS')) else 'BluRay'
+                    else:
+                        _source = self.metadata_mapper.detect_source_from_mediainfo(
+                            file_entry.mediainfo_data or {}
+                        ) or ''
+                if _source:
+                    # Insert source before video codec (x264/x265/HEVC/AVC)
+                    _codec_m = _re.search(r'([.\-])(x264|x265|h264|h265|HEVC|AVC|XviD)', tracker_release_name, _re.IGNORECASE)
+                    if _codec_m:
+                        _pos = _codec_m.start()
+                        _sep = _codec_m.group(1)
+                        tracker_release_name = tracker_release_name[:_pos] + _sep + _source + tracker_release_name[_pos:]
+                    else:
+                        # Insert before team tag (-GROUP)
+                        _team_m = _re.search(r'-[A-Za-z0-9]+$', tracker_release_name)
+                        if _team_m:
+                            tracker_release_name = tracker_release_name[:_team_m.start()] + '.' + _source + tracker_release_name[_team_m.start():]
+                        else:
+                            tracker_release_name += '.' + _source
+                    logger.info(f"  - source tag injected: {_source} → {tracker_release_name}")
+
             logger.info(f"  - tracker release_name: {tracker_release_name}")
 
             try:
@@ -1314,15 +1620,43 @@ class ProcessingPipeline:
                 except Exception as e:
                     logger.warning(f"Duplicate check failed for {tracker.name}: {e}, proceeding anyway")
 
-                # Inject first torrent into qBittorrent (do this once)
-                if not qbittorrent_injected:
-                    logger.info("Injecting torrent into qBittorrent for seeding...")
+                # Per-tracker qBittorrent injection
+                inject_to_qbit = bool(tracker.inject_to_qbit) if tracker.inject_to_qbit is not None else True
+                qbit_status = 'skipped'
+
+                if inject_to_qbit and qbit_client:
+                    logger.info(f"Injecting torrent into qBittorrent for {tracker.name}...")
                     try:
-                        await self._inject_to_qbittorrent(file_entry, torrent_path, tracker_slug=tracker.slug)
-                        qbittorrent_injected = True
-                        logger.info("✓ Torrent added to qBittorrent")
+                        # Use per-tracker release dir as save_path
+                        tracker_data = file_entry.get_tracker_status(tracker.slug) or {}
+                        save_path = tracker_data.get('release_dir') or file_entry.release_dir or str(Path(file_entry.file_path).parent)
+
+                        result = await qbit_client.inject_torrent(
+                            torrent_path=torrent_path,
+                            save_path=save_path,
+                            category="Seedarr",
+                            tags=tracker.name,
+                            skip_checking=True,
+                        )
+                        qbit_status = 'success' if result.get('success') else 'failed'
+                        logger.info(f"✓ Torrent injected to qBittorrent for {tracker.name}")
                     except Exception as e:
-                        logger.warning(f"qBittorrent injection failed: {e}")
+                        qbit_status = 'failed'
+                        logger.warning(f"qBittorrent injection failed for {tracker.name}: {e}")
+                elif not inject_to_qbit:
+                    qbit_status = 'manual'
+                    logger.info(f"qBittorrent injection disabled for {tracker.name} - manual injection required")
+                elif not qbit_client:
+                    qbit_status = 'not_configured'
+                    logger.info("qBittorrent not configured - skipping injection")
+
+                # Store qBit status in tracker_statuses
+                statuses = file_entry.get_tracker_statuses()
+                if tracker.slug in statuses:
+                    statuses[tracker.slug]['qbit_status'] = qbit_status
+                    file_entry.tracker_statuses = statuses
+                    from sqlalchemy.orm.attributes import flag_modified
+                    flag_modified(file_entry, 'tracker_statuses')
 
                 # Upload to tracker
                 logger.info(f"Uploading to {tracker.name}...")
@@ -1369,8 +1703,9 @@ class ProcessingPipeline:
                     logger.info(f"TMDB data prepared for TMDB ID: {tmdb_id}")
 
                 # Build options using config-driven mapper
-                genres = tracker_tmdb_data.get('genres', []) if tracker_tmdb_data else []
-                tracker_options = self._build_tracker_options(tracker, file_entry, tracker_release_name, tmdb_type, genres)
+                # Use tracker TMDB genres if available, fall back to tmdb_genres from file metadata
+                options_genres = (tracker_tmdb_data.get('genres', []) if tracker_tmdb_data else []) or tmdb_genres
+                tracker_options = self._build_tracker_options(tracker, file_entry, tracker_release_name, tmdb_type, options_genres)
                 if tracker_options:
                     upload_kwargs['options'] = tracker_options
                     logger.info(f"Tracker options: {tracker_options}")
@@ -1574,10 +1909,9 @@ class ProcessingPipeline:
         tracker_slug: Optional[str] = None
     ) -> None:
         """
-        Inject torrent into qBittorrent for seeding with category TP and tracker tag.
+        Inject torrent into qBittorrent for seeding.
 
-        This method adds the torrent file to qBittorrent with the original file path
-        so it starts seeding immediately without re-downloading.
+        Delegates to QBittorrentClient service module.
 
         Args:
             file_entry: FileEntry with torrent_path set
@@ -1587,150 +1921,42 @@ class ProcessingPipeline:
         Raises:
             TrackerAPIError: If qBittorrent injection fails
         """
-        import httpx
         from app.models.settings import Settings
+        from ..services.qbittorrent_client import get_qbittorrent_client_from_settings, QBittorrentError
+
+        settings = Settings.get_settings(self.db)
+        qbit_client = get_qbittorrent_client_from_settings(settings)
+
+        if not qbit_client:
+            raise TrackerAPIError(
+                "Cannot inject torrent: qBittorrent not configured. "
+                "Please set qBittorrent settings."
+            )
+
+        torrent_path = torrent_path or file_entry.torrent_path
+        if not torrent_path or not os.path.exists(torrent_path):
+            raise TrackerAPIError(
+                f"Torrent file not found: {torrent_path}. "
+                f"Run metadata generation stage first."
+            )
+
+        file_path = Path(file_entry.file_path)
+        save_path = file_entry.release_dir or str(file_path.parent)
 
         try:
-            # Get qBittorrent settings
-            settings = Settings.get_settings(self.db)
-
-            if not settings or not settings.qbittorrent_host:
-                raise TrackerAPIError(
-                    "Cannot inject torrent: qBittorrent not configured. "
-                    "Please set qBittorrent settings."
-                )
-
-            qb_host = settings.qbittorrent_host
-            qb_user = settings.qbittorrent_username
-            qb_pass = settings.qbittorrent_password
-
-            # Ensure qBittorrent host has protocol
-            if not qb_host.startswith('http'):
-                qb_host = f"http://{qb_host}"
-
-            logger.info(f"Connecting to qBittorrent at: {qb_host}")
-
-            # Use provided torrent path or fallback to file_entry
-            torrent_path = torrent_path or file_entry.torrent_path
-            if not torrent_path or not os.path.exists(torrent_path):
-                raise TrackerAPIError(
-                    f"Torrent file not found: {torrent_path}. "
-                    f"Run metadata generation stage first."
-                )
-
-            # Get the original file directory for save path
-            file_path = Path(file_entry.file_path)
-            save_path = str(file_path.parent)
-
-            # Path mapping: translate Seedarr's internal path to qBittorrent's path
-            # Handles Docker-to-Docker (e.g., Seedarr /media -> qBit /data)
-            # and Docker-to-host (e.g., Seedarr /media -> Windows C:\Media)
-            seedarr_root = (settings.input_media_path or '/media').rstrip('/')
-            qbit_root = (settings.qbittorrent_content_path or '').rstrip('/')
-
-            if qbit_root and save_path.startswith(seedarr_root):
-                relative_path = save_path[len(seedarr_root):].lstrip('/')
-                # Use forward slashes (paths are for Docker/Linux containers)
-                save_path = f"{qbit_root}/{relative_path}" if relative_path else qbit_root
-                logger.info(f"Path mapping ({seedarr_root} -> {qbit_root}): {save_path}")
-
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                # Login to qBittorrent
-                logger.info("Authenticating with qBittorrent...")
-                login_response = await client.post(
-                    f"{qb_host}/api/v2/auth/login",
-                    data={"username": qb_user, "password": qb_pass}
-                )
-
-                if login_response.text != "Ok.":
-                    raise TrackerAPIError(
-                        f"qBittorrent authentication failed: {login_response.text}"
-                    )
-
-                logger.info("✓ Authenticated with qBittorrent")
-                cookies = login_response.cookies
-
-                # Read torrent file
-                with open(torrent_path, 'rb') as f:
-                    torrent_file_data = f.read()
-
-                logger.info(f"Adding torrent to qBittorrent with category TP and save path: {save_path}")
-
-                # Build request data with optional tracker tag
-                add_data = {
-                    "savepath": save_path,  # Use original file location
-                    "category": "TP",  # Category TP
-                    "skip_checking": "true",  # Skip hash check (file already exists)
-                    "paused": "false",  # Start seeding immediately
-                    "autoTMM": "false"  # Disable automatic torrent management
-                }
-
-                # Add tracker tag if provided
-                if tracker_slug:
-                    add_data["tags"] = tracker_slug.upper()
-                    logger.info(f"Adding torrent with tag: {tracker_slug.upper()}")
-
-                # Add torrent to qBittorrent
-                add_response = await client.post(
-                    f"{qb_host}/api/v2/torrents/add",
-                    cookies=cookies,
-                    files={"torrents": ("torrent.torrent", torrent_file_data, "application/x-bittorrent")},
-                    data=add_data
-                )
-
-                if add_response.text != "Ok.":
-                    # Check if torrent already exists (qBittorrent returns "Fails." or contains "already")
-                    response_lower = add_response.text.lower()
-                    if "already" in response_lower or response_lower == "fails.":
-                        logger.warning(f"Torrent likely already exists in qBittorrent: {add_response.text}")
-                        # Try to add tag to existing torrent if tracker_slug is provided
-                        if tracker_slug:
-                            try:
-                                # Get torrent hash from the .torrent file using torf
-                                import torf
-                                t = torf.Torrent.read(torrent_path)
-                                torrent_hash = str(t.infohash).lower()
-
-                                # Add tag to existing torrent
-                                tag_response = await client.post(
-                                    f"{qb_host}/api/v2/torrents/addTags",
-                                    cookies=cookies,
-                                    data={
-                                        "hashes": torrent_hash,
-                                        "tags": tracker_slug.upper()
-                                    }
-                                )
-                                logger.info(f"✓ Added tag {tracker_slug.upper()} to existing torrent {torrent_hash[:8]}...")
-                            except Exception as tag_error:
-                                logger.warning(f"Could not add tag to existing torrent: {tag_error}")
-                    else:
-                        raise TrackerAPIError(
-                            f"Failed to add torrent to qBittorrent: {add_response.text}"
-                        )
-                else:
-                    tag_info = f" and tag {tracker_slug.upper()}" if tracker_slug else ""
-                    logger.info(f"✓ Torrent successfully added to qBittorrent with category TP{tag_info}")
-
-                # Verify torrent is seeding (optional)
-                try:
-                    torrents_response = await client.get(
-                        f"{qb_host}/api/v2/torrents/info",
-                        cookies=cookies,
-                        params={"category": "TP"}
-                    )
-                    torrents = torrents_response.json()
-                    logger.info(f"✓ Verified: {len(torrents)} torrent(s) in category TP")
-                except Exception as e:
-                    logger.warning(f"Could not verify torrent status: {e}")
-
-        except httpx.HTTPError as e:
-            error_msg = f"qBittorrent connection error: {e}"
-            logger.error(error_msg)
-            raise TrackerAPIError(error_msg) from e
-        except Exception as e:
-            error_msg = f"Failed to inject torrent into qBittorrent: {e}"
-            logger.error(error_msg, exc_info=True)
-            raise TrackerAPIError(error_msg) from e
+            result = await qbit_client.inject_torrent(
+                torrent_path=torrent_path,
+                save_path=save_path,
+                category="TP",
+                tags=tracker_slug.upper() if tracker_slug else None,
+                skip_checking=True,
+            )
+            if result.get('success'):
+                logger.info(f"✓ Torrent injected to qBittorrent")
+            else:
+                raise TrackerAPIError(f"qBittorrent injection failed: {result.get('message')}")
+        except QBittorrentError as e:
+            raise TrackerAPIError(str(e)) from e
 
     def reset_checkpoint(self, file_entry: FileEntry, from_stage: Status) -> None:
         """

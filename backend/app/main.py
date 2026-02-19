@@ -59,8 +59,9 @@ for uvicorn_logger_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
     # Ensure propagation is enabled so logs reach the root logger
     uvicorn_logger.propagate = True
 
-# Silence noisy watchfiles debug messages (file watcher polling)
+# Silence noisy debug messages
 logging.getLogger("watchfiles.main").setLevel(logging.WARNING)
+logging.getLogger("python_multipart.multipart").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
@@ -214,6 +215,25 @@ async def lifespan(app: FastAPI):
     # Launch metadata sync in background (does not block startup)
     logger.info("Scheduling tracker metadata sync (background)...")
     asyncio.create_task(background_metadata_sync())
+
+    # Periodic connection health checks (startup + every 5 min)
+    async def run_connection_health_loop():
+        """Check Radarr/Sonarr/Prowlarr/FlareSolverr on startup then every 5 min."""
+        CHECK_INTERVAL = 300  # seconds
+        while True:
+            try:
+                db = next(get_db())
+                try:
+                    from app.services.connection_health_service import check_all_services
+                    await check_all_services(db)
+                finally:
+                    db.close()
+            except Exception as e:
+                logger.warning(f"⚠ Connection health check error: {e}")
+            await asyncio.sleep(CHECK_INTERVAL)
+
+    logger.info("Scheduling connection health checks (startup + every 5 min)...")
+    asyncio.create_task(run_connection_health_loop())
 
     # Start hot reload watcher in development mode
     if hot_reload:

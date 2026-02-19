@@ -587,6 +587,6 @@ torrent:
 # ============================================================================
 response:
   success_field: "success"
-  error_field: "error"
+  error_field: "message"
   torrent_id_field: "data.id"
   torrent_url_template: "{tracker_url}/torrent/{torrent_id}"

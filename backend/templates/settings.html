@@ -72,6 +72,114 @@
     .import-preview-table .sensitive {
         color: var(--warning-color, #f59e0b);
     }
+    /* Test button connected state */
+    .btn-connected {
+        background: #16a34a !important;
+        border-color: #16a34a !important;
+        color: #fff !important;
+        padding: 0.25rem 0.75rem;
+        font-size: 0.75rem;
+        border-radius: 0.375rem;
+        cursor: pointer;
+        font-weight: 600;
+    }
+    .btn-connected:hover { background: #15803d !important; }
+    /* Status box below each service */
+    .svc-status-box {
+        margin-top: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.5rem;
+        background: var(--bg-secondary);
+        font-size: 0.85rem;
+        min-height: 2.25rem;
+        display: flex;
+        align-items: center;
+        color: var(--text-muted);
+        transition: all 0.2s;
+    }
+
+    /* *arr Stack 3-column grid */
+    .arr-stack-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.25rem;
+    }
+    @media (max-width: 900px) {
+        .arr-stack-grid { grid-template-columns: 1fr; }
+    }
+
+    .arr-col {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 0.75rem;
+        padding: 1rem 1rem 0.75rem;
+    }
+
+    .arr-col-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 700;
+        font-size: 0.95rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid;
+        margin-bottom: 0.25rem;
+    }
+    /* Push the Test button to the right */
+    .arr-col-header .arr-test-btn { margin-left: auto; }
+
+    /* Service accent colors */
+    .arr-prowlarr  { border-color: #f97316; color: #f97316; }
+    .arr-radarr    { border-color: #eab308; color: #eab308; }
+    .arr-sonarr    { border-color: #3b82f6; color: #3b82f6; }
+
+    .arr-test-btn {
+        padding: 0.2rem 0.65rem !important;
+        font-size: 0.73rem !important;
+        flex-shrink: 0;
+    }
+
+    .arr-input { margin-bottom: 0 !important; }
+
+    .arr-status {
+        margin-top: 0.25rem;
+        font-size: 0.8rem;
+    }
+
+    /* Directory browse button */
+    .dir-browse-btn {
+        padding: 0.45rem 0.6rem !important;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Directory picker items */
+    .dir-item {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+        transition: background 0.15s;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+    }
+    .dir-item:last-child { border-bottom: none; }
+    .dir-item:hover { background: var(--bg-tertiary); }
+    .dir-item-icon {
+        width: 1.25rem;
+        height: 1.25rem;
+        color: #eab308;
+        flex-shrink: 0;
+    }
+    .dir-item-drive {
+        color: #3b82f6;
+    }
 </style>
 {% endblock %}
 
@@ -85,410 +193,427 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                 </svg>
-                Application Settings
+                Paramètres
             </h1>
-            <p class="dashboard-subtitle">Configure Seedarr v2.0 runtime settings</p>
+            <p class="dashboard-subtitle">Configuration de Seedarr v2.0</p>
+        </div>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+            <input type="file" id="import-file" accept=".json" class="hidden" onchange="handleFileSelect(this)">
+            <button type="button" onclick="document.getElementById('import-file').click()" class="btn-secondary" style="display:inline-flex;align-items:center;padding:0.4rem 0.75rem;font-size:0.8rem;">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                </svg>
+                Importer
+            </button>
+            <button type="button" onclick="showExportDialog()" class="btn-secondary" style="display:inline-flex;align-items:center;padding:0.4rem 0.75rem;font-size:0.8rem;">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                Exporter
+            </button>
         </div>
     </div>
 
     <!-- Success/Error Messages -->
     <div id="message-container" class="mb-6"></div>
 
-        <!-- Settings Form -->
-        <form
-            id="settings-form"
-            hx-put="/api/settings/save"
-            hx-target="#message-container"
-            hx-swap="innerHTML"
-            hx-on::after-request="handleResponse(event)"
-            class="space-y-6"
-        >
-            <!-- Tracker Management Link -->
-            <div class="dashboard-card">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h2 class="card-title" style="font-size: 1.5rem; margin-bottom: 0.5rem;">
-                            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
-                            </svg>
-                            Tracker Management
-                        </h2>
-                        <p style="color: var(--text-muted); font-size: 0.875rem;">
-                            Configure multiple trackers for cross-seeding (La Cale, C411, etc.)
-                        </p>
-                    </div>
-                    <a href="/trackers" class="btn-primary" style="display: inline-flex; align-items: center;">
+    <form
+        id="settings-form"
+        hx-put="/api/settings/save"
+        hx-target="#message-container"
+        hx-swap="innerHTML"
+        hx-on::after-request="handleResponse(event)"
+        class="space-y-6"
+    >
+
+        <!-- ══ 1. TRACKERS ══════════════════════════════════════════════════════ -->
+        <div class="dashboard-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <h2 class="card-title" style="font-size:1.25rem;margin-bottom:0.25rem;">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
                         </svg>
-                        Manage Trackers
-                    </a>
+                        Trackers
+                    </h2>
+                    <p style="color:var(--text-muted);font-size:0.8rem;margin:0;">Configurer les trackers pour le cross-seeding (La Cale, C411, etc.)</p>
                 </div>
-            </div>
-
-            <!-- External Services Section -->
-            <div class="dashboard-card">
-                <h2 class="card-title" style="font-size: 1.5rem; margin-bottom: 1rem;">
-                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                <a href="/trackers" class="btn-primary" style="display:inline-flex;align-items:center;white-space:nowrap;">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                     </svg>
-                    External Services
-                </h2>
-
-                <div class="settings-grid-2" style="display: grid; gap: 1.5rem; grid-template-columns: 1fr;">
-                    <!-- FlareSolverr -->
-                    <div class="setting-row">
-                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <span class="form-label" style="margin: 0; font-weight: 600;">FlareSolverr URL</span>
-                            <button
-                                type="button"
-                                onclick="testConnection('flaresolverr')"
-                                class="btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;"
-                            >
-                                Test
-                            </button>
-                        </label>
-                        <input
-                            type="url"
-                            name="flaresolverr_url"
-                            value="{{ settings.flaresolverr_url or '' }}"
-                            placeholder="http://localhost:8191"
-                            class="form-input"
-                        />
-                        <label style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-muted);">
-                            <span>Cloudflare bypass service</span>
-                        </label>
-                    </div>
-
-                    <!-- qBittorrent -->
-                    <div class="setting-row">
-                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <span class="form-label" style="margin: 0; font-weight: 600;">qBittorrent Host</span>
-                            <button
-                                type="button"
-                                onclick="testConnection('qbittorrent')"
-                                class="btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;"
-                            >
-                                Test
-                            </button>
-                        </label>
-                        <input
-                            type="text"
-                            name="qbittorrent_host"
-                            value="{{ settings.qbittorrent_host or '' }}"
-                            placeholder="localhost:8080"
-                            class="form-input"
-                        />
-                        <label style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-muted);">
-                            <span>qBittorrent Web UI host:port</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="settings-grid-2" style="display: grid; gap: 1.5rem; grid-template-columns: 1fr;">
-                    <div class="setting-row">
-                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <span class="form-label" style="margin: 0; font-weight: 600;">qBittorrent Username</span>
-                        </label>
-                        <input
-                            type="text"
-                            name="qbittorrent_username"
-                            value="{{ settings.qbittorrent_username or '' }}"
-                            placeholder="admin"
-                            class="form-input"
-                        />
-                    </div>
-
-                    <div class="setting-row">
-                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <span class="form-label" style="margin: 0; font-weight: 600;">qBittorrent Password</span>
-                        </label>
-                        <input
-                            type="password"
-                            name="qbittorrent_password"
-                            value="{{ settings.qbittorrent_password or '' }}"
-                            placeholder="Enter password"
-                            class="form-input masked-input"
-                        />
-                    </div>
-                </div>
-
-                <div class="setting-row">
-                    <label class="form-label">
-                        <span style="font-weight: 600;">qBittorrent Content Path</span>
-                    </label>
-                    <input
-                        type="text"
-                        name="qbittorrent_content_path"
-                        value="{{ settings.qbittorrent_content_path or '' }}"
-                        placeholder="/data"
-                        class="form-input" style="font-family: 'Monaco', 'Menlo', 'Consolas', monospace;"
-                    />
-                    <label style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-muted);">
-                        <span>Base path as seen by qBittorrent. Maps Seedarr's media path to qBit's mount point (ex: Seedarr <code>/media</code> &rarr; qBit <code>/data</code>).</span>
-                    </label>
-                </div>
-
-                <div class="setting-row">
-                    <label class="form-label">
-                        <span style="font-weight: 600;">TMDB API Key</span>
-                        <button
-                            type="button"
-                            onclick="testConnection('tmdb')"
-                            class="btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;"
-                        >
-                            Test
-                        </button>
-                    </label>
-                    <input
-                        type="password"
-                        name="tmdb_api_key"
-                        value="{{ settings.tmdb_api_key or '' }}"
-                        placeholder="Enter TMDB API key"
-                        class="form-input masked-input"
-                    />
-                    <label style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-muted);">
-                        <span>API key for The Movie Database metadata fetching</span>
-                    </label>
-                </div>
+                    Gérer les trackers
+                </a>
             </div>
+        </div>
 
-            <!-- Prowlarr Integration Section -->
-            <div class="dashboard-card">
-                <h2 class="card-title" style="font-size: 1.5rem; margin-bottom: 1rem;">
-                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                    </svg>
-                    Prowlarr Integration
-                </h2>
-                <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.875rem;">
-                    Connect to Prowlarr to import indexers and check for duplicates before uploading.
-                </p>
-
-                <div class="settings-grid-2" style="display: grid; gap: 1.5rem; grid-template-columns: 1fr;">
-                    <div class="setting-row">
-                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <span class="form-label" style="margin: 0; font-weight: 600;">Prowlarr URL</span>
-                            <button
-                                type="button"
-                                onclick="testConnection('prowlarr')"
-                                class="btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;"
-                            >
-                                Test
-                            </button>
-                        </label>
-                        <input
-                            type="url"
-                            name="prowlarr_url"
-                            value="{{ settings.prowlarr_url or '' }}"
-                            placeholder="http://localhost:9696"
-                            class="form-input"
-                        />
-                        <label style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-muted);">
-                            <span>Prowlarr instance URL (e.g., http://localhost:9696)</span>
-                        </label>
-                    </div>
-
-                    <div class="setting-row">
-                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <span class="form-label" style="margin: 0; font-weight: 600;">Prowlarr API Key</span>
-                        </label>
-                        <input
-                            type="password"
-                            name="prowlarr_api_key"
-                            value="{{ settings.prowlarr_api_key or '' }}"
-                            placeholder="Enter Prowlarr API key"
-                            class="form-input masked-input"
-                        />
-                        <label style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-muted);">
-                            <span>API key from Prowlarr Settings > General > Security</span>
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Prowlarr Status -->
-                <div id="prowlarr-status" style="margin-top: 1rem; padding: 0.75rem; border-radius: 0.5rem; background: var(--bg-secondary);">
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <span id="prowlarr-status-icon" style="color: var(--text-muted);">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </span>
-                        <span id="prowlarr-status-text" style="font-size: 0.875rem; color: var(--text-muted);">
-                            Click "Test" to check Prowlarr connection
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Directory Paths Section -->
-            <div class="dashboard-card">
-                <h2 class="card-title" style="font-size: 1.5rem; margin-bottom: 1rem;">
-                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
-                    </svg>
-                    Directory Paths
-                </h2>
-
-                <div class="setting-row">
-                    <label class="form-label">
-                        <span style="font-weight: 600;">Input Media Path</span>
-                    </label>
-                    <input
-                        type="text"
-                        name="input_media_path"
-                        value="{{ settings.input_media_path or '' }}"
-                        placeholder="/path/to/input/media"
-                        class="form-input" style="font-family: 'Monaco', 'Menlo', 'Consolas', monospace;"
-                    />
-                    <label style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-muted);">
-                        <span>Directory where media files are scanned</span>
-                    </label>
-                </div>
-
-                <div class="setting-row">
-                    <label class="form-label">
-                        <span style="font-weight: 600;">Output Directory</span>
-                    </label>
-                    <input
-                        type="text"
-                        name="output_dir"
-                        value="{{ settings.output_dir or '' }}"
-                        placeholder="Leave empty to save in same folder as source"
-                        class="form-input" style="font-family: 'Monaco', 'Menlo', 'Consolas', monospace;"
-                    />
-                    <label style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-muted);">
-                        <span>Directory for generated files (.torrent, .nfo). Leave empty to use same folder as source file.</span>
-                    </label>
-                </div>
-            </div>
-
-            <!-- Application Settings Section -->
-            <div class="dashboard-card">
-                <h2 class="card-title" style="font-size: 1.5rem; margin-bottom: 1rem;">
-                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
-                    </svg>
-                    Application Settings
-                </h2>
-
-                <div class="settings-grid-3" style="display: grid; gap: 1.5rem; grid-template-columns: 1fr;">
-                    <div class="setting-row">
-                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <span class="form-label" style="margin: 0; font-weight: 600;">Log Level</span>
-                        </label>
-                        <select
-                            name="log_level"
-                            class="form-select"
-                        >
-                            {% for level in log_levels %}
-                            <option value="{{ level }}" {% if settings.log_level == level %}selected{% endif %}>
-                                {{ level }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <div class="setting-row">
-                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <span class="form-label" style="margin: 0; font-weight: 600;">TMDB Cache TTL (days)</span>
-                        </label>
-                        <input
-                            type="number"
-                            name="tmdb_cache_ttl_days"
-                            value="{{ settings.tmdb_cache_ttl_days or 30 }}"
-                            min="1"
-                            max="365"
-                            class="form-input"
-                        />
-                    </div>
-
-                    <div class="setting-row">
-                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <span class="form-label" style="margin: 0; font-weight: 600;">Tag Sync Interval (hours)</span>
-                        </label>
-                        <input
-                            type="number"
-                            name="tag_sync_interval_hours"
-                            value="{{ settings.tag_sync_interval_hours or 24 }}"
-                            min="1"
-                            max="168"
-                            class="form-input"
-                        />
-                    </div>
-                </div>
-            </div>
-
-            <!-- Submit Button -->
-            <div class="flex justify-end gap-4">
-                <button
-                    type="button"
-                    onclick="location.reload()"
-                    class="btn-secondary"
-                >
-                    Reset
-                </button>
-                <button
-                    type="submit"
-                    class="btn-primary"
-                    id="save-button"
-                >
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
-                    </svg>
-                    Save Settings
-                </button>
-            </div>
-        </form>
-
-        <!-- Import/Export Section -->
-        <div class="dashboard-card" style="margin-top: 1.5rem;">
-            <h2 class="text-2xl font-bold mb-4 flex items-center">
-                <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+        <!-- ══ 2. RÉPERTOIRES ══════════════════════════════════════════════════ -->
+        <div class="dashboard-card">
+            <h2 class="card-title" style="font-size:1.25rem;margin-bottom:1.25rem;">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
                 </svg>
-                Import / Export Configuration
+                Répertoires
             </h2>
-            <p style="color: var(--text-muted); margin-bottom: 1rem;">
-                Backup and restore your application settings. Export creates a JSON file that can be imported later.
+            <div class="settings-grid-2" style="display:grid;gap:1.25rem;grid-template-columns:1fr;">
+                <div>
+                    <label class="form-label" style="font-weight:600;">Dossier source</label>
+                    <div style="display:flex;gap:0.5rem;">
+                        <input type="text" name="input_media_path"
+                            value="{{ settings.input_media_path or '' }}"
+                            placeholder="/chemin/vers/les/médias"
+                            class="form-input" style="font-family:monospace;flex:1;"/>
+                        <button type="button" onclick="openDirPicker('input_media_path')" class="btn-secondary dir-browse-btn" title="Parcourir">
+                            <svg style="width:1.1rem;height:1.1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <p style="margin-top:0.25rem;font-size:0.8rem;color:var(--text-muted);">Dossier scanné pour détecter les fichiers média</p>
+                </div>
+                <div>
+                    <label class="form-label" style="font-weight:600;">Dossier de sortie</label>
+                    <div style="display:flex;gap:0.5rem;">
+                        <input type="text" name="output_dir"
+                            value="{{ settings.output_dir or '' }}"
+                            placeholder="Laisser vide = même dossier que la source"
+                            class="form-input dir-input" style="font-family:monospace;flex:1;"
+                            oninput="updateResolvedPath(this, 'resolved-output-dir')"/>
+                        <button type="button" onclick="openDirPicker('output_dir')" class="btn-secondary dir-browse-btn" title="Parcourir">
+                            <svg style="width:1.1rem;height:1.1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <p id="resolved-output-dir" style="margin-top:0.25rem;font-size:0.75rem;color:var(--text-muted);font-family:monospace;"></p>
+                    <p style="margin-top:0.1rem;font-size:0.8rem;color:var(--text-muted);">Dossier pour les releases (hardlinks, NFO, screenshots). Chemin relatif = basé sur le dossier source.</p>
+                </div>
+                <div>
+                    <label class="form-label" style="font-weight:600;">Dossier torrents</label>
+                    <div style="display:flex;gap:0.5rem;">
+                        <input type="text" name="torrent_output_dir"
+                            value="{{ settings.torrent_output_dir or '' }}"
+                            placeholder="Laisser vide = {dossier de sortie}/.torrents"
+                            class="form-input dir-input" style="font-family:monospace;flex:1;"
+                            oninput="updateResolvedPath(this, 'resolved-torrent-dir')"/>
+                        <button type="button" onclick="openDirPicker('torrent_output_dir')" class="btn-secondary dir-browse-btn" title="Parcourir">
+                            <svg style="width:1.1rem;height:1.1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <p id="resolved-torrent-dir" style="margin-top:0.25rem;font-size:0.75rem;color:var(--text-muted);font-family:monospace;"></p>
+                    <p style="margin-top:0.1rem;font-size:0.8rem;color:var(--text-muted);">Dossier pour les fichiers .torrent (sous-dossier par tracker)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ 2b. HARDLINK SETTINGS ═══════════════════════════════════════════ -->
+        <div class="dashboard-card">
+            <h2 class="card-title" style="font-size:1.25rem;margin-bottom:0.4rem;">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                </svg>
+                Hardlinks
+            </h2>
+            <p style="color:var(--text-muted);margin-bottom:1.25rem;font-size:0.8rem;">
+                Les hardlinks permettent d'avoir plusieurs noms de fichier pour un seul fichier physique sur disque,
+                économisant l'espace disque. Fonctionne uniquement si source et destination sont sur la même partition/volume.
             </p>
 
-            <!-- Warning about sensitive data -->
-            <div class="alert alert-warning" style="margin-bottom: 1rem;">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            {% if os_info and os_info.hardlink_warning %}
+            <div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.4);border-radius:0.5rem;padding:0.75rem 1rem;margin-bottom:1rem;display:flex;align-items:flex-start;gap:0.5rem;">
+                <svg style="width:1.25rem;height:1.25rem;color:#f59e0b;flex-shrink:0;margin-top:0.1rem;" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
                 </svg>
-                <span>
-                    <strong>Security Notice:</strong> Export includes ALL settings including sensitive data (API keys, passwords) for full backup capability. Store exported files securely.
-                </span>
+                <div style="font-size:0.8rem;color:#f59e0b;">
+                    <strong>{{ os_info.os_name }}</strong> &mdash; {{ os_info.hardlink_warning }}
+                </div>
             </div>
+            {% endif %}
 
-            <div class="flex gap-4 flex-wrap">
-                <!-- Export Button -->
-                <button
-                    type="button"
-                    onclick="showExportDialog()"
-                    class="btn-secondary"
-                >
+            <div style="display:flex;flex-direction:column;gap:1rem;">
+                <!-- Hardlink enabled toggle -->
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                        <input type="checkbox" name="hardlink_enabled"
+                            {% if settings.hardlink_enabled is not defined or settings.hardlink_enabled %}checked{% endif %}
+                            onchange="document.getElementById('hardlink-fallback-row').style.display = this.checked ? 'flex' : 'none'"
+                            style="width:1.1rem;height:1.1rem;accent-color:var(--accent-primary);"/>
+                        <span style="font-weight:600;font-size:0.9rem;">Activer les hardlinks</span>
+                    </label>
+                    <span style="font-size:0.75rem;color:var(--text-muted);background:var(--bg-tertiary);padding:0.15rem 0.5rem;border-radius:0.25rem;">
+                        OS: {{ os_info.os_name if os_info else 'N/A' }}
+                    </span>
+                </div>
+                <p style="font-size:0.8rem;color:var(--text-muted);margin-top:-0.5rem;">
+                    Si désactivé, les torrents pointeront directement vers le fichier source original sans créer de copie ou de hardlink.
+                </p>
+
+                <!-- Fallback copy toggle (visible only when hardlinks enabled) -->
+                <div id="hardlink-fallback-row"
+                     style="display:{% if settings.hardlink_enabled is not defined or settings.hardlink_enabled %}flex{% else %}none{% endif %};align-items:center;gap:0.5rem;padding-left:1.5rem;">
+                    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                        <input type="checkbox" name="hardlink_fallback_copy"
+                            {% if settings.hardlink_fallback_copy is not defined or settings.hardlink_fallback_copy %}checked{% endif %}
+                            style="width:1.1rem;height:1.1rem;accent-color:var(--accent-primary);"/>
+                        <span style="font-weight:600;font-size:0.9rem;">Copie de secours</span>
+                    </label>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin:0;">
+                        Si le hardlink échoue (partitions différentes), copier le fichier au lieu de bloquer le pipeline.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ 3. *ARR STACK ═══════════════════════════════════════════════════ -->
+        <div class="dashboard-card">
+            <h2 class="card-title" style="font-size:1.25rem;margin-bottom:0.4rem;">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                </svg>
+                *arr Stack
+            </h2>
+            <p style="color:var(--text-muted);margin-bottom:1.25rem;font-size:0.8rem;">
+                Prowlarr pour l'indexation — Radarr &amp; Sonarr pour la récupération du <strong>sceneName</strong> original au scan.
+            </p>
+            <div class="arr-stack-grid">
+
+                <!-- Prowlarr -->
+                <div class="arr-col">
+                    <div class="arr-col-header arr-prowlarr">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:1rem;height:1rem;">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        Prowlarr
+                        <button id="btn-test-prowlarr" type="button" onclick="testConnection('prowlarr')" class="btn-secondary arr-test-btn">Test</button>
+                    </div>
+                    <input type="url" name="prowlarr_url" value="{{ settings.prowlarr_url or '' }}" placeholder="http://localhost:9696" class="form-input arr-input"/>
+                    <input type="password" name="prowlarr_api_key" value="{{ settings.prowlarr_api_key or '' }}" placeholder="API Key" class="form-input masked-input arr-input"/>
+                    <div id="status-box-prowlarr" class="svc-status-box arr-status">Cliquez Test pour vérifier</div>
+                </div>
+
+                <!-- Radarr -->
+                <div class="arr-col">
+                    <div class="arr-col-header arr-radarr">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:1rem;height:1rem;">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4"/>
+                        </svg>
+                        Radarr
+                        <button id="btn-test-radarr" type="button" onclick="testConnection('radarr')" class="btn-secondary arr-test-btn">Test</button>
+                    </div>
+                    <input type="url" name="radarr_url" value="{{ settings.radarr_url or '' }}" placeholder="http://localhost:7878" class="form-input arr-input"/>
+                    <input type="password" name="radarr_api_key" value="{{ settings.radarr_api_key or '' }}" placeholder="API Key" class="form-input masked-input arr-input"/>
+                    <div id="status-box-radarr" class="svc-status-box arr-status">Cliquez Test pour vérifier</div>
+                </div>
+
+                <!-- Sonarr -->
+                <div class="arr-col">
+                    <div class="arr-col-header arr-sonarr">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:1rem;height:1rem;">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.069A1 1 0 0121 8.868V15.13a1 1 0 01-1.447.899L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                        Sonarr
+                        <button id="btn-test-sonarr" type="button" onclick="testConnection('sonarr')" class="btn-secondary arr-test-btn">Test</button>
+                    </div>
+                    <input type="url" name="sonarr_url" value="{{ settings.sonarr_url or '' }}" placeholder="http://localhost:8989" class="form-input arr-input"/>
+                    <input type="password" name="sonarr_api_key" value="{{ settings.sonarr_api_key or '' }}" placeholder="API Key" class="form-input masked-input arr-input"/>
+                    <div id="status-box-sonarr" class="svc-status-box arr-status">Cliquez Test pour vérifier</div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ══ 4. QBITTORRENT ═════════════════════════════════════════════════ -->
+        <div class="dashboard-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+                <h2 class="card-title" style="font-size:1.25rem;margin:0;">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                     </svg>
-                    Export Settings
-                </button>
+                    qBittorrent
+                </h2>
+                <button id="btn-test-qbittorrent" type="button" onclick="testConnection('qbittorrent')"
+                    class="btn-secondary" style="padding:0.25rem 0.75rem;font-size:0.75rem;">Test</button>
+            </div>
 
-                <!-- Import Button -->
-                <input type="file" id="import-file" accept=".json" class="hidden" onchange="handleFileSelect(this)">
-                <button
-                    type="button"
-                    onclick="document.getElementById('import-file').click()"
-                    class="btn-secondary"
-                >
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-                    </svg>
-                    Import Settings
-                </button>
+            <!-- Host -->
+            <div style="margin-bottom:1rem;">
+                <label class="form-label" style="font-weight:600;">Host</label>
+                <input type="text" name="qbittorrent_host"
+                    value="{{ settings.qbittorrent_host or '' }}"
+                    placeholder="localhost:8080"
+                    class="form-input"/>
+                <p style="margin-top:0.25rem;font-size:0.8rem;color:var(--text-muted);">Adresse du Web UI qBittorrent (host:port)</p>
+            </div>
+
+            <!-- Username + Password -->
+            <div class="settings-grid-2" style="display:grid;gap:1rem;grid-template-columns:1fr;margin-bottom:1rem;">
+                <div>
+                    <label class="form-label" style="font-weight:600;">Identifiant</label>
+                    <input type="text" name="qbittorrent_username"
+                        value="{{ settings.qbittorrent_username or '' }}"
+                        placeholder="admin"
+                        class="form-input"/>
+                </div>
+                <div>
+                    <label class="form-label" style="font-weight:600;">Mot de passe</label>
+                    <input type="password" name="qbittorrent_password"
+                        value="{{ settings.qbittorrent_password or '' }}"
+                        placeholder="••••••••"
+                        class="form-input masked-input"/>
+                </div>
+            </div>
+
+            <!-- Content Path -->
+            <div>
+                <label class="form-label" style="font-weight:600;">Chemin de contenu</label>
+                <div style="display:flex;gap:0.5rem;">
+                    <input type="text" name="qbittorrent_content_path"
+                        value="{{ settings.qbittorrent_content_path or '' }}"
+                        placeholder="/data"
+                        class="form-input" style="font-family:monospace;flex:1;"/>
+                    <button type="button" onclick="openDirPicker('qbittorrent_content_path')" class="btn-secondary dir-browse-btn" title="Parcourir">
+                        <svg style="width:1.1rem;height:1.1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                        </svg>
+                    </button>
+                </div>
+                <p style="margin-top:0.25rem;font-size:0.8rem;color:var(--text-muted);">
+                    Chemin racine tel que vu par qBittorrent. Mappe le chemin Seedarr vers le point de montage qBit (ex: <code>/media</code> &rarr; <code>/data</code>).
+                </p>
+            </div>
+
+            <div id="status-box-qbittorrent" class="svc-status-box" style="margin-top:0.75rem;">Cliquez Test pour vérifier la connexion</div>
+        </div>
+
+        <!-- ══ 5. MÉTADONNÉES ═════════════════════════════════════════════════ -->
+        <div class="dashboard-card">
+            <h2 class="card-title" style="font-size:1.25rem;margin-bottom:1.25rem;">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4"></path>
+                </svg>
+                Métadonnées &amp; Bypass
+            </h2>
+            <div class="arr-stack-grid" style="grid-template-columns:repeat(2,1fr);">
+
+                <!-- FlareSolverr -->
+                <div class="arr-col">
+                    <div class="arr-col-header" style="border-color:#8b5cf6;color:#8b5cf6;">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:1rem;height:1rem;">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+                        </svg>
+                        FlareSolverr
+                        <button id="btn-test-flaresolverr" type="button" onclick="testConnection('flaresolverr')" class="btn-secondary arr-test-btn">Test</button>
+                    </div>
+                    <input type="url" name="flaresolverr_url" value="{{ settings.flaresolverr_url or '' }}" placeholder="http://localhost:8191" class="form-input arr-input"/>
+                    <p style="font-size:0.75rem;color:var(--text-muted);margin:0;">Bypass Cloudflare pour les trackers protégés</p>
+                    <div id="status-box-flaresolverr" class="svc-status-box arr-status">Cliquez Test pour vérifier</div>
+                </div>
+
+                <!-- TMDB -->
+                <div class="arr-col">
+                    <div class="arr-col-header" style="border-color:#06b6d4;color:#06b6d4;">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:1rem;height:1rem;">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.069A1 1 0 0121 8.868V15.13a1 1 0 01-1.447.899L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                        TMDB
+                        <button id="btn-test-tmdb" type="button" onclick="testConnection('tmdb')" class="btn-secondary arr-test-btn">Test</button>
+                    </div>
+                    <input type="password" name="tmdb_api_key" value="{{ settings.tmdb_api_key or '' }}" placeholder="API Key" class="form-input masked-input arr-input"/>
+                    <p style="font-size:0.75rem;color:var(--text-muted);margin:0;">Clé API The Movie Database pour les métadonnées</p>
+                    <div id="status-box-tmdb" class="svc-status-box arr-status">Cliquez Test pour vérifier</div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ══ 6. PARAMÈTRES AVANCÉS ══════════════════════════════════════════ -->
+        <div class="dashboard-card">
+            <h2 class="card-title" style="font-size:1.25rem;margin-bottom:1.25rem;">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                </svg>
+                Paramètres avancés
+            </h2>
+            <div class="settings-grid-3" style="display:grid;gap:1.25rem;grid-template-columns:1fr;">
+                <div>
+                    <label class="form-label" style="font-weight:600;">Niveau de log</label>
+                    <select name="log_level" class="form-select">
+                        {% for level in log_levels %}
+                        <option value="{{ level }}" {% if settings.log_level == level %}selected{% endif %}>{{ level }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" style="font-weight:600;">Cache TMDB (jours)</label>
+                    <input type="number" name="tmdb_cache_ttl_days"
+                        value="{{ settings.tmdb_cache_ttl_days or 30 }}"
+                        min="1" max="365" class="form-input"/>
+                    <p style="margin-top:0.25rem;font-size:0.8rem;color:var(--text-muted);">Durée de conservation des données TMDB en cache</p>
+                </div>
+                <div>
+                    <label class="form-label" style="font-weight:600;">Sync tags (heures)</label>
+                    <input type="number" name="tag_sync_interval_hours"
+                        value="{{ settings.tag_sync_interval_hours or 24 }}"
+                        min="1" max="168" class="form-input"/>
+                    <p style="margin-top:0.25rem;font-size:0.8rem;color:var(--text-muted);">Intervalle de synchronisation des tags tracker</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ BOUTONS SAVE/RESET ════════════════════════════════════════════ -->
+        <div class="flex justify-end gap-4">
+            <button type="button" onclick="location.reload()" class="btn-secondary">Réinitialiser</button>
+            <button type="submit" class="btn-primary" id="save-button">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                </svg>
+                Sauvegarder
+            </button>
+        </div>
+
+    </form>
+
+        <!-- Directory Picker Modal -->
+        <div id="dir-picker-modal" class="modal-overlay" style="display: none;">
+            <div class="modal-content" style="max-width:550px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+                    <h3 style="font-size:1.15rem;font-weight:600;margin:0;">Parcourir les dossiers</h3>
+                    <button type="button" onclick="closeDirPicker()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;padding:0.25rem;">&times;</button>
+                </div>
+
+                <!-- Current path display -->
+                <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+                    <button type="button" id="dir-picker-up" onclick="dirPickerUp()" class="btn-secondary" style="padding:0.3rem 0.5rem;font-size:0.8rem;" title="Dossier parent">
+                        <svg style="width:1rem;height:1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"/>
+                        </svg>
+                    </button>
+                    <div id="dir-picker-path" style="flex:1;font-family:monospace;font-size:0.85rem;padding:0.4rem 0.6rem;background:var(--bg-secondary);border-radius:0.375rem;border:1px solid var(--border-color);overflow-x:auto;white-space:nowrap;">
+                        /
+                    </div>
+                </div>
+
+                <!-- Directory list -->
+                <div id="dir-picker-list" style="max-height:350px;overflow-y:auto;border:1px solid var(--border-color);border-radius:0.5rem;background:var(--bg-secondary);">
+                    <div style="padding:2rem;text-align:center;color:var(--text-muted);">Chargement...</div>
+                </div>
+
+                <!-- Error display -->
+                <div id="dir-picker-error" style="display:none;margin-top:0.5rem;padding:0.5rem 0.75rem;border-radius:0.375rem;background:rgba(239,68,68,0.1);color:#ef4444;font-size:0.8rem;"></div>
+
+                <!-- Action buttons -->
+                <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
+                    <button type="button" onclick="closeDirPicker()" class="btn-secondary">Annuler</button>
+                    <button type="button" onclick="selectCurrentDir()" class="btn-primary" id="dir-picker-select">
+                        <svg style="width:1rem;height:1rem;margin-right:0.3rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Sélectionner ce dossier
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -589,107 +714,170 @@
         }
     }
 
-    // Test service connection
-    async function testConnection(service) {
-        const messageContainer = document.getElementById('message-container');
+    // Fields to save per service before testing
+    const SERVICE_FIELDS = {
+        'flaresolverr': ['flaresolverr_url'],
+        'qbittorrent':  ['qbittorrent_host', 'qbittorrent_username', 'qbittorrent_password'],
+        'tmdb':         ['tmdb_api_key'],
+        'prowlarr':     ['prowlarr_url', 'prowlarr_api_key'],
+        'radarr':       ['radarr_url', 'radarr_api_key'],
+        'sonarr':       ['sonarr_url', 'sonarr_api_key'],
+    };
 
-        messageContainer.innerHTML = `
-            <div class="alert alert-info">
-                <div class="loading-spinner"></div>
-                <span>Testing ${service} connection...</span>
-            </div>
-        `;
+    async function saveServiceFields(service) {
+        const fields = SERVICE_FIELDS[service] || [];
+        if (!fields.length) return;
+        const fd = new FormData();
+        for (const f of fields) {
+            const el = document.querySelector(`[name="${f}"]`);
+            if (el) fd.append(f, el.value || '');
+        }
+        try { await fetch('/api/settings/save', { method: 'PUT', body: fd }); }
+        catch(e) { console.warn('Pre-test save failed:', e); }
+    }
 
-        try {
-            // Build the URL with service parameter
-            let url = `/api/settings/test-connection?service=${service}`;
-
-            // Include current form values for each service
-            if (service === 'tmdb') {
-                const apiKeyInput = document.querySelector('[name="tmdb_api_key"]');
-                if (apiKeyInput && apiKeyInput.value) {
-                    url += `&api_key=${encodeURIComponent(apiKeyInput.value)}`;
-                }
-            } else if (service === 'flaresolverr') {
-                const urlInput = document.querySelector('[name="flaresolverr_url"]');
-                if (urlInput && urlInput.value) {
-                    url += `&url=${encodeURIComponent(urlInput.value)}`;
-                }
-            } else if (service === 'qbittorrent') {
-                const hostInput = document.querySelector('[name="qbittorrent_host"]');
-                const usernameInput = document.querySelector('[name="qbittorrent_username"]');
-                const passwordInput = document.querySelector('[name="qbittorrent_password"]');
-                if (hostInput && hostInput.value) {
-                    url += `&host=${encodeURIComponent(hostInput.value)}`;
-                }
-                if (usernameInput && usernameInput.value) {
-                    url += `&username=${encodeURIComponent(usernameInput.value)}`;
-                }
-                if (passwordInput && passwordInput.value) {
-                    url += `&password=${encodeURIComponent(passwordInput.value)}`;
-                }
-            } else if (service === 'prowlarr') {
-                const prowlarrUrlInput = document.querySelector('[name="prowlarr_url"]');
-                const prowlarrApiKeyInput = document.querySelector('[name="prowlarr_api_key"]');
-                if (prowlarrUrlInput && prowlarrUrlInput.value) {
-                    url += `&url=${encodeURIComponent(prowlarrUrlInput.value)}`;
-                }
-                if (prowlarrApiKeyInput && prowlarrApiKeyInput.value) {
-                    url += `&api_key=${encodeURIComponent(prowlarrApiKeyInput.value)}`;
-                }
-            }
-
-            const response = await fetch(url, {
-                method: 'POST'
-            });
-
-            const result = await response.json();
-
-            if (response.ok) {
-                // Store TMDB sample data for template preview if available
-                if (service === 'tmdb' && result.sample_data) {
-                    localStorage.setItem('tmdb_preview_data', JSON.stringify(result.sample_data));
-                    console.log('TMDB preview data stored:', result.sample_data.title);
-                }
-
-                messageContainer.innerHTML = `
-                    <div class="alert alert-info">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                        <span>${result.message}${result.sample_data ? ' (Donnees de test chargees)' : ''}</span>
-                    </div>
-                `;
-            } else {
-                messageContainer.innerHTML = `
-                    <div class="alert alert-warning">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                        </svg>
-                        <span>${result.detail || 'Connection test failed'}</span>
-                    </div>
-                `;
-            }
-
-            // Auto-hide message after 5 seconds
-            setTimeout(() => {
-                messageContainer.innerHTML = '';
-            }, 5000);
-
-        } catch (error) {
-            messageContainer.innerHTML = `
-                <div class="alert alert-error">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <span>Error testing connection: ${error.message}</span>
-                </div>
-            `;
+    function setTestButtonState(service, state) {
+        const btn = document.getElementById(`btn-test-${service}`);
+        if (!btn) return;
+        btn.disabled = false;
+        if (state === 'loading') {
+            btn.disabled = true;
+            btn.className = 'btn-secondary';
+            btn.style.cssText = 'padding:0.25rem 0.75rem;font-size:0.75rem;';
+            btn.innerHTML = '…';
+        } else if (state === 'success') {
+            btn.className = 'btn-connected';
+            btn.style.cssText = '';
+            btn.innerHTML = '✓ OK';
+        } else {
+            btn.className = 'btn-secondary';
+            btn.style.cssText = 'padding:0.25rem 0.75rem;font-size:0.75rem;';
+            btn.innerHTML = 'Test';
         }
     }
 
+    function setStatusBox(service, html) {
+        const box = document.getElementById(`status-box-${service}`);
+        if (box) box.innerHTML = html;
+    }
+
+    // Test service connection
+    async function testConnection(service) {
+        // 1. Save current fields to DB first
+        await saveServiceFields(service);
+
+        // 2. Show loading in local status box
+        setTestButtonState(service, 'loading');
+        setStatusBox(service, `<div style="display:flex;align-items:center;gap:0.5rem;">
+            <div class="loading-spinner" style="width:1rem;height:1rem;flex-shrink:0;"></div>
+            <span>Test en cours…</span></div>`);
+
+        try {
+            // 3. Build test URL with current form values
+            let url = `/api/settings/test-connection?service=${service}`;
+            const q = (name) => encodeURIComponent(document.querySelector(`[name="${name}"]`)?.value || '');
+
+            if (service === 'tmdb') {
+                url += `&api_key=${q('tmdb_api_key')}`;
+            } else if (service === 'flaresolverr') {
+                url += `&url=${q('flaresolverr_url')}`;
+            } else if (service === 'qbittorrent') {
+                url += `&host=${q('qbittorrent_host')}&username=${q('qbittorrent_username')}&password=${q('qbittorrent_password')}`;
+            } else if (service === 'prowlarr') {
+                url += `&url=${q('prowlarr_url')}&api_key=${q('prowlarr_api_key')}`;
+            } else if (service === 'radarr') {
+                url += `&url=${q('radarr_url')}&api_key=${q('radarr_api_key')}`;
+            } else if (service === 'sonarr') {
+                url += `&url=${q('sonarr_url')}&api_key=${q('sonarr_api_key')}`;
+            }
+
+            const response = await fetch(url, { method: 'POST' });
+            const result = await response.json();
+            const ok = result.status === 'success';
+
+            // 4. Store TMDB sample data if available
+            if (service === 'tmdb' && result.sample_data) {
+                localStorage.setItem('tmdb_preview_data', JSON.stringify(result.sample_data));
+            }
+
+            // 5. Update button and local status box
+            if (ok) {
+                setTestButtonState(service, 'success');
+                const msg = result.message + (result.sample_data ? ' — données de test chargées' : '');
+                setStatusBox(service, `<div style="display:flex;align-items:center;gap:0.5rem;color:#16a34a;">
+                    <svg style="width:1rem;height:1rem;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg><span>${msg}</span></div>`);
+                // Persist in localStorage for next page load
+                localStorage.setItem(`svc_test_${service}`, JSON.stringify({ status: 'success', message: result.message }));
+            } else {
+                setTestButtonState(service, 'error');
+                const msg = result.message || result.detail || 'Connexion échouée';
+                setStatusBox(service, `<div style="display:flex;align-items:center;gap:0.5rem;color:#dc2626;">
+                    <svg style="width:1rem;height:1rem;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg><span>${msg}</span></div>`);
+                localStorage.removeItem(`svc_test_${service}`);
+            }
+
+        } catch (error) {
+            setTestButtonState(service, 'error');
+            setStatusBox(service, `<span style="color:#dc2626;">Erreur: ${error.message}</span>`);
+            localStorage.removeItem(`svc_test_${service}`);
+        }
+    }
+
+    // ─── Persistent connection status (from server cache) ────────────────────
+    function applyStatusFromCache(service, entry) {
+        if (!entry) return;
+        const ok = entry.status === 'success';
+        setTestButtonState(service, ok ? 'success' : 'error');
+        const color = ok ? '#16a34a' : '#dc2626';
+        const icon  = ok
+            ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>'
+            : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>';
+        const ts = entry.checked_at ? ` <span style="opacity:.6;font-size:.8em;">(${entry.checked_at.replace('T',' ').replace('Z','')})</span>` : '';
+        setStatusBox(service, `<div style="display:flex;align-items:center;gap:0.5rem;color:${color};">
+            <svg style="width:1rem;height:1rem;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">${icon}</svg>
+            <span>${entry.message}${ts}</span></div>`);
+    }
+
+    async function initConnectionStatus() {
+        try {
+            const r = await fetch('/api/settings/connection-status');
+            if (!r.ok) { applyLocalStorageStatus(); return; }
+            const statuses = await r.json();
+            // Apply server cache (authoritative)
+            for (const [svc, entry] of Object.entries(statuses)) {
+                applyStatusFromCache(svc, entry);
+            }
+            // Fallback: localStorage for services not yet in server cache
+            for (const svc of ['tmdb', 'qbittorrent', 'flaresolverr']) {
+                if (!statuses[svc]) {
+                    const stored = localStorage.getItem(`svc_test_${svc}`);
+                    if (stored) try { applyStatusFromCache(svc, JSON.parse(stored)); } catch(e) {}
+                }
+            }
+        } catch(e) {
+            console.warn('Could not fetch connection status:', e);
+            applyLocalStorageStatus();
+        }
+    }
+
+    function applyLocalStorageStatus() {
+        const svcs = ['flaresolverr', 'qbittorrent', 'tmdb', 'prowlarr', 'radarr', 'sonarr'];
+        for (const svc of svcs) {
+            const stored = localStorage.getItem(`svc_test_${svc}`);
+            if (stored) try { applyStatusFromCache(svc, JSON.parse(stored)); } catch(e) {}
+        }
+    }
+
+    // Run on page load and every 5 minutes
+    document.addEventListener('DOMContentLoaded', initConnectionStatus);
+    setInterval(initConnectionStatus, 5 * 60 * 1000);
+
     // Sensitive fields that need masking in preview
-    const sensitiveFields = ['tracker_passkey', 'tmdb_api_key', 'prowlarr_api_key', 'qbittorrent_password'];
+    const sensitiveFields = ['tracker_passkey', 'tmdb_api_key', 'prowlarr_api_key', 'radarr_api_key', 'sonarr_api_key', 'qbittorrent_password'];
 
     // Field labels for better display
     const fieldLabels = {
@@ -703,6 +891,10 @@
         'tmdb_api_key': 'TMDB API Key',
         'prowlarr_url': 'Prowlarr URL',
         'prowlarr_api_key': 'Prowlarr API Key',
+        'radarr_url': 'Radarr URL',
+        'radarr_api_key': 'Radarr API Key',
+        'sonarr_url': 'Sonarr URL',
+        'sonarr_api_key': 'Sonarr API Key',
         'input_media_path': 'Input Media Path',
         'output_dir': 'Output Directory',
         'log_level': 'Log Level',
@@ -983,5 +1175,152 @@
         pendingImportFile = null;
         document.getElementById('import-file').value = '';
     }
+
+    // ─── Directory Picker ──────────────────────────────────────────────────
+    let dirPickerTargetField = null;
+    let dirPickerCurrentPath = '';
+    let dirPickerParentPath = null;
+
+    function openDirPicker(fieldName) {
+        dirPickerTargetField = fieldName;
+        const input = document.querySelector(`[name="${fieldName}"]`);
+        const startPath = input?.value || '';
+
+        document.getElementById('dir-picker-modal').style.display = 'flex';
+        document.getElementById('dir-picker-error').style.display = 'none';
+        loadDirPicker(startPath);
+    }
+
+    function closeDirPicker() {
+        document.getElementById('dir-picker-modal').style.display = 'none';
+        dirPickerTargetField = null;
+    }
+
+    function dirPickerUp() {
+        if (dirPickerParentPath !== null) {
+            loadDirPicker(dirPickerParentPath);
+        }
+    }
+
+    async function loadDirPicker(path) {
+        const listEl = document.getElementById('dir-picker-list');
+        const pathEl = document.getElementById('dir-picker-path');
+        const errorEl = document.getElementById('dir-picker-error');
+        const upBtn = document.getElementById('dir-picker-up');
+
+        listEl.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--text-muted);">Chargement...</div>';
+        errorEl.style.display = 'none';
+
+        try {
+            const url = `/api/settings/browse-dirs?path=${encodeURIComponent(path || '')}`;
+            const resp = await fetch(url);
+            const data = await resp.json();
+
+            dirPickerCurrentPath = data.path || '';
+            dirPickerParentPath = data.parent !== undefined ? data.parent : null;
+
+            pathEl.textContent = dirPickerCurrentPath || 'Racine';
+            upBtn.disabled = dirPickerParentPath === null;
+
+            if (data.error) {
+                errorEl.textContent = data.error;
+                errorEl.style.display = 'block';
+            }
+
+            if (data.dirs.length === 0 && !data.error) {
+                listEl.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--text-muted);font-size:0.85rem;">Aucun sous-dossier</div>';
+                return;
+            }
+
+            let html = '';
+            for (const dir of data.dirs) {
+                const iconClass = dir.is_drive ? 'dir-item-icon dir-item-drive' : 'dir-item-icon';
+                const icon = dir.is_drive
+                    ? '<svg class="' + iconClass + '" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>'
+                    : '<svg class="' + iconClass + '" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>';
+                // Store path as data attribute to avoid backslash escaping issues in onclick
+                // Drives: single click navigates into them. Folders: single click highlights, double click navigates.
+                const clickAction = dir.is_drive
+                    ? 'onclick="loadDirPicker(this.dataset.path)"'
+                    : 'onclick="highlightDir(this, this.dataset.path)" ondblclick="loadDirPicker(this.dataset.path)"';
+                html += `<div class="dir-item" data-path="${dir.path.replace(/"/g, '&quot;')}" ${clickAction}>
+                    ${icon}
+                    <span>${dir.name}</span>
+                </div>`;
+            }
+            listEl.innerHTML = html;
+
+        } catch (e) {
+            listEl.innerHTML = '<div style="padding:1.5rem;text-align:center;color:#ef4444;">Erreur de chargement</div>';
+            console.error('Dir picker error:', e);
+        }
+    }
+
+    let selectedDirPath = null;
+    function highlightDir(el, path) {
+        // Remove previous highlight
+        document.querySelectorAll('#dir-picker-list .dir-item').forEach(d => d.style.background = '');
+        el.style.background = 'var(--bg-tertiary)';
+        selectedDirPath = path;
+    }
+
+    function selectCurrentDir() {
+        // Use selected subdir if one is highlighted, otherwise use current path
+        const pathToUse = selectedDirPath || dirPickerCurrentPath;
+        if (dirPickerTargetField && pathToUse) {
+            const input = document.querySelector(`[name="${dirPickerTargetField}"]`);
+            if (input) {
+                input.value = pathToUse;
+                input.dispatchEvent(new Event('input'));
+            }
+        }
+        selectedDirPath = null;
+        closeDirPicker();
+    }
+
+    // Handle escape key for dir picker
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.getElementById('dir-picker-modal').style.display === 'flex') {
+            closeDirPicker();
+        }
+    });
+
+    // ─── Resolved Path Preview ─────────────────────────────────────────────
+    function updateResolvedPath(input, resolvedId) {
+        const value = input.value.trim();
+        const resolvedEl = document.getElementById(resolvedId);
+        if (!resolvedEl) return;
+
+        if (!value) {
+            resolvedEl.textContent = '';
+            return;
+        }
+
+        // Check if path is absolute (Windows drive letter or Unix /)
+        const isAbsolute = /^[A-Za-z]:[\\\/]/.test(value) || value.startsWith('/');
+        if (isAbsolute) {
+            resolvedEl.textContent = '';
+            return;
+        }
+
+        // Relative path: show resolved preview
+        const sourceDir = document.querySelector('[name="input_media_path"]')?.value?.trim() || '';
+        if (sourceDir) {
+            const sep = sourceDir.includes('\\') ? '\\' : '/';
+            const base = sourceDir.replace(/[\\\/]+$/, '');
+            resolvedEl.innerHTML = '<span style="color:#3b82f6;">&#8594; ' + base + sep + value + '</span>';
+        } else {
+            resolvedEl.innerHTML = '<span style="color:#f59e0b;">Chemin relatif &mdash; configurez le dossier source pour la résolution automatique</span>';
+        }
+    }
+
+    // Initialize resolved path previews on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const outputDir = document.querySelector('[name="output_dir"]');
+        if (outputDir && outputDir.value) updateResolvedPath(outputDir, 'resolved-output-dir');
+
+        const torrentDir = document.querySelector('[name="torrent_output_dir"]');
+        if (torrentDir && torrentDir.value) updateResolvedPath(torrentDir, 'resolved-torrent-dir');
+    });
 </script>
 {% endblock %}

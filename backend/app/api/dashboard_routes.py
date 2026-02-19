@@ -29,6 +29,7 @@ from typing import Optional
 
 from app.models.file_entry import FileEntry, Status
 from app.services.log_store import get_log_store
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,165 @@ templates = Jinja2Templates(directory=templates_dir)
 
 # Database dependency
 from app.database import get_db
+
+
+def _compute_tracker_upload_names(entry: FileEntry, trackers: list, db) -> list:
+    """
+    Compute the upload name for each tracker based on its naming template.
+    Uses stored names if available (post-metadata), otherwise derives from release_name.
+    Returns list of dicts: [{name, slug, release_name, is_preview}]
+    """
+    from app.services.universal_renamer import get_universal_renamer
+    from app.services.metadata_mapper import MetadataMapper
+
+    stored = entry.get_tracker_release_names()
+    results = []
+
+    for tracker in trackers:
+        # Use stored name if available (set during metadata stage)
+        if stored and tracker.slug in stored:
+            results.append({
+                'name': tracker.name,
+                'slug': tracker.slug,
+                'release_name': stored[tracker.slug],
+                'is_preview': False,
+            })
+            continue
+
+        # No naming template → show release_name as-is
+        if not tracker.naming_template:
+            results.append({
+                'name': tracker.name,
+                'slug': tracker.slug,
+                'release_name': entry.release_name or '—',
+                'is_preview': bool(entry.release_name),
+            })
+            continue
+
+        # Need release_name to derive tracker-specific name
+        if not entry.release_name:
+            results.append({
+                'name': tracker.name,
+                'slug': tracker.slug,
+                'release_name': '—',
+                'is_preview': False,
+            })
+            continue
+
+        try:
+            renamer = get_universal_renamer()
+            mapper = MetadataMapper(db)
+
+            # Hybrid approach:
+            # - release_name  → titre, année, langue, résolution, codec vidéo, team
+            # - mediainfo_data.audio_tracks → codec audio réel (MediaInfo)
+            # - mediainfo_data.parsed_from_filename → source/quality (fichier original)
+            release_parsed = mapper.parse_filename(entry.release_name)
+
+            metadata = entry.mediainfo_data or {}
+            orig_parsed = metadata.get('parsed_from_filename', {})
+            tmdb = metadata.get('tmdb', {})
+            audio_tracks = metadata.get('audio_tracks', [])
+            video_tracks = metadata.get('video_tracks', [])
+
+            # Audio codec: from MediaInfo tracks (release_name rarely includes it)
+            audio_codec = release_parsed.get('audio') or orig_parsed.get('audio')
+            if not audio_codec and audio_tracks:
+                af = (audio_tracks[0].get('codec') or '').upper()
+                for k, v in [('TRUEHD', 'TrueHD'), ('ATMOS', 'Atmos'),
+                             ('DTS-HD MA', 'DTS-HD.MA'), ('DTS-HD', 'DTS-HD'),
+                             ('DTS', 'DTS'), ('EAC3', 'EAC3'), ('E-AC-3', 'EAC3'),
+                             ('AC3', 'AC3'), ('AC-3', 'AC3'),
+                             ('AAC', 'AAC'), ('FLAC', 'FLAC')]:
+                    if k in af:
+                        audio_codec = v
+                        break
+
+            # Audio channels: from MediaInfo tracks
+            audio_channels = None
+            if audio_tracks:
+                ch = str(audio_tracks[0].get('channels', ''))
+                audio_channels = {'2': '2.0', '6': '5.1', '8': '7.1', '1': '1.0'}.get(ch, ch or None)
+                if audio_tracks[0].get('channel_layout'):
+                    layout = audio_tracks[0].get('channel_layout', '')
+                    if '5.1' in layout:
+                        audio_channels = '5.1'
+                    elif '7.1' in layout:
+                        audio_channels = '7.1'
+
+            # Video codec: from release_name first, then MediaInfo
+            video_codec = release_parsed.get('codec')
+            if not video_codec and video_tracks:
+                vf = (video_tracks[0].get('codec') or '').upper()
+                if 'HEVC' in vf or 'H265' in vf:
+                    video_codec = 'x265'
+                elif 'AVC' in vf or 'H264' in vf:
+                    video_codec = 'x264'
+
+            # Source: from original filename parsing (release_name rarely has it)
+            source = orig_parsed.get('source') or release_parsed.get('source') or ''
+
+            # Quality: HDLight/REMUX — check release_name then original filename
+            release_lower = entry.release_name.lower()
+            orig_lower = (entry.file_path or '').lower()
+            quality = ''
+            if 'hdlight' in release_lower or 'hd.light' in release_lower:
+                quality = 'HDLight'
+            elif 'remux' in release_lower:
+                quality = 'REMUX'
+            elif 'hdlight' in orig_lower:
+                quality = 'HDLight'
+            elif 'remux' in orig_lower:
+                quality = 'REMUX'
+            elif source and 'web' in source.lower():
+                quality = 'HDLight'
+
+            # Titles from TMDB
+            parsed_title = (release_parsed.get('title') or '').title() or None
+            title_fr = tmdb.get('title') or parsed_title or entry.release_name
+            title_en = tmdb.get('original_title') or parsed_title or title_fr
+
+            # Team: from release_name (.mkv suffix prevents stripping group tag as extension)
+            team = renamer.extract_team_from_filename(entry.release_name + '.mkv') or 'NOTAG'
+
+            # Normalize language: VFF/TRUEFRENCH/VOF/VFQ are variants of FRENCH.
+            # The template {langue}.{vff} handles the pairing (e.g. FRENCH.VFF).
+            # Passing 'VFF' directly would produce 'VFF.VFF'.
+            lang = release_parsed.get('language') or orig_parsed.get('language') or 'FRENCH'
+            if lang in ('VFF', 'TRUEFRENCH', 'VOF', 'VFQ', 'VFI', 'VF2'):
+                lang = 'FRENCH'
+
+            template_metadata = renamer.build_template_metadata(
+                title=title_fr,
+                year=tmdb.get('year') or release_parsed.get('year'),
+                language=lang,
+                resolution=release_parsed.get('resolution') or orig_parsed.get('resolution'),
+                source=source,
+                audio_codec=audio_codec,
+                video_codec=video_codec,
+                team=team,
+                quality=quality,
+                audio_channels=audio_channels,
+                title_fr=title_fr,
+                title_en=title_en,
+            )
+
+            computed_name = renamer.format_with_template(tracker.naming_template, template_metadata)
+            results.append({
+                'name': tracker.name,
+                'slug': tracker.slug,
+                'release_name': computed_name,
+                'is_preview': True,
+            })
+        except Exception:
+            results.append({
+                'name': tracker.name,
+                'slug': tracker.slug,
+                'release_name': entry.release_name or '—',
+                'is_preview': bool(entry.release_name),
+            })
+
+    return results
 
 
 def _transform_jobs_for_queue(entries: list) -> list:
@@ -824,6 +984,11 @@ async def release_details_page(request: Request, release_id: int, db: Session = 
         # Calculate progress
         progress = _calculate_progress(entry.status)
 
+        # Compute tracker upload names for all active trackers
+        from app.models.tracker import Tracker
+        active_trackers = Tracker.get_upload_enabled(db)
+        tracker_upload_names = _compute_tracker_upload_names(entry, active_trackers, db)
+
         # Build release object for template
         release = {
             "id": entry.id,
@@ -856,6 +1021,7 @@ async def release_details_page(request: Request, release_id: int, db: Session = 
             "tracker_torrent_url": entry.tracker_torrent_url,
             "torrent_paths": entry.get_torrent_paths(),
             "tracker_release_names": entry.get_tracker_release_names(),
+            "tracker_upload_names": tracker_upload_names,
             # Approval workflow
             "approval_requested_at": entry.approval_requested_at,
             "approved_at": entry.approved_at,
@@ -1933,12 +2099,15 @@ async def delete_job(
 
         logger.info(f"Deleted job {job_id} from queue")
 
-        # Re-fetch and return updated queue content
+        # Re-fetch and return updated queue content (same format as refresh_queue)
         entries = db.query(FileEntry).filter(
             FileEntry.status.notin_([Status.UPLOADED, Status.FAILED])
-        ).order_by(FileEntry.updated_at.desc()).all()
+        ).order_by(FileEntry.updated_at.desc()).limit(20).all()
 
-        # Transform entries to job format for template
+        total_count = db.query(FileEntry).filter(
+            FileEntry.status.notin_([Status.UPLOADED, Status.FAILED])
+        ).count()
+
         active_jobs = []
         for entry in entries:
             filename = os.path.basename(entry.file_path) if entry.file_path else "Unknown"
@@ -1960,15 +2129,27 @@ async def delete_job(
                 "progress": progress,
                 "current_stage": entry.status.value.replace("_", " ").title() if entry.status else "Unknown",
                 "created_at": entry.created_at,
-                "error_message": entry.error_message
+                "error_message": entry.error_message,
+                "release_name": entry.release_name,
+                "final_release_name": getattr(entry, 'final_release_name', None),
+                "tmdb_id": entry.tmdb_id,
+                "tmdb_type": entry.tmdb_type,
+                "cover_url": entry.cover_url,
+                "tracker_statuses": entry.tracker_statuses if entry.tracker_statuses else {},
+                "duplicate_check_results": entry.duplicate_check_results if hasattr(entry, 'duplicate_check_results') and entry.duplicate_check_results else None,
             })
 
         return templates.TemplateResponse(
-            "components/queue_table.html",
+            "components/queue_content.html",
             {
                 "request": request,
                 "active_jobs": active_jobs,
-                "waiting_jobs": []
+                "total_count": total_count,
+                "offset": 0,
+                "limit": 20,
+                "search": "",
+                "has_more": total_count > 20,
+                "next_offset": 20
             }
         )
 
@@ -2593,59 +2774,94 @@ async def get_system_health(request: Request, db: Session = Depends(get_db)):
     """
     Get system health status for sidebar indicators.
 
-    Returns HTML fragment with health indicators for qBittorrent, FlareSolverr, and Tracker.
+    Returns HTML fragment with grouped health indicators for all services.
     Used by the sidebar via HTMX to show real-time service status.
     """
     from app.models.settings import Settings
-    settings = Settings.get_settings(db)
-
-    system_status = {
-        "qbittorrent": "unknown",
-        "flaresolverr": "unknown",
-        "tracker": "unknown"
-    }
-
-    # Check qBittorrent status if configured
-    if settings and settings.qbittorrent_host:
-        qb_url = settings.qbittorrent_host
-        if not qb_url.startswith(('http://', 'https://')):
-            qb_url = f"http://{qb_url}"
-        system_status["qbittorrent"] = await check_service_health(f"{qb_url}/api/v2/app/version", timeout=3)
-
-    # Check FlareSolverr status if configured
-    if settings and settings.flaresolverr_url:
-        flaresolverr_url = settings.flaresolverr_url.rstrip('/')
-        system_status["flaresolverr"] = await check_service_health(f"{flaresolverr_url}/health", timeout=3)
-
-    # Tracker status - Check if any tracker is configured and enabled
     from app.models.tracker import Tracker
+    from app.services.connection_health_service import get_cached_status
+
+    settings = Settings.get_settings(db)
+    cached = get_cached_status()
+
+    def cached_svc(name):
+        """Convert cached entry → (status, msg)."""
+        entry = cached.get(name)
+        if not entry:
+            return "unknown", None
+        ok = entry['status'] == 'success'
+        return ("connected" if ok else "disconnected"), entry.get('message')
+
+    def dot_class(status):
+        return {
+            "connected": "",
+            "disconnected": "error",
+            "unknown": "warning",
+            "unconfigured": "unconfigured",
+        }.get(status, "warning")
+
+    # ── qBittorrent – from cache ──────────────────────────────────────────
+    qb_status, _ = cached_svc('qbittorrent')
+    if qb_status == "unknown" and not (settings and settings.qbittorrent_host):
+        qb_status = "unconfigured"
+
+    # ── FlareSolverr – from cache ─────────────────────────────────────────
+    fs_status, _ = cached_svc('flaresolverr')
+    if fs_status == "unknown" and not (settings and settings.flaresolverr_url):
+        fs_status = "unconfigured"
+
+    # ── TMDB – key presence ───────────────────────────────────────────────
+    tmdb_status = "connected" if (settings and settings.tmdb_api_key) else "unconfigured"
+
+    # ── Prowlarr – from cache ─────────────────────────────────────────────
+    prowlarr_status, _ = cached_svc('prowlarr')
+    if prowlarr_status == "unknown" and not (settings and settings.prowlarr_url):
+        prowlarr_status = "unconfigured"
+
+    # ── Radarr – from cache ───────────────────────────────────────────────
+    radarr_status, _ = cached_svc('radarr')
+    if radarr_status == "unknown" and not (settings and settings.radarr_url):
+        radarr_status = "unconfigured"
+
+    # ── Sonarr – from cache ───────────────────────────────────────────────
+    sonarr_status, _ = cached_svc('sonarr')
+    if sonarr_status == "unknown" and not (settings and settings.sonarr_url):
+        sonarr_status = "unconfigured"
+
+    # ── Trackers – DB count ───────────────────────────────────────────────
     enabled_trackers = db.query(Tracker).filter(Tracker.enabled == True).count()
-    if enabled_trackers > 0:
-        system_status["tracker"] = "connected"
+    tracker_status = "connected" if enabled_trackers > 0 else "unknown"
+    tracker_msg = f"{enabled_trackers} actif(s)" if enabled_trackers > 0 else None
 
-    # Generate HTML for sidebar health indicators
-    def get_dot_class(status):
-        if status == "connected":
-            return ""
-        elif status == "disconnected":
-            return "error"
-        else:
-            return "warning"
+    def indicator(name, status, msg=None):
+        dc = dot_class(status)
+        msg_html = f'<span class="health-msg">{msg}</span>' if msg else ''
+        return (
+            f'<div class="health-indicator">'
+            f'<span class="health-dot {dc}"></span>'
+            f'<div class="health-label-wrap">'
+            f'<span class="health-name">{name}</span>{msg_html}'
+            f'</div></div>'
+        )
 
-    html = f"""
-    <div class="health-indicator">
-        <span class="health-dot {get_dot_class(system_status['qbittorrent'])}"></span>
-        <span>qBittorrent</span>
-    </div>
-    <div class="health-indicator">
-        <span class="health-dot {get_dot_class(system_status['flaresolverr'])}"></span>
-        <span>FlareSolverr</span>
-    </div>
-    <div class="health-indicator">
-        <span class="health-dot {get_dot_class(system_status['tracker'])}"></span>
-        <span>Tracker</span>
-    </div>
-    """
+    html = (
+        '<div class="health-group">'
+        '<div class="health-group-label">Infrastructure</div>'
+        + indicator("qBittorrent", qb_status)
+        + indicator("FlareSolverr", fs_status)
+        + indicator("TMDB", tmdb_status)
+        + '</div>'
+        '<div class="health-group">'
+        '<div class="health-group-label">*arr Stack</div>'
+        + indicator("Prowlarr", prowlarr_status)
+        + indicator("Radarr", radarr_status)
+        + indicator("Sonarr", sonarr_status)
+        + '</div>'
+        '<div class="health-group">'
+        '<div class="health-group-label">Trackers</div>'
+        + indicator("Tracker", tracker_status, tracker_msg)
+        + '</div>'
+    )
 
     return html
 
@@ -3156,22 +3372,46 @@ async def send_to_qbittorrent(
                 "message": f"Torrent file not found for tracker '{tracker_slug}'"
             }
 
-        # Create pipeline instance to use _inject_to_qbittorrent
-        pipeline = ProcessingPipeline(db)
+        # Use QBittorrentClient for injection
+        from app.services.qbittorrent_client import get_qbittorrent_client_from_settings, QBittorrentError
+        from app.models.settings import Settings
 
-        # Inject to qBittorrent with tracker tag
-        await pipeline._inject_to_qbittorrent(
-            file_entry=file_entry,
-            torrent_path=torrent_path,
-            tracker_slug=tracker_slug
+        settings = Settings.get_settings(db)
+        qbit_client = get_qbittorrent_client_from_settings(settings)
+
+        if not qbit_client:
+            return {
+                "status": "error",
+                "message": "qBittorrent not configured. Please set qBittorrent settings."
+            }
+
+        # Determine save path: per-tracker release_dir if available, else main release_dir
+        tracker_data = file_entry.get_tracker_status(tracker_slug) or {}
+        save_path = (
+            tracker_data.get('release_dir')
+            or file_entry.release_dir
+            or str(Path(file_entry.file_path).parent)
         )
 
-        logger.info(f"Manually sent torrent to qBittorrent for release {release_id}, tracker {tracker_slug}")
+        result = await qbit_client.inject_torrent(
+            torrent_path=torrent_path,
+            save_path=save_path,
+            category="TP",
+            tags=tracker_slug.upper(),
+            skip_checking=True,
+        )
 
-        return {
-            "status": "success",
-            "message": f"Torrent sent to qBittorrent with tag {tracker_slug.upper()}"
-        }
+        if result.get('success'):
+            logger.info(f"Manually sent torrent to qBittorrent for release {release_id}, tracker {tracker_slug}")
+            return {
+                "status": "success",
+                "message": f"Torrent sent to qBittorrent with tag {tracker_slug.upper()}"
+            }
+        else:
+            return {
+                "status": "error",
+                "message": result.get('message', 'Unknown error')
+            }
 
     except Exception as e:
         error_msg = f"{type(e).__name__}: {e}"
@@ -3379,6 +3619,41 @@ async def check_release_duplicates(
 
 
 # ============================================================================
+# Tracker Release Name Override
+# ============================================================================
+
+@router.patch("/api/releases/{release_id}/tracker-name")
+async def update_tracker_release_name(
+    release_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Save a user-edited tracker-specific release name."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    body = await request.json()
+    tracker_slug = body.get("tracker_slug", "").strip()
+    release_name = body.get("release_name", "").strip()
+
+    if not tracker_slug or not release_name:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "tracker_slug and release_name required"}, status_code=400)
+
+    entry = db.query(FileEntry).filter(FileEntry.id == release_id).first()
+    if not entry:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Release not found"}, status_code=404)
+
+    names = entry.get_tracker_release_names()
+    names[tracker_slug] = release_name
+    entry.tracker_release_names = names
+    flag_modified(entry, "tracker_release_names")
+    db.commit()
+
+    return {"status": "ok", "tracker_slug": tracker_slug, "release_name": release_name}
+
+
+# ============================================================================
 # Manual Processing Step Endpoints
 # ============================================================================
 
@@ -3406,7 +3681,7 @@ async def execute_processing_step(
     from ..models.settings import Settings
     from ..adapters.tracker_factory import TrackerFactory
 
-    valid_steps = ['scan', 'analyze', 'rename', 'metadata', 'upload']
+    valid_steps = ['scan', 'analyze', 'scan_analyze', 'rename', 'prepare', 'metadata', 'upload']
 
     if step_name not in valid_steps:
         return {
@@ -3433,6 +3708,12 @@ async def execute_processing_step(
             await pipeline._scan_stage(file_entry)
             message = "Scan completed successfully"
 
+        elif step_name == 'scan_analyze':
+            await pipeline._scan_stage(file_entry)
+            db.commit()
+            await pipeline._analyze_stage(file_entry)
+            message = "Scan & Analysis completed successfully"
+
         elif step_name == 'analyze':
             await pipeline._analyze_stage(file_entry)
             message = "Analysis completed successfully"
@@ -3441,7 +3722,14 @@ async def execute_processing_step(
             await pipeline._rename_stage(file_entry)
             message = "Rename completed successfully"
 
+        elif step_name == 'prepare':
+            await pipeline._prepare_files_stage(file_entry)
+            message = "File preparation completed successfully"
+
         elif step_name == 'metadata':
+            if not file_entry.renamed_at:
+                await pipeline._rename_stage(file_entry)
+                db.commit()
             await pipeline._metadata_generation_stage(file_entry)
             message = "Metadata generation completed successfully"
 

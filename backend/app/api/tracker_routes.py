@@ -73,6 +73,11 @@ class TrackerCreate(BaseModel):
     default_category_id: Optional[str] = Field(None, description="Default category ID")
     default_subcategory_id: Optional[str] = Field(None, description="Default subcategory ID")
 
+    # Hardlink & torrent management (v2.5)
+    hardlink_dir: Optional[str] = Field(None, description="Per-tracker hardlink output directory")
+    torrent_dir: Optional[str] = Field(None, description="Per-tracker torrent output directory")
+    inject_to_qbit: bool = Field(True, description="Auto-inject torrent to qBittorrent")
+
     # Options
     requires_cloudflare: bool = Field(False, description="Requires FlareSolverr")
     upload_enabled: bool = Field(True, description="Enable uploads")
@@ -101,6 +106,11 @@ class TrackerUpdate(BaseModel):
     category_mapping: Optional[Dict[str, Any]] = None
     upload_config: Optional[Dict[str, Any]] = None
 
+    # Hardlink & torrent management (v2.5)
+    hardlink_dir: Optional[str] = None
+    torrent_dir: Optional[str] = None
+    inject_to_qbit: Optional[bool] = None
+
     requires_cloudflare: Optional[bool] = None
     upload_enabled: Optional[bool] = None
     priority: Optional[int] = None
@@ -126,6 +136,9 @@ class TrackerResponse(BaseModel):
     naming_template: Optional[str] = None  # Release naming template
     category_mapping: Optional[Dict[str, Any]] = None
     upload_config: Optional[Dict[str, Any]] = None
+    hardlink_dir: Optional[str] = None
+    torrent_dir: Optional[str] = None
+    inject_to_qbit: Optional[bool] = True
     requires_cloudflare: bool
     upload_enabled: bool
     priority: int

@@ -19,16 +19,19 @@ Security:
     - Export includes all fields including sensitive ones for full backup/restore
 """
 
-from fastapi import APIRouter, Depends, Request, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, Request, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime, timezone
+from pathlib import Path
 import logging
 import json
 import httpx
+import platform
+import string
 
 from app.models.settings import Settings
 from app.models.validators import (
@@ -106,9 +109,24 @@ class SettingsUpdateRequest(BaseModel):
         min_length=16
     )
 
+    # Radarr/Sonarr integration
+    radarr_url: Optional[str] = Field(
+        None,
+        description="Radarr instance URL",
+        examples=["http://localhost:7878"]
+    )
+    radarr_api_key: Optional[str] = Field(None, description="Radarr API key")
+    sonarr_url: Optional[str] = Field(
+        None,
+        description="Sonarr instance URL",
+        examples=["http://localhost:8989"]
+    )
+    sonarr_api_key: Optional[str] = Field(None, description="Sonarr API key")
+
     # Directory paths - validated for path traversal
     input_media_path: Optional[str] = Field(None, description="Input media directory path")
     output_dir: Optional[str] = Field(None, description="Output directory path")
+    torrent_output_dir: Optional[str] = Field(None, description="Dedicated folder for .torrent files")
 
     # Application settings with bounds
     log_level: Optional[str] = Field(
@@ -130,13 +148,13 @@ class SettingsUpdateRequest(BaseModel):
     )
 
     # Validators using Pydantic v2 syntax
-    @field_validator('tracker_url', 'flaresolverr_url', 'prowlarr_url', mode='before')
+    @field_validator('tracker_url', 'flaresolverr_url', 'prowlarr_url', 'radarr_url', 'sonarr_url', mode='before')
     @classmethod
     def validate_url_fields(cls, v: Optional[str]) -> Optional[str]:
         """Validate URL fields have proper http/https format."""
         return url_validator(v)
 
-    @field_validator('input_media_path', 'output_dir', 'qbittorrent_content_path', mode='before')
+    @field_validator('input_media_path', 'output_dir', 'torrent_output_dir', 'qbittorrent_content_path', mode='before')
     @classmethod
     def validate_path_fields(cls, v: Optional[str]) -> Optional[str]:
         """Validate and sanitize path fields, blocking path traversal."""
@@ -161,9 +179,15 @@ class SettingsResponse(BaseModel):
     # Prowlarr integration
     prowlarr_url: Optional[str]
     prowlarr_api_key: Optional[str]
+    # Radarr/Sonarr integration
+    radarr_url: Optional[str]
+    radarr_api_key: Optional[str]
+    sonarr_url: Optional[str]
+    sonarr_api_key: Optional[str]
     # Directory paths
     input_media_path: Optional[str]
     output_dir: Optional[str]
+    torrent_output_dir: Optional[str]
     # Application settings
     log_level: Optional[str]
     tmdb_cache_ttl_days: Optional[int]
@@ -194,12 +218,17 @@ async def settings_page(request: Request, db: Session = Depends(get_db)):
         # Pass settings to template (unmask for editing)
         settings_dict = settings.to_dict(mask_secrets=False)
 
+        # OS detection for hardlink compatibility warnings
+        from app.services.hardlink_manager import HardlinkManager
+        os_info = HardlinkManager.detect_os_info()
+
         return templates.TemplateResponse(
             "settings.html",
             {
                 "request": request,
                 "settings": settings_dict,
-                "log_levels": ["DEBUG", "INFO", "WARNING", "ERROR"]
+                "log_levels": ["DEBUG", "INFO", "WARNING", "ERROR"],
+                "os_info": os_info,
             }
         )
     except Exception as e:
@@ -416,7 +445,7 @@ async def import_settings(
                 )
 
         # Validate URLs
-        url_fields = ['tracker_url', 'flaresolverr_url', 'prowlarr_url']
+        url_fields = ['tracker_url', 'flaresolverr_url', 'prowlarr_url', 'radarr_url', 'sonarr_url']
         for field in url_fields:
             if field in update_data and update_data[field]:
                 if not validate_url(update_data[field]):
@@ -426,7 +455,7 @@ async def import_settings(
                     )
 
         # Validate and sanitize paths
-        path_fields = ['input_media_path', 'output_dir']
+        path_fields = ['input_media_path', 'output_dir', 'torrent_output_dir']
         for field in path_fields:
             if field in update_data and update_data[field]:
                 # Sanitize path
@@ -1004,6 +1033,88 @@ async def test_connection(
                     "status": "error",
                     "message": f"Connection error: {str(e)}"
                 }
+        elif service == "radarr":
+            test_url = url or settings.radarr_url
+            test_key = api_key or settings.radarr_api_key
+
+            if not test_url or not test_key:
+                return {
+                    "service": service,
+                    "status": "error",
+                    "message": "URL et API key requis pour Radarr"
+                }
+
+            try:
+                from app.services.radarr_client import RadarrClient
+                client = RadarrClient(base_url=test_url, api_key=test_key)
+                health = await client.health_check()
+
+                if health.get('healthy'):
+                    logger.info(f"Radarr connection test successful: v{health.get('version')}")
+                    return {
+                        "service": service,
+                        "status": "success",
+                        "message": f"Connecté à Radarr v{health.get('version')}",
+                        "url": test_url,
+                        "version": health.get('version')
+                    }
+                else:
+                    return {
+                        "service": service,
+                        "status": "error",
+                        "message": health.get('error', 'Connexion échouée'),
+                        "url": test_url
+                    }
+
+            except httpx.TimeoutException:
+                return {"service": service, "status": "error", "message": "Timeout. Vérifiez que Radarr est démarré."}
+            except httpx.ConnectError:
+                return {"service": service, "status": "error", "message": "Impossible de se connecter à Radarr. Vérifiez l'URL."}
+            except Exception as e:
+                logger.error(f"Radarr connection test error: {e}")
+                return {"service": service, "status": "error", "message": f"Erreur de connexion: {str(e)}"}
+
+        elif service == "sonarr":
+            test_url = url or settings.sonarr_url
+            test_key = api_key or settings.sonarr_api_key
+
+            if not test_url or not test_key:
+                return {
+                    "service": service,
+                    "status": "error",
+                    "message": "URL et API key requis pour Sonarr"
+                }
+
+            try:
+                from app.services.sonarr_client import SonarrClient
+                client = SonarrClient(base_url=test_url, api_key=test_key)
+                health = await client.health_check()
+
+                if health.get('healthy'):
+                    logger.info(f"Sonarr connection test successful: v{health.get('version')}")
+                    return {
+                        "service": service,
+                        "status": "success",
+                        "message": f"Connecté à Sonarr v{health.get('version')}",
+                        "url": test_url,
+                        "version": health.get('version')
+                    }
+                else:
+                    return {
+                        "service": service,
+                        "status": "error",
+                        "message": health.get('error', 'Connexion échouée'),
+                        "url": test_url
+                    }
+
+            except httpx.TimeoutException:
+                return {"service": service, "status": "error", "message": "Timeout. Vérifiez que Sonarr est démarré."}
+            except httpx.ConnectError:
+                return {"service": service, "status": "error", "message": "Impossible de se connecter à Sonarr. Vérifiez l'URL."}
+            except Exception as e:
+                logger.error(f"Sonarr connection test error: {e}")
+                return {"service": service, "status": "error", "message": f"Erreur de connexion: {str(e)}"}
+
         else:
             raise HTTPException(
                 status_code=400,
@@ -1040,8 +1151,15 @@ async def save_settings_html(
     tmdb_api_key: Optional[str] = Form(None),
     prowlarr_url: Optional[str] = Form(None),
     prowlarr_api_key: Optional[str] = Form(None),
+    radarr_url: Optional[str] = Form(None),
+    radarr_api_key: Optional[str] = Form(None),
+    sonarr_url: Optional[str] = Form(None),
+    sonarr_api_key: Optional[str] = Form(None),
     input_media_path: Optional[str] = Form(None),
     output_dir: Optional[str] = Form(None),
+    torrent_output_dir: Optional[str] = Form(None),
+    hardlink_enabled: Optional[str] = Form(None),
+    hardlink_fallback_copy: Optional[str] = Form(None),
     log_level: Optional[str] = Form(None),
     tmdb_cache_ttl_days: Optional[int] = Form(None),
     tag_sync_interval_hours: Optional[int] = Form(None),
@@ -1065,6 +1183,7 @@ async def save_settings_html(
         # Sanitize path inputs to remove invisible Unicode characters
         input_media_path = sanitize_path(input_media_path)
         output_dir = sanitize_path(output_dir)
+        torrent_output_dir = sanitize_path(torrent_output_dir)
         qbittorrent_content_path = sanitize_path(qbittorrent_content_path)
 
         # Build update data from form fields
@@ -1090,10 +1209,29 @@ async def save_settings_html(
             update_data['prowlarr_url'] = prowlarr_url
         if prowlarr_api_key is not None:
             update_data['prowlarr_api_key'] = prowlarr_api_key
+        if radarr_url is not None:
+            update_data['radarr_url'] = radarr_url
+        if radarr_api_key is not None:
+            update_data['radarr_api_key'] = radarr_api_key
+        if sonarr_url is not None:
+            update_data['sonarr_url'] = sonarr_url
+        if sonarr_api_key is not None:
+            update_data['sonarr_api_key'] = sonarr_api_key
         if input_media_path is not None:
             update_data['input_media_path'] = input_media_path
         if output_dir is not None:
             update_data['output_dir'] = output_dir
+        if torrent_output_dir is not None:
+            update_data['torrent_output_dir'] = torrent_output_dir
+        # Hardlink toggles (checkbox values: 'on' = enabled, None/absent = disabled)
+        if hardlink_enabled is not None:
+            update_data['hardlink_enabled'] = hardlink_enabled == 'on'
+        else:
+            update_data['hardlink_enabled'] = False
+        if hardlink_fallback_copy is not None:
+            update_data['hardlink_fallback_copy'] = hardlink_fallback_copy == 'on'
+        else:
+            update_data['hardlink_fallback_copy'] = False
         if log_level is not None:
             update_data['log_level'] = log_level
         if tmdb_cache_ttl_days is not None:
@@ -1230,8 +1368,93 @@ async def export_configuration(db: Session = Depends(get_db)):
 
 
 # ============================================================================
+# Directory Browser Endpoint
+# ============================================================================
+
+
+@router.get("/api/settings/browse-dirs")
+async def browse_directories(
+    path: Optional[str] = Query(None, description="Directory path to browse. If empty, lists drive roots (Windows) or / (Linux)."),
+):
+    """
+    List subdirectories for a given path. Used by the directory picker UI.
+
+    Returns a JSON list of directories with their names and full paths.
+    On Windows with no path, returns available drive letters.
+    """
+    try:
+        items = []
+
+        if not path or path.strip() == '':
+            # Root level: list drives on Windows, / on Linux
+            if platform.system() == 'Windows':
+                for letter in string.ascii_uppercase:
+                    drive = f"{letter}:\\"
+                    drive_path = Path(drive)
+                    if drive_path.exists():
+                        items.append({
+                            "name": f"{letter}:",
+                            "path": str(drive_path),
+                            "is_drive": True,
+                        })
+                return {"path": "", "parent": None, "dirs": items}
+            else:
+                path = "/"
+
+        p = Path(path)
+
+        if not p.exists():
+            return {"path": str(p), "parent": str(p.parent), "dirs": [], "error": "Le dossier n'existe pas"}
+
+        if not p.is_dir():
+            return {"path": str(p), "parent": str(p.parent), "dirs": [], "error": "Ce n'est pas un dossier"}
+
+        # Compute parent path
+        parent = str(p.parent) if p.parent != p else None
+        # On Windows, if we're at a drive root like C:\, parent should go back to drive list
+        if platform.system() == 'Windows' and p.parent == p:
+            parent = ""
+
+        # List subdirectories
+        try:
+            for item in sorted(p.iterdir(), key=lambda x: x.name.lower()):
+                if item.is_dir() and not item.name.startswith('.'):
+                    items.append({
+                        "name": item.name,
+                        "path": str(item),
+                    })
+        except PermissionError:
+            return {"path": str(p), "parent": parent, "dirs": [], "error": "Permission refusée"}
+
+        return {
+            "path": str(p),
+            "parent": parent,
+            "dirs": items,
+        }
+
+    except Exception as e:
+        logger.error(f"Error browsing directory: {e}")
+        return {"path": path or "", "parent": None, "dirs": [], "error": str(e)}
+
+
+# ============================================================================
 # Tag Diagnostics and Sync Endpoints
 # ============================================================================
+
+
+@router.get("/api/settings/connection-status")
+async def get_connection_status():
+    """
+    Return cached connection status for all external services.
+
+    The status is refreshed by a background task on startup and every 5 minutes.
+    Frontend uses this to restore button/status-box states on page load.
+
+    Returns:
+        Dict[service_name, {status, message, checked_at}]
+    """
+    from app.services.connection_health_service import get_cached_status
+    return get_cached_status()
 
 
 @router.get("/api/tags/list")
