@@ -48,4 +48,5 @@ echo "Migrations complete."
 
 # Start the application as seedarr user
 echo "Starting Seedarr..."
+cd /app
 exec gosu seedarr uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --log-config /app/backend/logging_config.json
