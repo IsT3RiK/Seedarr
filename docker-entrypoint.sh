@@ -22,6 +22,15 @@ fi
 # Create data directory if it doesn't exist
 mkdir -p /app/backend/data
 
+# If DATABASE_URL points to a custom path, ensure that directory exists too
+if [ -n "$DATABASE_URL" ]; then
+    DB_DIR=$(echo "$DATABASE_URL" | sed 's|sqlite:///||' | xargs dirname 2>/dev/null || true)
+    if [ -n "$DB_DIR" ] && [ "$DB_DIR" != "." ]; then
+        mkdir -p "$DB_DIR"
+        chown -R seedarr:seedarr "$DB_DIR"
+    fi
+fi
+
 # Fix permissions on data directory (writable)
 chown -R seedarr:seedarr /app/backend/data
 

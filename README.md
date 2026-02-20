@@ -40,24 +40,24 @@ Accessible sur http://localhost:8000
 
 ## Pages
 
-| Page | Route | Description |
-|------|-------|-------------|
-| Dashboard | `/dashboard` | Vue d'ensemble pipeline |
-| Queue | `/queue` | File d'attente |
-| File Manager | `/filemanager` | Navigateur fichiers |
-| History | `/history` | Historique uploads |
-| Trackers | `/trackers` | Gestion trackers |
-| Templates | `/bbcode-templates` | Templates BBCode |
-| Statistics | `/statistics` | Statistiques |
-| Settings | `/settings` | Configuration |
+| Page         | Route               | Description             |
+| ------------ | ------------------- | ----------------------- |
+| Dashboard    | `/dashboard`        | Vue d'ensemble pipeline |
+| Queue        | `/queue`            | File d'attente          |
+| File Manager | `/filemanager`      | Navigateur fichiers     |
+| History      | `/history`          | Historique uploads      |
+| Trackers     | `/trackers`         | Gestion trackers        |
+| Templates    | `/bbcode-templates` | Templates BBCode        |
+| Statistics   | `/statistics`       | Statistiques            |
+| Settings     | `/settings`         | Configuration           |
 
 ## Trackers supportes
 
-| Tracker | Adapter | Auth | Cloudflare |
-|---------|---------|------|------------|
-| La Cale | lacale | Passkey | Oui |
-| C411 | c411 | API Key | Non |
-| Generic | generic | Passkey | Non |
+| Tracker | Adapter | Auth    | Cloudflare |
+| ------- | ------- | ------- | ---------- |
+| La Cale | lacale  | Passkey | Oui        |
+| C411    | c411    | API Key | Non        |
+| Generic | generic | Passkey | Non        |
 
 ## Services requis
 
