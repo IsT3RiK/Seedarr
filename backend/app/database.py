@@ -15,7 +15,11 @@ DATABASE_URL = Config.DATABASE_URL
 # Create database directory if it doesn't exist
 db_dir = os.path.dirname(DATABASE_URL.replace('sqlite:///', ''))
 if db_dir and not os.path.exists(db_dir):
-    os.makedirs(db_dir, exist_ok=True)
+    try:
+        os.makedirs(db_dir, exist_ok=True)
+    except PermissionError:
+        import logging
+        logging.warning(f"Cannot create database directory '{db_dir}' - ensure it exists with proper permissions")
 
 # SQLAlchemy engine and session
 engine = create_engine(

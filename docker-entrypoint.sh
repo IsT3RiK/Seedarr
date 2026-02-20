@@ -19,26 +19,20 @@ if ! id -u seedarr > /dev/null 2>&1; then
     useradd -u "$PUID" -g "$PGID" -d /app -s /bin/bash seedarr
 fi
 
-# Create data directory if it doesn't exist
-mkdir -p /app/backend/data
+# Resolve database path from DATABASE_URL (default: /app/backend/data/seedarr.db)
+DATABASE_URL="${DATABASE_URL:-sqlite:////app/backend/data/seedarr.db}"
+DB_FILE="${DATABASE_URL#sqlite:///}"
+DB_DIR="$(dirname "$DB_FILE")"
 
-# If DATABASE_URL points to a custom path, ensure that directory exists too
-if [ -n "$DATABASE_URL" ]; then
-    DB_DIR=$(echo "$DATABASE_URL" | sed 's|sqlite:///||' | xargs dirname 2>/dev/null || true)
-    if [ -n "$DB_DIR" ] && [ "$DB_DIR" != "." ]; then
-        mkdir -p "$DB_DIR"
-        chown -R seedarr:seedarr "$DB_DIR"
-    fi
-fi
-
-# Fix permissions on data directory (writable)
-chown -R seedarr:seedarr /app/backend/data
+# Ensure database directory exists with correct ownership
+echo "Database directory: $DB_DIR"
+mkdir -p "$DB_DIR"
+chown -R seedarr:seedarr "$DB_DIR"
 
 # Run database migrations as seedarr user
 echo "Running database migrations..."
-DB_PATH="/app/backend/data/seedarr.db"
 
-if [ -f "$DB_PATH" ]; then
+if [ -f "$DB_FILE" ]; then
     echo "Existing database found - running migrations..."
     cd /app/backend && gosu seedarr alembic upgrade head || {
         echo "WARNING: Migration failed. Attempting stamp + upgrade..."
@@ -58,4 +52,4 @@ echo "Migrations complete."
 # Start the application as seedarr user
 echo "Starting Seedarr..."
 cd /app/backend
-exec gosu seedarr uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-config /backend/logging_config.json
+exec gosu seedarr uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-config /app/backend/logging_config.json
